@@ -5,8 +5,6 @@ import {
   StyleSheet,
   SafeAreaView,
   ScrollView,
-  TouchableOpacity,
-  Alert,
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
@@ -68,18 +66,9 @@ export default function WalletScreen() {
     }
   };
 
-  const handleAddMoney = (amount) => {
-    setBalance((prev) => prev + amount);
-    if (typeof window !== 'undefined' && window.alert) {
-      window.alert(`₹${amount} added successfully to your PlanToPark Wallet!`);
-    } else {
-      Alert.alert('Wallet Recharged', `₹${amount} added successfully to your PlanToPark Wallet!`);
-    }
-  };
-
   return (
     <SafeAreaView style={styles.container}>
-      <Header title="PlanToPark Wallet" subtitle="Instant One-Tap Payments & Cancellation Refunds" />
+      <Header title="PlanToPark Wallet" subtitle="Cancellation Refunds & Digital Wallet" />
 
       <ScrollView
         contentContainerStyle={styles.content}
@@ -96,24 +85,9 @@ export default function WalletScreen() {
       >
         {/* Wallet Balance Banner */}
         <View style={styles.balanceCard}>
-          <Text style={styles.balanceLabel}>Available Refund & Payment Balance</Text>
+          <Text style={styles.balanceLabel}>Available Refund & Wallet Balance</Text>
           <Text style={styles.balanceVal}>₹{Number(balance).toLocaleString('en-IN')}.00</Text>
-          <Text style={styles.balanceTag}>⚡ Auto-refunded on cancellation & usable for bookings</Text>
-        </View>
-
-        {/* Quick Top-up Options */}
-        <Text style={styles.sectionTitle}>Add Money to Wallet</Text>
-        <View style={styles.topUpRow}>
-          {[100, 250, 500, 1000].map((amt) => (
-            <TouchableOpacity
-              key={amt}
-              style={styles.amtBtn}
-              onPress={() => handleAddMoney(amt)}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.amtTxt}>+ ₹{amt}</Text>
-            </TouchableOpacity>
-          ))}
+          <Text style={styles.balanceTag}>⚡ Auto-credited on cancellation & usable for parking</Text>
         </View>
 
         {/* Recent Transactions */}
@@ -126,7 +100,7 @@ export default function WalletScreen() {
             <Text style={{ fontSize: 36, marginBottom: 8 }}>💳</Text>
             <Text style={{ color: COLORS.white, fontSize: 14, fontWeight: '700' }}>No wallet transactions yet</Text>
             <Text style={{ color: COLORS.textMuted, fontSize: 12, marginTop: 4, textAlign: 'center' }}>
-              Refunds from cancelled bookings and top-ups will appear here.
+              Refunds from cancelled bookings will automatically appear here.
             </Text>
           </View>
         ) : (
@@ -198,25 +172,6 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: COLORS.white,
     marginBottom: 12,
-  },
-  topUpRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 24,
-  },
-  amtBtn: {
-    flex: 1,
-    backgroundColor: COLORS.cardBg,
-    borderWidth: 1,
-    borderColor: COLORS.primary,
-    borderRadius: 12,
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
-  amtTxt: {
-    color: COLORS.primary,
-    fontSize: 13,
-    fontWeight: '800',
   },
   txCard: {
     backgroundColor: COLORS.cardBg,
