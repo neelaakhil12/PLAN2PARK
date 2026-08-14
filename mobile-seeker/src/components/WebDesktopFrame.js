@@ -30,19 +30,25 @@ export default function WebDesktopFrame({ children, downloadUrl = "https://expo.
         style.id = styleId;
         style.innerHTML = `
           .razorpay-container {
-            max-width: 400px !important;
-            max-height: 800px !important;
+            position: fixed !important;
+            width: 396px !important;
+            max-width: calc(100vw - 32px) !important;
+            height: 760px !important;
+            max-height: calc(90vh - 20px) !important;
             left: 50% !important;
             top: 50% !important;
             transform: translate(-50%, -50%) !important;
-            border-radius: 34px !important;
+            border-radius: 32px !important;
             overflow: hidden !important;
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5) !important;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.45) !important;
+            z-index: 999999 !important;
           }
           .razorpay-checkout-frame {
-            max-width: 400px !important;
-            max-height: 800px !important;
-            border-radius: 34px !important;
+            width: 100% !important;
+            height: 100% !important;
+            border-radius: 32px !important;
+            border: none !important;
+            display: block !important;
           }
         `;
         document.head.appendChild(style);
