@@ -255,6 +255,7 @@ router.post('/', protect, ownerOnly, upload.single('imageFile'), async (req, res
       slots,
       suitableVehicles: suitableList,
       cancellationPolicy: req.body.cancellationPolicy || 'full',
+      maxWalletDiscount: req.body.maxWalletDiscount !== undefined ? Number(req.body.maxWalletDiscount) : 10,
       status: 'approved', // Auto-approved for verified owners
     });
 
@@ -498,6 +499,10 @@ router.put('/:id', protect, ownerOnly, upload.single('imageFile'), async (req, r
 
     if (req.body.cancellationPolicy) {
       space.cancellationPolicy = req.body.cancellationPolicy;
+    }
+
+    if (req.body.maxWalletDiscount !== undefined) {
+      space.maxWalletDiscount = Number(req.body.maxWalletDiscount);
     }
 
     const updated = await space.save();

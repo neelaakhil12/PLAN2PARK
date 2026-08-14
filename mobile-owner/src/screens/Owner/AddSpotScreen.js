@@ -37,6 +37,7 @@ export default function AddSpotScreen({ route, navigation }) {
   const [hasEvCharger, setHasEvCharger] = useState(Boolean(editingSpot?.hasEvCharger));
   const [isActive, setIsActive] = useState(editingSpot?.isActive !== false);
   const [cancellationPolicy, setCancellationPolicy] = useState(editingSpot?.cancellationPolicy || 'full');
+  const [maxWalletDiscount, setMaxWalletDiscount] = useState(String(editingSpot?.maxWalletDiscount !== undefined ? editingSpot.maxWalletDiscount : '10'));
   const [loading, setLoading] = useState(false);
   const [locating, setLocating] = useState(false);
 
@@ -54,6 +55,7 @@ export default function AddSpotScreen({ route, navigation }) {
       setHasEvCharger(Boolean(s.hasEvCharger));
       setIsActive(s.isActive !== false);
       setCancellationPolicy(s.cancellationPolicy || 'full');
+      setMaxWalletDiscount(String(s.maxWalletDiscount !== undefined ? s.maxWalletDiscount : '10'));
     }
   }, [route?.params?.spot]);
 
@@ -503,6 +505,7 @@ export default function AddSpotScreen({ route, navigation }) {
           hasEvCharger,
           isActive,
           cancellationPolicy,
+          maxWalletDiscount: Number(maxWalletDiscount || 0),
         }),
       });
 
@@ -721,6 +724,22 @@ export default function AddSpotScreen({ route, navigation }) {
                 );
               })}
             </View>
+          </View>
+
+          {/* Max Wallet Discount Option (Owner Control) */}
+          <View style={{ marginBottom: 14 }}>
+            <Text style={styles.label}>⚡ Max Wallet Money Usable per Booking (₹)</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="10"
+              placeholderTextColor={COLORS.textMuted}
+              keyboardType="numeric"
+              value={maxWalletDiscount}
+              onChangeText={setMaxWalletDiscount}
+            />
+            <Text style={{ fontSize: 11, color: COLORS.textMuted, marginTop: 4 }}>
+              Drivers can deduct up to ₹{maxWalletDiscount || 0} from their PlanToPark Wallet balance on each booking.
+            </Text>
           </View>
 
           <View style={styles.switchRow}>

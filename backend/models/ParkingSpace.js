@@ -89,6 +89,10 @@ const parkingSpaceSchema = new mongoose.Schema(
       enum: ['full', 'half', 'none'],
       default: 'full', // 'full' = 100% Refund, 'half' = 50% Refund, 'none' = 0% No Refund
     },
+    maxWalletDiscount: {
+      type: Number,
+      default: 10, // Owner sets how much wallet money seeker can use per booking (e.g. ₹10)
+    },
     suitableVehicles: {
       type: [String],
       enum: ['2-wheeler', '4-wheeler', 'large-car', 'heavy-vehicle'],

@@ -98,6 +98,32 @@ router.post('/', protect, seekerOnly, upload.single('driverImageFile'), async (r
 
     // Calculate total amount was handled above
 
+    // ── Apply Owner-Configured Wallet Discount if Seeker opted in ──
+    let walletAmountUsed = 0;
+    const maxDiscountAllowed = (space.maxWalletDiscount !== undefined && space.maxWalletDiscount !== null) ? Number(space.maxWalletDiscount) : 10;
+    
+    if ((req.body.useWalletBalance === true || req.body.useWalletBalance === 'true' || req.body.walletAmountApplied > 0) && maxDiscountAllowed > 0) {
+      const seeker = await User.findById(req.user._id);
+      const seekerBalance = seeker ? (seeker.walletBalance || 0) : 0;
+      if (seekerBalance > 0) {
+        walletAmountUsed = Math.min(seekerBalance, maxDiscountAllowed, totalAmount);
+        if (walletAmountUsed > 0) {
+          seeker.walletBalance = Number(((seeker.walletBalance || 0) - walletAmountUsed).toFixed(2));
+          if (!seeker.walletTransactions) seeker.walletTransactions = [];
+          seeker.walletTransactions.push({
+            type: 'debit',
+            amount: walletAmountUsed,
+            description: `Wallet discount applied for booking at ${space.title || 'Parking Spot'}`,
+            date: new Date(),
+          });
+          await seeker.save();
+        }
+      }
+    }
+
+    const finalPayableAmount = Math.max(0, totalAmount - walletAmountUsed);
+    const isFullyPaidByWallet = finalPayableAmount === 0 && walletAmountUsed > 0;
+
     const booking = await Booking.create({
       seekerId: req.user._id,
       spaceId,
@@ -109,15 +135,21 @@ router.post('/', protect, seekerOnly, upload.single('driverImageFile'), async (r
       bookingType,
       startTime: start,
       endTime: endTime,
-      totalAmount,
+      totalAmount: finalPayableAmount,
+      walletAmountUsed,
       driverImage: finalDriverImage,
-      status: 'allotted', // Directly allotted because seeker chose slot
-      paymentStatus: 'unpaid',
+      status: isFullyPaidByWallet ? 'paid' : 'allotted',
+      paymentStatus: isFullyPaidByWallet ? 'paid' : 'unpaid',
+      paidAt: isFullyPaidByWallet ? new Date() : null,
     });
 
     res.status(201).json({
-      message: 'Booking created successfully with your selected slot! Proceed to pay.',
+      message: isFullyPaidByWallet
+        ? 'Booking confirmed and 100% paid using PlanToPark Wallet!'
+        : 'Booking created successfully with your selected slot! Proceed to pay.',
       booking,
+      walletAmountUsed,
+      finalPayableAmount,
     });
   } catch (error) {
     res.status(500).json({ message: error.message });

@@ -48,9 +48,32 @@ export default function SpotDetailsScreen({ route, navigation }) {
   const [durationHours, setDurationHours] = useState('2');
   const [loading, setLoading] = useState(false);
   const [bookingSuccessModal, setBookingSuccessModal] = useState(null);
+  const [walletBalance, setWalletBalance] = useState(0);
+  const [useWallet, setUseWallet] = useState(true);
+
+  useEffect(() => {
+    const fetchWallet = async () => {
+      try {
+        const baseUrl = await getBaseApiUrl();
+        const res = await fetch(`${baseUrl}/auth/wallet`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const d = await res.json();
+          setWalletBalance(d.walletBalance || 0);
+        }
+      } catch (e) {
+        console.warn('Error fetching wallet:', e);
+      }
+    };
+    if (token) fetchWallet();
+  }, [token]);
 
   const hourlyRate = space.pricePerHour !== undefined ? space.pricePerHour : (space.hourlyRate || 40);
-  const totalPrice = Number(durationHours || 1) * hourlyRate;
+  const rawTotalPrice = Number(durationHours || 1) * hourlyRate;
+  const maxWalletAllowed = space.maxWalletDiscount !== undefined && space.maxWalletDiscount !== null ? Number(space.maxWalletDiscount) : 10;
+  const walletDiscount = (useWallet && walletBalance > 0 && maxWalletAllowed > 0) ? Math.min(walletBalance, maxWalletAllowed, rawTotalPrice) : 0;
+  const finalPayablePrice = Math.max(0, rawTotalPrice - walletDiscount);
 
   const handleCreateBooking = async () => {
     if (!vehicleNumber) {
@@ -74,7 +97,9 @@ export default function SpotDetailsScreen({ route, navigation }) {
         hours: actualHours,
         startTime: startTime.toISOString(),
         endTime: endTime.toISOString(),
-        totalAmount: totalPrice,
+        totalAmount: rawTotalPrice,
+        useWalletBalance: useWallet && walletDiscount > 0,
+        walletAmountApplied: walletDiscount,
         bookingType: 'hourly',
       };
 
@@ -97,6 +122,20 @@ export default function SpotDetailsScreen({ route, navigation }) {
       }
 
       const newBooking = data.booking || data;
+
+      // If 100% paid by wallet, open success modal immediately
+      if (newBooking.paymentStatus === 'paid' || finalPayablePrice === 0) {
+        setBookingSuccessModal({
+          slotId: newBooking.slotId || 'Slot-1',
+          spotTitle: space.title || 'Parking Spot',
+          vehicleNumber: vehicleNumber.trim().toUpperCase(),
+          hours: actualHours,
+          totalAmount: 0,
+          walletUsed: walletDiscount,
+        });
+        setLoading(false);
+        return;
+      }
 
       // 2. Fetch Razorpay Order from backend
       try {
@@ -147,7 +186,8 @@ export default function SpotDetailsScreen({ route, navigation }) {
                       spotTitle: space.title || 'Parking Spot',
                       vehicleNumber: vehicleNumber.trim().toUpperCase(),
                       hours: actualHours,
-                      totalAmount: totalPrice,
+                      totalAmount: finalPayablePrice,
+                      walletUsed: walletDiscount,
                     });
                   } else {
                     setBookingSuccessModal({
@@ -155,7 +195,8 @@ export default function SpotDetailsScreen({ route, navigation }) {
                       spotTitle: space.title || 'Parking Spot',
                       vehicleNumber: vehicleNumber.trim().toUpperCase(),
                       hours: actualHours,
-                      totalAmount: totalPrice,
+                      totalAmount: finalPayablePrice,
+                      walletUsed: walletDiscount,
                     });
                   }
                 } catch (vErr) {
@@ -164,7 +205,8 @@ export default function SpotDetailsScreen({ route, navigation }) {
                     spotTitle: space.title || 'Parking Spot',
                     vehicleNumber: vehicleNumber.trim().toUpperCase(),
                     hours: actualHours,
-                    totalAmount: totalPrice,
+                    totalAmount: finalPayablePrice,
+                    walletUsed: walletDiscount,
                   });
                 }
               },
@@ -194,7 +236,8 @@ export default function SpotDetailsScreen({ route, navigation }) {
         spotTitle: space.title || 'Parking Spot',
         vehicleNumber: vehicleNumber.trim().toUpperCase(),
         hours: actualHours,
-        totalAmount: totalPrice,
+        totalAmount: finalPayablePrice,
+        walletUsed: walletDiscount,
       });
     } catch (err) {
       showAlert('Error', err.message || 'Network error during booking');
@@ -315,24 +358,63 @@ export default function SpotDetailsScreen({ route, navigation }) {
             ))}
           </View>
 
+          {/* PlanToPark Wallet Money Deduction Card */}
+          {walletBalance > 0 && maxWalletAllowed > 0 && (
+            <TouchableOpacity
+              style={[
+                styles.walletOptionCard,
+                useWallet && styles.walletOptionCardActive,
+              ]}
+              onPress={() => setUseWallet((prev) => !prev)}
+              activeOpacity={0.85}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, gap: 10 }}>
+                <View style={[styles.walletIconCircle, useWallet && styles.walletIconCircleActive]}>
+                  <Text style={{ fontSize: 18 }}>⚡</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.walletOptionTitle}>
+                    Use PlanToPark Wallet (-₹{walletDiscount})
+                  </Text>
+                  <Text style={styles.walletOptionSub}>
+                    Available Balance: ₹{walletBalance}.00 • Max ₹{maxWalletAllowed} usable
+                  </Text>
+                </View>
+              </View>
+              <View style={[styles.walletCheckbox, useWallet && styles.walletCheckboxActive]}>
+                {useWallet && <Text style={{ color: '#fff', fontSize: 12, fontWeight: '900' }}>✓</Text>}
+              </View>
+            </TouchableOpacity>
+          )}
+
           {/* Price Calculation Box */}
           <View style={styles.priceBox}>
             <View style={styles.priceRow}>
               <Text style={styles.priceLabel}>Base Rate</Text>
-              <Text style={styles.priceVal}>₹{hourlyRate} × {durationHours} hrs</Text>
+              <Text style={styles.priceVal}>₹{hourlyRate} × {durationHours} hrs = ₹{rawTotalPrice}</Text>
             </View>
+            {walletDiscount > 0 && (
+              <View style={styles.priceRow}>
+                <Text style={[styles.priceLabel, { color: '#10b981', fontWeight: '700' }]}>
+                  ⚡ Wallet Money Applied
+                </Text>
+                <Text style={[styles.priceVal, { color: '#10b981', fontWeight: '800' }]}>
+                  - ₹{walletDiscount}.00
+                </Text>
+              </View>
+            )}
             <View style={styles.priceRow}>
               <Text style={styles.priceLabel}>Platform Convenience Fee</Text>
               <Text style={styles.priceVal}>₹0 (Free)</Text>
             </View>
             <View style={[styles.priceRow, { marginTop: 6, borderTopWidth: 1, borderTopColor: COLORS.borderDark, paddingTop: 6 }]}>
               <Text style={styles.totalLabel}>Total Payable</Text>
-              <Text style={styles.totalVal}>₹{totalPrice}</Text>
+              <Text style={styles.totalVal}>₹{finalPayablePrice}</Text>
             </View>
           </View>
 
           <Button
-            title={`Confirm Booking • ₹${totalPrice}`}
+            title={finalPayablePrice === 0 ? "Confirm with Wallet • Free" : `Confirm & Pay • ₹${finalPayablePrice}`}
             onPress={handleCreateBooking}
             loading={loading}
             style={{ marginTop: 16 }}
@@ -768,5 +850,57 @@ const styles = StyleSheet.create({
     color: COLORS.primary,
     fontWeight: '900',
     fontSize: 18,
+  },
+  walletOptionCard: {
+    backgroundColor: '#0f172a80',
+    borderWidth: 1.5,
+    borderColor: '#334155',
+    borderRadius: 14,
+    padding: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  walletOptionCardActive: {
+    borderColor: '#10b981',
+    backgroundColor: '#064e3b25',
+  },
+  walletIconCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#334155',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  walletIconCircleActive: {
+    backgroundColor: '#064e3b',
+    borderWidth: 1,
+    borderColor: '#10b981',
+  },
+  walletOptionTitle: {
+    color: COLORS.white,
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  walletOptionSub: {
+    color: COLORS.textMuted,
+    fontSize: 11,
+    marginTop: 2,
+  },
+  walletCheckbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    borderWidth: 1.5,
+    borderColor: '#475569',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 8,
+  },
+  walletCheckboxActive: {
+    backgroundColor: '#10b981',
+    borderColor: '#10b981',
   },
 });
