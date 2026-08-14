@@ -12,17 +12,10 @@ import {
 } from 'react-native';
 import { AuthContext } from '../../context/AuthContext';
 import { COLORS } from '../../theme/colors';
+import { endpoints, getImageUrl } from '../../config/api';
 import Header from '../../components/Header';
 import Button from '../../components/Button';
 import ProfileEditorModal from '../../components/ProfileEditorModal';
-
-const getAvatarUri = (imgPath) => {
-  if (!imgPath) return null;
-  if (imgPath.startsWith('data:') || imgPath.startsWith('http://') || imgPath.startsWith('https://')) {
-    return imgPath;
-  }
-  return `http://43.204.235.124:5000${imgPath.startsWith('/') ? '' : '/'}${imgPath}`;
-};
 
 export default function ProfileScreen() {
   const { user, updateProfile, logout } = useContext(AuthContext);
@@ -104,7 +97,7 @@ export default function ProfileScreen() {
                 <ActivityIndicator size="small" color={COLORS.white} />
               ) : hasCustomPhoto ? (
                 <Image
-                  source={{ uri: getAvatarUri(user.profileImage) }}
+                  source={{ uri: getImageUrl(user.profileImage) }}
                   style={styles.avatarImg}
                   resizeMode="cover"
                 />

@@ -63,6 +63,8 @@ router.post('/seeker/signup', async (req, res) => {
       role: user.role,
       status: user.status,
       contact: user.contact,
+      profileImage: user.profileImage || '',
+      vehicles: user.vehicles || [],
       token: generateToken(user._id),
       message: 'Seeker registration successful.',
     });
@@ -96,6 +98,8 @@ router.post('/owner/signup', async (req, res) => {
       role: user.role,
       status: user.status,
       contact: user.contact,
+      profileImage: user.profileImage || '',
+      vehicles: user.vehicles || [],
       token: generateToken(user._id),
       message: 'Owner registration successful.',
     });
@@ -132,6 +136,8 @@ router.post('/seeker/login', async (req, res) => {
       role: user.role,
       status: user.status,
       contact: user.contact,
+      profileImage: user.profileImage || '',
+      vehicles: user.vehicles || [],
       token: generateToken(user._id),
     });
   } catch (error) {
@@ -167,6 +173,8 @@ router.post('/owner/login', async (req, res) => {
       role: user.role,
       status: user.status,
       contact: user.contact,
+      profileImage: user.profileImage || '',
+      vehicles: user.vehicles || [],
       token: generateToken(user._id),
     });
   } catch (error) {
@@ -202,6 +210,7 @@ router.post('/admin/login', async (req, res) => {
       role: user.role,
       status: user.status,
       contact: user.contact,
+      profileImage: user.profileImage || '',
       token: generateToken(user._id),
     });
   } catch (error) {

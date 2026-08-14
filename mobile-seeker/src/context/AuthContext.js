@@ -78,6 +78,8 @@ export const AuthProvider = ({ children }) => {
       role: data.role || role,
       contact: data.contact,
       status: data.status,
+      profileImage: data.profileImage || '',
+      vehicles: data.vehicles || [],
       isEmailVerified: data.isEmailVerified,
       isNewlyRegistered: false,
     };
@@ -108,7 +110,10 @@ export const AuthProvider = ({ children }) => {
     const data = await res.json();
 
     if (!res.ok) {
-      throw new Error(data.message || 'Signup failed');
+      const error = new Error(data.message || 'Signup failed');
+      error.isEmailVerified = data.isEmailVerified;
+      error.email = data.email;
+      throw error;
     }
 
     if (data.token) {
@@ -119,6 +124,8 @@ export const AuthProvider = ({ children }) => {
         role: data.role || role,
         contact: data.contact,
         status: data.status,
+        profileImage: data.profileImage || '',
+        vehicles: data.vehicles || [],
         isEmailVerified: data.isEmailVerified,
         isNewlyRegistered: true,
       };
