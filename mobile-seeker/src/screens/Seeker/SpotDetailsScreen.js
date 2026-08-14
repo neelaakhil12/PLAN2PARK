@@ -47,6 +47,7 @@ export default function SpotDetailsScreen({ route, navigation }) {
   const [vehicleType, setVehicleType] = useState('4-wheeler');
   const [durationHours, setDurationHours] = useState('2');
   const [loading, setLoading] = useState(false);
+  const [bookingSuccessModal, setBookingSuccessModal] = useState(null);
 
   const hourlyRate = space.pricePerHour !== undefined ? space.pricePerHour : (space.hourlyRate || 40);
   const totalPrice = Number(durationHours || 1) * hourlyRate;
@@ -139,16 +140,32 @@ export default function SpotDetailsScreen({ route, navigation }) {
                   });
 
                   if (verifyRes.ok) {
-                    showAlert('🎉 Payment Successful!', `Booking confirmed for ${space.title}!`, [
-                      { text: 'View My Bookings', onPress: () => navigation.navigate('Bookings') },
-                    ]);
+                    const verifyData = await verifyRes.json();
+                    const b = verifyData.booking || newBooking;
+                    setBookingSuccessModal({
+                      slotId: b.slotId || newBooking.slotId || 'Slot-1',
+                      spotTitle: space.title || 'Parking Spot',
+                      vehicleNumber: vehicleNumber.trim().toUpperCase(),
+                      hours: actualHours,
+                      totalAmount: totalPrice,
+                    });
                   } else {
-                    showAlert('Notice', 'Payment processed. Checking status in Bookings.', [
-                      { text: 'OK', onPress: () => navigation.navigate('Bookings') },
-                    ]);
+                    setBookingSuccessModal({
+                      slotId: newBooking.slotId || 'Slot-1',
+                      spotTitle: space.title || 'Parking Spot',
+                      vehicleNumber: vehicleNumber.trim().toUpperCase(),
+                      hours: actualHours,
+                      totalAmount: totalPrice,
+                    });
                   }
                 } catch (vErr) {
-                  navigation.navigate('Bookings');
+                  setBookingSuccessModal({
+                    slotId: newBooking.slotId || 'Slot-1',
+                    spotTitle: space.title || 'Parking Spot',
+                    vehicleNumber: vehicleNumber.trim().toUpperCase(),
+                    hours: actualHours,
+                    totalAmount: totalPrice,
+                  });
                 }
               },
               prefill: {
@@ -172,12 +189,13 @@ export default function SpotDetailsScreen({ route, navigation }) {
       }
 
       // Default fallback confirmation
-      showAlert('🎉 Booking Confirmed!', `Spot reserved at ${space.title}!`, [
-        {
-          text: 'View My Bookings',
-          onPress: () => navigation.navigate('Bookings'),
-        },
-      ]);
+      setBookingSuccessModal({
+        slotId: newBooking.slotId || 'Slot-1',
+        spotTitle: space.title || 'Parking Spot',
+        vehicleNumber: vehicleNumber.trim().toUpperCase(),
+        hours: actualHours,
+        totalAmount: totalPrice,
+      });
     } catch (err) {
       showAlert('Error', err.message || 'Network error during booking');
     } finally {
@@ -321,11 +339,186 @@ export default function SpotDetailsScreen({ route, navigation }) {
           />
         </View>
       </ScrollView>
+
+      {/* Booking Success Modal Overlay */}
+      {bookingSuccessModal && (
+        <View style={styles.successModalOverlay}>
+          <View style={styles.successModalCard}>
+            <View style={styles.successIconCircle}>
+              <Text style={{ fontSize: 34 }}>✅</Text>
+            </View>
+
+            <Text style={styles.successModalTitle}>Your Parking Slot Booking Completed!</Text>
+            <Text style={styles.successModalSub}>
+              Your spot is confirmed. Please proceed to your allocated parking slot on arrival.
+            </Text>
+
+            {/* Allocated Slot Highlight Box */}
+            <View style={styles.successSlotBox}>
+              <Text style={styles.successSlotLabel}>ALLOTTED PARKING SLOT</Text>
+              <Text style={styles.successSlotVal}>🅿️ {bookingSuccessModal.slotId}</Text>
+            </View>
+
+            {/* Quick Details Box */}
+            <View style={styles.successDetailsBox}>
+              <View style={styles.successDetailRow}>
+                <Text style={styles.successDetailLabel}>📍 Spot</Text>
+                <Text style={styles.successDetailVal} numberOfLines={1}>{bookingSuccessModal.spotTitle}</Text>
+              </View>
+              <View style={styles.successDetailRow}>
+                <Text style={styles.successDetailLabel}>🚗 Vehicle</Text>
+                <Text style={styles.successDetailVal}>{bookingSuccessModal.vehicleNumber}</Text>
+              </View>
+              <View style={styles.successDetailRow}>
+                <Text style={styles.successDetailLabel}>⏱️ Duration</Text>
+                <Text style={styles.successDetailVal}>{bookingSuccessModal.hours} Hour(s)</Text>
+              </View>
+              <View style={styles.successDetailRow}>
+                <Text style={styles.successDetailLabel}>💰 Total Paid</Text>
+                <Text style={[styles.successDetailVal, { color: '#10b981', fontWeight: '800' }]}>
+                  ₹{bookingSuccessModal.totalAmount} (Paid)
+                </Text>
+              </View>
+            </View>
+
+            {/* OK Button */}
+            <TouchableOpacity
+              style={styles.successOkBtn}
+              onPress={() => {
+                setBookingSuccessModal(null);
+                navigation.navigate('SeekerMain', { screen: 'Bookings' });
+              }}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.successOkBtnTxt}>OK</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  successModalOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.85)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+    zIndex: 99999,
+  },
+  successModalCard: {
+    backgroundColor: COLORS.cardBg,
+    borderRadius: 24,
+    padding: 24,
+    width: '100%',
+    maxWidth: 360,
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: '#10b981',
+    shadowColor: '#10b981',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 25,
+  },
+  successIconCircle: {
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    backgroundColor: '#064e3b',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+    borderWidth: 2,
+    borderColor: '#10b981',
+  },
+  successModalTitle: {
+    fontSize: 18,
+    fontWeight: '900',
+    color: COLORS.white,
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  successModalSub: {
+    fontSize: 12,
+    color: COLORS.textMuted,
+    textAlign: 'center',
+    lineHeight: 18,
+    marginBottom: 16,
+  },
+  successSlotBox: {
+    backgroundColor: '#064e3b40',
+    borderWidth: 1.5,
+    borderColor: '#10b981',
+    borderRadius: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    width: '100%',
+    marginBottom: 14,
+  },
+  successSlotLabel: {
+    color: '#6ee7b7',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+    marginBottom: 2,
+  },
+  successSlotVal: {
+    color: '#10b981',
+    fontSize: 20,
+    fontWeight: '900',
+  },
+  successDetailsBox: {
+    backgroundColor: '#0f172a',
+    borderRadius: 12,
+    padding: 12,
+    width: '100%',
+    gap: 8,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#334155',
+  },
+  successDetailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  successDetailLabel: {
+    fontSize: 12,
+    color: COLORS.textMuted,
+    fontWeight: '600',
+  },
+  successDetailVal: {
+    fontSize: 12,
+    color: COLORS.white,
+    fontWeight: '700',
+    maxWidth: '65%',
+  },
+  successOkBtn: {
+    backgroundColor: '#10b981',
+    borderRadius: 14,
+    paddingVertical: 14,
+    width: '100%',
+    alignItems: 'center',
+    shadowColor: '#10b981',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  successOkBtnTxt: {
+    color: COLORS.white,
+    fontSize: 16,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+  },
   container: {
     flex: 1,
     backgroundColor: COLORS.darkBg,
