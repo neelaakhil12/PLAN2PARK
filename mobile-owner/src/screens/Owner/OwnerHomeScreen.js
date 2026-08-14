@@ -192,7 +192,7 @@ export default function OwnerHomeScreen({ navigation }) {
                   <View style={styles.spotInfo}>
                     <Text style={styles.spotTitle}>{spot.title || 'Parking Spot'}</Text>
                     <Text style={styles.spotAddress}>📍 {spot.address || 'Address'}, {spot.city || 'Hyderabad'}</Text>
-                    <Text style={styles.spotPrice}>Rate: ₹{spotRate}/hr • {spotSlots} slots</Text>
+                    <Text style={styles.spotPrice}>Rate: ₹{spotRate}/hr • {spotSlots} slots {spot.hasEvCharger ? '• ⚡ EV Available' : ''}</Text>
                   </View>
                   <TouchableOpacity
                     style={styles.toggleCol}

@@ -634,21 +634,26 @@ export default function AddSpotScreen({ route, navigation }) {
               <Text style={styles.switchTitle}>⚡ EV Charger Facility</Text>
               <Text style={styles.switchSub}>Is electric vehicle charging available?</Text>
             </View>
-            <TouchableOpacity
-              style={[
-                styles.customToggleTrack,
-                { backgroundColor: hasEvCharger ? '#10b981' : '#334155' }
-              ]}
-              onPress={() => setHasEvCharger(!hasEvCharger)}
-              activeOpacity={0.8}
-            >
-              <View
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <TouchableOpacity
                 style={[
-                  styles.customToggleThumb,
-                  { alignSelf: hasEvCharger ? 'flex-end' : 'flex-start' }
+                  styles.customToggleTrack,
+                  { backgroundColor: hasEvCharger ? '#10b981' : '#334155' }
                 ]}
-              />
-            </TouchableOpacity>
+                onPress={() => setHasEvCharger((prev) => !prev)}
+                activeOpacity={0.8}
+              >
+                <View
+                  style={[
+                    styles.customToggleThumb,
+                    { alignSelf: hasEvCharger ? 'flex-end' : 'flex-start' }
+                  ]}
+                />
+              </TouchableOpacity>
+              <Text style={{ fontSize: 12, fontWeight: '800', width: 30, color: hasEvCharger ? '#10b981' : '#94a3b8' }}>
+                {hasEvCharger ? 'ON' : 'OFF'}
+              </Text>
+            </View>
           </View>
 
           <Button
