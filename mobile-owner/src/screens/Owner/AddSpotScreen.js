@@ -538,45 +538,6 @@ export default function AddSpotScreen({ route, navigation }) {
             onChangeText={setTitle}
           />
 
-          {/* Plot No & House No Field */}
-          <Text style={styles.label}>Plot No. / House No. / Building No.</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="e.g. Plot No. 42 or H.No. 8-3-123"
-            placeholderTextColor={COLORS.textMuted}
-            value={plotNo}
-            onChangeText={(txt) => {
-              setPlotNo(txt);
-              handleAddressSubFieldChange(txt, colonyArea, landmark, city, pincode);
-            }}
-          />
-
-          {/* Colony / Area / Street Field */}
-          <Text style={styles.label}>Colony / Street / Area Name</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="e.g. Chaitanya Hills, BN Reddy Nagar"
-            placeholderTextColor={COLORS.textMuted}
-            value={colonyArea}
-            onChangeText={(txt) => {
-              setColonyArea(txt);
-              handleAddressSubFieldChange(plotNo, txt, landmark, city, pincode);
-            }}
-          />
-
-          {/* Landmark Field */}
-          <Text style={styles.label}>Landmark (Optional)</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="e.g. Near Cult Gym or Opp. SBI Bank"
-            placeholderTextColor={COLORS.textMuted}
-            value={landmark}
-            onChangeText={(txt) => {
-              setLandmark(txt);
-              handleAddressSubFieldChange(plotNo, colonyArea, txt, city, pincode);
-            }}
-          />
-
           {/* Location Action Row */}
           <View style={styles.locationHeaderRow}>
             <Text style={styles.label}>Full Address (Complete)</Text>
@@ -614,10 +575,7 @@ export default function AddSpotScreen({ route, navigation }) {
                 placeholder="Hyderabad"
                 placeholderTextColor={COLORS.textMuted}
                 value={city}
-                onChangeText={(txt) => {
-                  setCity(txt);
-                  handleAddressSubFieldChange(plotNo, colonyArea, landmark, txt, pincode);
-                }}
+                onChangeText={setCity}
               />
             </View>
             <View style={styles.col}>
@@ -628,10 +586,7 @@ export default function AddSpotScreen({ route, navigation }) {
                 placeholderTextColor={COLORS.textMuted}
                 keyboardType="numeric"
                 value={pincode}
-                onChangeText={(txt) => {
-                  setPincode(txt);
-                  handleAddressSubFieldChange(plotNo, colonyArea, landmark, city, txt);
-                }}
+                onChangeText={setPincode}
               />
             </View>
           </View>
