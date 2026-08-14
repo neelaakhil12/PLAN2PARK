@@ -25,6 +25,7 @@ export default function OwnerHomeScreen({ navigation }) {
   const topPadding = Math.max(insets.top, Platform.OS === 'android' ? (StatusBar.currentHeight || 24) : 0);
 
   const [spots, setSpots] = useState([]);
+  const [recentBookings, setRecentBookings] = useState([]);
   const [totalEarnings, setTotalEarnings] = useState(0);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -38,9 +39,10 @@ export default function OwnerHomeScreen({ navigation }) {
   const fetchOwnerSpots = async () => {
     try {
       const baseUrl = await getBaseApiUrl();
-      const [spacesRes, analyticsRes] = await Promise.all([
+      const [spacesRes, analyticsRes, bookingsRes] = await Promise.all([
         fetch(`${baseUrl}/spaces/owner/my-spaces`, { headers: { Authorization: `Bearer ${token}` } }),
         fetch(`${baseUrl}/analytics/owner`, { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(`${baseUrl}/bookings/owner-bookings`, { headers: { Authorization: `Bearer ${token}` } }),
       ]);
 
       if (spacesRes.ok) {
@@ -48,9 +50,21 @@ export default function OwnerHomeScreen({ navigation }) {
         setSpots(Array.isArray(spacesData) ? spacesData : spacesData.spaces || []);
       }
 
+      let calculatedEarnings = 0;
+      if (bookingsRes.ok) {
+        const bookingsData = await bookingsRes.json();
+        const bList = Array.isArray(bookingsData) ? bookingsData : [];
+        setRecentBookings(bList);
+        calculatedEarnings = bList
+          .filter((b) => b.paymentStatus === 'paid' || b.status === 'paid')
+          .reduce((sum, b) => sum + (b.ownerEarnings || Math.round((b.totalAmount || 0) * 0.9)), 0);
+      }
+
       if (analyticsRes.ok) {
         const analyticsData = await analyticsRes.json();
-        setTotalEarnings(analyticsData.earnings || 0);
+        setTotalEarnings(calculatedEarnings > 0 ? calculatedEarnings : (analyticsData.earnings || 0));
+      } else {
+        setTotalEarnings(calculatedEarnings);
       }
     } catch (err) {
       console.error(err);
@@ -149,14 +163,39 @@ export default function OwnerHomeScreen({ navigation }) {
         {/* Metric Cards */}
         <View style={styles.metricsRow}>
           <View style={styles.metricCard}>
-            <Text style={styles.metricVal}>₹{totalEarnings.toLocaleString('en-IN')}</Text>
-            <Text style={styles.metricLabel}>Total Earnings</Text>
+            <Text style={styles.metricVal}>₹{Math.round(totalEarnings).toLocaleString('en-IN')}</Text>
+            <Text style={styles.metricLabel}>Net Earnings (90%)</Text>
           </View>
+          <TouchableOpacity
+            style={styles.metricCard}
+            onPress={() => navigation.navigate('Orders')}
+            activeOpacity={0.8}
+          >
+            <Text style={[styles.metricVal, { color: '#10b981' }]}>{recentBookings.length}</Text>
+            <Text style={styles.metricLabel}>Total Orders →</Text>
+          </TouchableOpacity>
           <View style={styles.metricCard}>
             <Text style={[styles.metricVal, { color: COLORS.ownerAccent }]}>{spots.length}</Text>
             <Text style={styles.metricLabel}>Listed Spots</Text>
           </View>
         </View>
+
+        {/* Live Booking Orders Preview Banner */}
+        {recentBookings.length > 0 && (
+          <TouchableOpacity
+            style={styles.ordersAlertBanner}
+            onPress={() => navigation.navigate('Orders')}
+            activeOpacity={0.85}
+          >
+            <View style={{ flex: 1 }}>
+              <Text style={styles.ordersAlertTitle}>📑 {recentBookings.length} Driver Booking(s) Received</Text>
+              <Text style={styles.ordersAlertSub}>
+                Latest: {recentBookings[0]?.vehicleNumber || 'Vehicle'} • Slot {recentBookings[0]?.slotId || '1'} • ₹{recentBookings[0]?.totalAmount || 0}
+              </Text>
+            </View>
+            <Text style={styles.ordersAlertArrow}>View Orders →</Text>
+          </TouchableOpacity>
+        )}
 
         {/* Add Spot Banner */}
         <TouchableOpacity
@@ -283,20 +322,49 @@ const styles = StyleSheet.create({
   metricCard: {
     flex: 1,
     backgroundColor: COLORS.cardBg,
-    borderRadius: 16,
-    padding: 18,
+    borderRadius: 14,
+    padding: 14,
     borderWidth: 1,
     borderColor: COLORS.borderDark,
+    alignItems: 'center',
   },
   metricVal: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: '900',
     color: COLORS.primary,
   },
   metricLabel: {
-    fontSize: 12,
+    fontSize: 11,
     color: COLORS.textMuted,
     marginTop: 4,
+    fontWeight: '600',
+  },
+  ordersAlertBanner: {
+    backgroundColor: '#10b98115',
+    borderWidth: 1,
+    borderColor: '#10b981',
+    borderRadius: 14,
+    padding: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  ordersAlertTitle: {
+    color: '#10b981',
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  ordersAlertSub: {
+    color: '#94a3b8',
+    fontSize: 12,
+    marginTop: 2,
+  },
+  ordersAlertArrow: {
+    color: '#10b981',
+    fontSize: 13,
+    fontWeight: '800',
+    marginLeft: 10,
   },
   addBanner: {
     backgroundColor: COLORS.ownerAccent,

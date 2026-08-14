@@ -16,6 +16,7 @@ import ResetPasswordScreen from '../screens/Auth/ResetPasswordScreen';
 
 // Owner Screens
 import OwnerHomeScreen from '../screens/Owner/OwnerHomeScreen';
+import OwnerBookingsScreen from '../screens/Owner/OwnerBookingsScreen';
 import AddSpotScreen from '../screens/Owner/AddSpotScreen';
 import ProfileScreen from '../screens/Seeker/ProfileScreen';
 
@@ -45,6 +46,13 @@ function OwnerTabs() {
         component={OwnerHomeScreen}
         options={{
           tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 18 }}>📊</Text>,
+        }}
+      />
+      <Tab.Screen
+        name="Orders"
+        component={OwnerBookingsScreen}
+        options={{
+          tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 18 }}>📑</Text>,
         }}
       />
       <Tab.Screen
