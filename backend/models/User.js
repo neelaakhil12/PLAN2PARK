@@ -90,6 +90,14 @@ const userSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    previousPassword: {
+      type: String,
+      default: null,
+    },
+    passwordChangedAt: {
+      type: Date,
+      default: null,
+    },
   },
   {
     timestamps: true,

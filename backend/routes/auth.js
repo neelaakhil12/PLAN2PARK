@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
 const User = require('../models/User');
 const { protect, adminOnly } = require('../middleware/auth');
 const { sendVerificationEmail, sendPasswordResetEmail } = require('../utils/mailer');
@@ -42,12 +43,13 @@ const generateToken = (id) => {
 router.post('/seeker/signup', async (req, res) => {
   const { name, email, password, contact } = req.body;
   try {
-    const userExists = await User.findOne({ email });
-    if (userExists) return res.status(400).json({ message: 'User already exists' });
+    const normalizedEmail = (email || '').trim().toLowerCase();
+    const userExists = await User.findOne({ email: normalizedEmail });
+    if (userExists) return res.status(400).json({ message: 'An account with this email already exists' });
 
     const user = await User.create({
       name,
-      email,
+      email: normalizedEmail,
       password,
       role: 'seeker',
       contact,
@@ -74,12 +76,13 @@ router.post('/seeker/signup', async (req, res) => {
 router.post('/owner/signup', async (req, res) => {
   const { name, email, password, contact } = req.body;
   try {
-    const userExists = await User.findOne({ email });
-    if (userExists) return res.status(400).json({ message: 'User already exists' });
+    const normalizedEmail = (email || '').trim().toLowerCase();
+    const userExists = await User.findOne({ email: normalizedEmail });
+    if (userExists) return res.status(400).json({ message: 'An account with this email already exists' });
 
     const user = await User.create({
       name,
-      email,
+      email: normalizedEmail,
       password,
       role: 'owner',
       contact,
@@ -106,11 +109,19 @@ router.post('/owner/signup', async (req, res) => {
 router.post('/seeker/login', async (req, res) => {
   const { email, password } = req.body;
   try {
-    const user = await User.findOne({ email });
+    const normalizedEmail = (email || '').trim().toLowerCase();
+    const user = await User.findOne({ email: normalizedEmail });
     if (!user || user.role !== 'seeker') {
-      return res.status(401).json({ message: 'Access denied: Not a parking seeker account or invalid credentials' });
+      return res.status(401).json({ message: 'Access denied: Not a parking seeker account or invalid email.' });
     }
-    if (!(await user.matchPassword(password))) {
+
+    const isMatch = await user.matchPassword(password);
+    if (!isMatch) {
+      if (user.previousPassword && (await bcrypt.compare(password, user.previousPassword))) {
+        return res.status(401).json({
+          message: 'You entered an old password. Your password was changed recently. Please log in with your updated new password or reset it.',
+        });
+      }
       return res.status(401).json({ message: 'Invalid email or password' });
     }
 
@@ -133,11 +144,19 @@ router.post('/seeker/login', async (req, res) => {
 router.post('/owner/login', async (req, res) => {
   const { email, password } = req.body;
   try {
-    const user = await User.findOne({ email });
+    const normalizedEmail = (email || '').trim().toLowerCase();
+    const user = await User.findOne({ email: normalizedEmail });
     if (!user || user.role !== 'owner') {
-      return res.status(401).json({ message: 'Access denied: Not a parking owner account or invalid credentials' });
+      return res.status(401).json({ message: 'Access denied: Not a parking owner account or invalid email.' });
     }
-    if (!(await user.matchPassword(password))) {
+
+    const isMatch = await user.matchPassword(password);
+    if (!isMatch) {
+      if (user.previousPassword && (await bcrypt.compare(password, user.previousPassword))) {
+        return res.status(401).json({
+          message: 'You entered an old password. Your password was changed recently. Please log in with your updated new password or reset it.',
+        });
+      }
       return res.status(401).json({ message: 'Invalid email or password' });
     }
 
@@ -160,11 +179,19 @@ router.post('/owner/login', async (req, res) => {
 router.post('/admin/login', async (req, res) => {
   const { email, password } = req.body;
   try {
-    const user = await User.findOne({ email });
+    const normalizedEmail = (email || '').trim().toLowerCase();
+    const user = await User.findOne({ email: normalizedEmail });
     if (!user || user.role !== 'admin') {
-      return res.status(401).json({ message: 'Access denied: Not an administrator account or invalid credentials' });
+      return res.status(401).json({ message: 'Access denied: Not an administrator account or invalid email.' });
     }
-    if (!(await user.matchPassword(password))) {
+
+    const isMatch = await user.matchPassword(password);
+    if (!isMatch) {
+      if (user.previousPassword && (await bcrypt.compare(password, user.previousPassword))) {
+        return res.status(401).json({
+          message: 'You entered an old password. Your password was changed recently. Please log in with your updated new password or reset it.',
+        });
+      }
       return res.status(401).json({ message: 'Invalid email or password' });
     }
 
@@ -258,7 +285,9 @@ router.post('/reset-password', async (req, res) => {
       return res.status(400).json({ message: 'Invalid or expired reset code. Please request a new password reset.' });
     }
 
-    // Update password (pre-save hook will hash it with bcrypt)
+    // Retain previous password hash for detection & update password
+    user.previousPassword = user.password;
+    user.passwordChangedAt = new Date();
     user.password = newPassword;
     user.resetPasswordOtp = null;
     user.resetPasswordToken = null;
