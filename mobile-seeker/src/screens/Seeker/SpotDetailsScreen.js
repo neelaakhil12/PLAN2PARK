@@ -10,10 +10,21 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { AuthContext } from '../../context/AuthContext';
-import { endpoints } from '../../config/api';
+import { endpoints, getBaseApiUrl } from '../../config/api';
 import { COLORS } from '../../theme/colors';
 import Button from '../../components/Button';
 import Header from '../../components/Header';
+
+const showAlert = (title, message, buttons) => {
+  if (typeof window !== 'undefined' && window.alert) {
+    window.alert(`${title}\n\n${message}`);
+    if (buttons && buttons[0] && buttons[0].onPress) {
+      buttons[0].onPress();
+    }
+  } else {
+    Alert.alert(title, message, buttons);
+  }
+};
 
 const loadRazorpayScript = () => {
   return new Promise((resolve) => {
@@ -41,26 +52,32 @@ export default function SpotDetailsScreen({ route, navigation }) {
 
   const handleCreateBooking = async () => {
     if (!vehicleNumber) {
-      Alert.alert('Error', 'Please enter your vehicle plate number');
+      showAlert('Required', 'Please enter your vehicle plate number');
       return;
     }
 
     setLoading(true);
     try {
+      const baseUrl = await getBaseApiUrl();
       const startTime = new Date();
-      const endTime = new Date(startTime.getTime() + Number(durationHours) * 60 * 60 * 1000);
+      const actualHours = Number(durationHours || 1);
+      const endTime = new Date(startTime.getTime() + actualHours * 60 * 60 * 1000);
 
       const payload = {
         spaceId: space._id,
-        vehicleNumber,
+        vehicleNumber: vehicleNumber.trim().toUpperCase(),
         vehicleType,
+        seekerName: user?.name || 'Seeker',
+        seekerContact: user?.contact || user?.phone || '9876543210',
+        hours: actualHours,
         startTime: startTime.toISOString(),
         endTime: endTime.toISOString(),
         totalAmount: totalPrice,
+        bookingType: 'hourly',
       };
 
       // 1. Create booking in backend
-      const res = await fetch(endpoints.createBooking, {
+      const res = await fetch(`${baseUrl}/bookings`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -72,7 +89,7 @@ export default function SpotDetailsScreen({ route, navigation }) {
       const data = await res.json();
 
       if (!res.ok) {
-        Alert.alert('Booking Error', data.message || 'Could not complete booking');
+        showAlert('Booking Notice', data.message || 'Could not complete booking');
         setLoading(false);
         return;
       }
@@ -81,7 +98,7 @@ export default function SpotDetailsScreen({ route, navigation }) {
 
       // 2. Fetch Razorpay Order from backend
       try {
-        const orderRes = await fetch(endpoints.razorpayOrder(newBooking._id), {
+        const orderRes = await fetch(`${baseUrl}/bookings/${newBooking._id}/razorpay-order`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -106,7 +123,7 @@ export default function SpotDetailsScreen({ route, navigation }) {
               order_id: orderId,
               handler: async function (response) {
                 try {
-                  const verifyRes = await fetch(endpoints.verifyPayment(newBooking._id), {
+                  const verifyRes = await fetch(`${baseUrl}/bookings/${newBooking._id}/verify-payment`, {
                     method: 'POST',
                     headers: {
                       'Content-Type': 'application/json',
@@ -121,11 +138,11 @@ export default function SpotDetailsScreen({ route, navigation }) {
                   });
 
                   if (verifyRes.ok) {
-                    Alert.alert('🎉 Payment Successful!', `Booking confirmed for ${space.title}!`, [
+                    showAlert('🎉 Payment Successful!', `Booking confirmed for ${space.title}!`, [
                       { text: 'View My Bookings', onPress: () => navigation.navigate('Bookings') },
                     ]);
                   } else {
-                    Alert.alert('Notice', 'Payment processed. Checking status in Bookings.', [
+                    showAlert('Notice', 'Payment processed. Checking status in Bookings.', [
                       { text: 'OK', onPress: () => navigation.navigate('Bookings') },
                     ]);
                   }
@@ -154,14 +171,14 @@ export default function SpotDetailsScreen({ route, navigation }) {
       }
 
       // Default fallback confirmation
-      Alert.alert('🎉 Booking Confirmed!', `Spot reserved at ${space.title}!`, [
+      showAlert('🎉 Booking Confirmed!', `Spot reserved at ${space.title}!`, [
         {
           text: 'View My Bookings',
           onPress: () => navigation.navigate('Bookings'),
         },
       ]);
     } catch (err) {
-      Alert.alert('Error', err.message || 'Network error during booking');
+      showAlert('Error', err.message || 'Network error during booking');
     } finally {
       setLoading(false);
     }

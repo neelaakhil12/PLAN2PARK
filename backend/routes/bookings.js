@@ -87,7 +87,7 @@ router.post('/', protect, seekerOnly, upload.single('driverImageFile'), async (r
     // Verify no overlap on the exact slotId for active bookings
     const overlapping = await Booking.find({
       spaceId,
-      slotId,
+      slotId: targetSlotId,
       status: { $in: ['allotted', 'paid'] },
       startTime: { $lt: endTime },
       endTime: { $gt: start }
