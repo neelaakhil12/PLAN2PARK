@@ -56,13 +56,18 @@ export default function OwnerHomeScreen({ navigation }) {
         const bList = Array.isArray(bookingsData) ? bookingsData : [];
         setRecentBookings(bList);
         calculatedEarnings = bList
-          .filter((b) => b.paymentStatus === 'paid' || b.status === 'paid')
-          .reduce((sum, b) => sum + (b.ownerEarnings || Math.round((b.totalAmount || 0) * 0.9)), 0);
+          .reduce((sum, b) => {
+            const earn = b.ownerEarnings !== undefined && b.ownerEarnings !== null
+              ? Number(b.ownerEarnings)
+              : (b.paymentStatus === 'paid' ? Number(b.totalAmount || 0) * 0.9 : 0);
+            return sum + (isNaN(earn) ? 0 : earn);
+          }, 0);
       }
 
       if (analyticsRes.ok) {
         const analyticsData = await analyticsRes.json();
-        setTotalEarnings(calculatedEarnings > 0 ? calculatedEarnings : (analyticsData.earnings || 0));
+        const backendEarnings = Number(analyticsData.earnings || 0);
+        setTotalEarnings(calculatedEarnings > 0 ? calculatedEarnings : backendEarnings);
       } else {
         setTotalEarnings(calculatedEarnings);
       }
@@ -98,12 +103,12 @@ export default function OwnerHomeScreen({ navigation }) {
         fetchOwnerSpots(); // Revert if failed
       }
     } catch (err) {
-      console.error(err);
-      fetchOwnerSpots(); // Revert on failure
+      console.error('Error toggling spot status:', err);
+      fetchOwnerSpots();
     }
   };
 
-  const handleDeleteSpot = async (spotId, spotTitle) => {
+  const handleDeleteSpot = (spotId, spotTitle) => {
     const doDelete = async () => {
       try {
         const baseUrl = await getBaseApiUrl();
@@ -113,12 +118,9 @@ export default function OwnerHomeScreen({ navigation }) {
         });
         if (res.ok) {
           fetchOwnerSpots();
-        } else {
-          const err = await res.json();
-          alert(err.message || 'Could not delete spot');
         }
-      } catch (e) {
-        console.error(e);
+      } catch (err) {
+        console.error('Error deleting spot:', err);
       }
     };
 
@@ -126,7 +128,7 @@ export default function OwnerHomeScreen({ navigation }) {
       if (window.confirm(`Are you sure you want to delete "${spotTitle || 'this spot'}"?`)) {
         doDelete();
       }
-    } else if (typeof Alert !== 'undefined' && Alert.alert) {
+    } else {
       Alert.alert('Delete Spot', `Are you sure you want to delete "${spotTitle || 'this spot'}"?`, [
         { text: 'Cancel', style: 'cancel' },
         { text: 'Delete', style: 'destructive', onPress: doDelete },
@@ -163,7 +165,9 @@ export default function OwnerHomeScreen({ navigation }) {
         {/* Metric Cards */}
         <View style={styles.metricsRow}>
           <View style={styles.metricCard}>
-            <Text style={styles.metricVal}>₹{Math.round(totalEarnings).toLocaleString('en-IN')}</Text>
+            <Text style={styles.metricVal}>
+              ₹{Number(totalEarnings).toFixed(2).replace(/\.00$/, '')}
+            </Text>
             <Text style={styles.metricLabel}>Net Earnings (90%)</Text>
           </View>
           <TouchableOpacity

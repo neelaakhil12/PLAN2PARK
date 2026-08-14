@@ -812,10 +812,11 @@ const cancelBookingHandler = async (req, res) => {
       booking.refundStatus = policyApplied === 'full' ? 'full' : policyApplied === 'half' ? 'half' : 'rejected';
       booking.refundPolicyApplied = policyApplied;
 
-      // Adjust owner earnings
-      if (refundAmount > 0) {
-        booking.ownerEarnings = Math.max(0, (booking.ownerEarnings || 0) - refundAmount);
+      // Adjust owner earnings to retained portion after refund
+      const retainedAmount = Math.max(0, booking.totalAmount - refundAmount);
+      booking.ownerEarnings = Number((retainedAmount * 0.9).toFixed(2));
 
+      if (refundAmount > 0) {
         // Credit refund to seeker's wallet
         const seeker = await User.findById(booking.seekerId);
         if (seeker) {

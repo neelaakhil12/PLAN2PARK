@@ -168,10 +168,13 @@ router.get('/owner', protect, ownerOnly, async (req, res) => {
       }
     });
 
-    // 3. Earnings
+    // 3. Earnings (all paid bookings and retained cancellation earnings)
     const bookings = await Booking.find({
       spaceId: { $in: spaceIds },
-      paymentStatus: 'paid',
+      $or: [
+        { paymentStatus: 'paid' },
+        { ownerEarnings: { $gt: 0 } },
+      ],
     });
     const totalEarnings = bookings.reduce((sum, b) => sum + (b.ownerEarnings || 0), 0);
 

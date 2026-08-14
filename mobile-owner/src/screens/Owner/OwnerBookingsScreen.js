@@ -60,8 +60,12 @@ export default function OwnerBookingsScreen({ navigation }) {
   });
 
   const totalEarnings = bookings
-    .filter((b) => b.paymentStatus === 'paid' || b.status === 'paid')
-    .reduce((sum, b) => sum + (b.ownerEarnings || b.totalAmount * 0.9 || 0), 0);
+    .reduce((sum, b) => {
+      const earn = b.ownerEarnings !== undefined && b.ownerEarnings !== null
+        ? Number(b.ownerEarnings)
+        : (b.paymentStatus === 'paid' ? Number(b.totalAmount || 0) * 0.9 : 0);
+      return sum + (isNaN(earn) ? 0 : earn);
+    }, 0);
 
   const handleCallSeeker = (phone) => {
     if (phone) {
@@ -131,7 +135,7 @@ export default function OwnerBookingsScreen({ navigation }) {
         {/* Earnings Summary Card */}
         <View style={styles.summaryCard}>
           <View style={styles.summaryCol}>
-            <Text style={styles.summaryVal}>₹{Math.round(totalEarnings).toLocaleString('en-IN')}</Text>
+            <Text style={styles.summaryVal}>₹{Number(totalEarnings).toFixed(2).replace(/\.00$/, '')}</Text>
             <Text style={styles.summaryLabel}>Total Net Earnings (90%)</Text>
           </View>
           <View style={styles.summaryCol}>
