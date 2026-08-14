@@ -144,8 +144,8 @@ export default function OwnerBookingsScreen({ navigation }) {
         <View style={styles.filterRow}>
           {[
             { id: 'all', label: `All (${bookings.length})` },
-            { id: 'paid', label: `Paid (${bookings.filter((b) => b.paymentStatus === 'paid').length})` },
-            { id: 'pending', label: `Unpaid (${bookings.filter((b) => b.paymentStatus === 'unpaid').length})` },
+            { id: 'paid', label: `Paid (${bookings.filter((b) => b.paymentStatus === 'paid' || b.status === 'paid').length})` },
+            { id: 'pending', label: `Failed (${bookings.filter((b) => b.paymentStatus !== 'paid' && b.status !== 'paid').length})` },
           ].map((item) => (
             <TouchableOpacity
               key={item.id}
@@ -176,6 +176,7 @@ export default function OwnerBookingsScreen({ navigation }) {
         ) : (
           filteredBookings.map((booking) => {
             const isPaid = booking.paymentStatus === 'paid' || booking.status === 'paid';
+            const isCancelled = booking.status === 'cancelled';
             const spotTitle = booking.spaceId?.title || 'Parking Space';
             const seekerName = booking.seekerName || booking.seekerId?.name || 'Driver';
             const seekerPhone = booking.seekerContact || booking.seekerId?.contact || '';
@@ -197,9 +198,15 @@ export default function OwnerBookingsScreen({ navigation }) {
                     <Text style={styles.spotTitle}>{spotTitle}</Text>
                     <Text style={styles.slotBadge}>🅿️ Slot: {slot}</Text>
                   </View>
-                  <View style={[styles.statusBadge, { backgroundColor: isPaid ? '#10b98120' : '#f59e0b20', borderColor: isPaid ? '#10b981' : '#f59e0b' }]}>
-                    <Text style={[styles.statusTxt, { color: isPaid ? '#10b981' : '#f59e0b' }]}>
-                      {isPaid ? '✓ PAID' : '⌛ UNPAID'}
+                  <View style={[
+                    styles.statusBadge, 
+                    { 
+                      backgroundColor: isPaid ? '#10b98120' : isCancelled ? '#64748b20' : '#ef444420', 
+                      borderColor: isPaid ? '#10b981' : isCancelled ? '#64748b' : '#ef4444' 
+                    }
+                  ]}>
+                    <Text style={[styles.statusTxt, { color: isPaid ? '#10b981' : isCancelled ? '#94a3b8' : '#ef4444' }]}>
+                      {isPaid ? '✓ PAID' : isCancelled ? '🚫 CANCELLED' : '🔴 FAILED'}
                     </Text>
                   </View>
                 </View>

@@ -60,6 +60,13 @@ export default function BookingsScreen({ navigation }) {
             Alert.alert('Cancelled', 'Booking cancelled successfully');
           }
           fetchMyBookings();
+        } else {
+          const err = await res.json();
+          if (typeof window !== 'undefined' && window.alert) {
+            window.alert(err.message || 'Could not cancel booking');
+          } else {
+            Alert.alert('Error', err.message || 'Could not cancel booking');
+          }
         }
       } catch (err) {
         if (typeof window !== 'undefined' && window.alert) {
@@ -78,6 +85,34 @@ export default function BookingsScreen({ navigation }) {
       Alert.alert('Cancel Booking', 'Are you sure you want to cancel this reservation?', [
         { text: 'No', style: 'cancel' },
         { text: 'Yes, Cancel', style: 'destructive', onPress: doCancel },
+      ]);
+    }
+  };
+
+  const handleDeleteBooking = async (bookingId) => {
+    const doDelete = async () => {
+      try {
+        const baseUrl = await getBaseApiUrl();
+        const res = await fetch(`${baseUrl}/bookings/${bookingId}`, {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          fetchMyBookings();
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    };
+
+    if (typeof window !== 'undefined' && window.confirm) {
+      if (window.confirm('Remove this parking pass from list?')) {
+        doDelete();
+      }
+    } else {
+      Alert.alert('Delete Pass', 'Remove this pass from your list?', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete', style: 'destructive', onPress: doDelete },
       ]);
     }
   };
@@ -102,6 +137,7 @@ export default function BookingsScreen({ navigation }) {
     const isCancelled = item.status === 'cancelled';
     const isCompleted = item.status === 'completed';
     const isPaid = item.paymentStatus === 'paid' || item.status === 'paid';
+    const isFailed = !isPaid && !isCancelled;
     const space = item.spaceId;
     const slot = item.slotId || 'Slot-1';
 
@@ -113,32 +149,36 @@ export default function BookingsScreen({ navigation }) {
           <View
             style={[
               styles.statusBadge,
-              isCancelled
-                ? { backgroundColor: '#ef444425', borderColor: '#ef4444' }
-                : isPaid
+              isPaid
                 ? { backgroundColor: '#10b98125', borderColor: '#10b981' }
-                : { backgroundColor: '#f59e0b25', borderColor: '#f59e0b' },
+                : isCancelled
+                ? { backgroundColor: '#64748b25', borderColor: '#64748b' }
+                : { backgroundColor: '#ef444425', borderColor: '#ef4444' },
             ]}
           >
             <Text
               style={[
                 styles.statusTxt,
-                isCancelled
-                  ? { color: '#ef4444' }
-                  : isPaid
+                isPaid
                   ? { color: '#10b981' }
-                  : { color: '#f59e0b' },
+                  : isCancelled
+                  ? { color: '#94a3b8' }
+                  : { color: '#ef4444' },
               ]}
             >
-              {isCancelled ? 'CANCELLED' : isPaid ? '✓ PAID & CONFIRMED' : '⌛ UNPAID'}
+              {isPaid ? '✓ PAID & CONFIRMED' : isCancelled ? '🚫 CANCELLED' : '❌ PAYMENT FAILED'}
             </Text>
           </View>
         </View>
 
         {/* Big Slot Highlight */}
-        <View style={styles.slotHighlightBox}>
-          <Text style={styles.slotHighlightLabel}>YOUR ASSIGNED SLOT</Text>
-          <Text style={styles.slotHighlightVal}>🅿️ {slot}</Text>
+        <View style={[styles.slotHighlightBox, !isPaid && { borderColor: '#ef4444', backgroundColor: '#ef444415' }]}>
+          <Text style={[styles.slotHighlightLabel, !isPaid && { color: '#f87171' }]}>
+            {isPaid ? 'YOUR ASSIGNED SLOT' : 'RESERVATION STATUS'}
+          </Text>
+          <Text style={[styles.slotHighlightVal, !isPaid && { color: '#ef4444', fontSize: 16 }]}>
+            {isPaid ? `🅿️ ${slot}` : isCancelled ? 'Reservation Cancelled' : 'Payment Incomplete (Failed)'}
+          </Text>
         </View>
 
         {/* Spot Details */}
@@ -146,18 +186,20 @@ export default function BookingsScreen({ navigation }) {
         <Text style={styles.spotAddress}>📍 {space?.address || 'City Center'}, {space?.city || 'Hyderabad'}</Text>
 
         {/* Google Maps Turn-by-Turn GPS Navigation Button */}
-        <TouchableOpacity
-          style={styles.navigateBtn}
-          onPress={() => handleOpenMap(space)}
-          activeOpacity={0.85}
-        >
-          <Text style={styles.navigateBtnIcon}>🗺️</Text>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.navigateBtnTitle}>Navigate to Parking Spot (Google Maps)</Text>
-            <Text style={styles.navigateBtnSub}>Turn-by-turn driving directions straight to the spot</Text>
-          </View>
-          <Text style={styles.navigateBtnArrow}>→</Text>
-        </TouchableOpacity>
+        {isPaid && (
+          <TouchableOpacity
+            style={styles.navigateBtn}
+            onPress={() => handleOpenMap(space)}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.navigateBtnIcon}>🗺️</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.navigateBtnTitle}>Navigate to Parking Spot (Google Maps)</Text>
+              <Text style={styles.navigateBtnSub}>Turn-by-turn driving directions straight to the spot</Text>
+            </View>
+            <Text style={styles.navigateBtnArrow}>→</Text>
+          </TouchableOpacity>
+        )}
 
         {/* Booking Details Grid */}
         <View style={styles.infoGrid}>
@@ -171,7 +213,7 @@ export default function BookingsScreen({ navigation }) {
           </View>
           <View style={styles.infoCol}>
             <Text style={styles.infoLabel}>Total Amount</Text>
-            <Text style={[styles.infoVal, { color: '#10b981', fontWeight: '800' }]}>₹{item.totalAmount || 0}</Text>
+            <Text style={[styles.infoVal, { color: isPaid ? '#10b981' : '#ef4444', fontWeight: '800' }]}>₹{item.totalAmount || 0}</Text>
           </View>
         </View>
 
@@ -182,14 +224,26 @@ export default function BookingsScreen({ navigation }) {
           </Text>
         </View>
 
-        {!isCancelled && !isCompleted && (
-          <TouchableOpacity
-            style={styles.cancelBtn}
-            onPress={() => handleCancelBooking(item._id)}
-          >
-            <Text style={styles.cancelTxt}>Cancel Reservation</Text>
-          </TouchableOpacity>
-        )}
+        {/* Action Buttons */}
+        <View style={{ flexDirection: 'row', gap: 10, marginTop: 10 }}>
+          {isPaid && !isCancelled && !isCompleted && (
+            <TouchableOpacity
+              style={[styles.cancelBtn, { flex: 1 }]}
+              onPress={() => handleCancelBooking(item._id)}
+            >
+              <Text style={styles.cancelTxt}>Cancel Reservation</Text>
+            </TouchableOpacity>
+          )}
+
+          {(!isPaid || isCancelled || isCompleted) && (
+            <TouchableOpacity
+              style={[styles.cancelBtn, { flex: 1, borderColor: '#ef444480' }]}
+              onPress={() => handleDeleteBooking(item._id)}
+            >
+              <Text style={[styles.cancelTxt, { color: '#f87171' }]}>🗑️ Delete Pass</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
     );
   };

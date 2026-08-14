@@ -738,4 +738,38 @@ router.delete('/:id', protect, async (req, res) => {
   }
 });
 
+// @desc    Cancel a booking (Seeker, Owner, or Admin)
+// @route   POST & PUT /api/bookings/:id/cancel
+// @access  Private
+const cancelBookingHandler = async (req, res) => {
+  try {
+    const booking = await Booking.findById(req.params.id);
+    if (!booking) {
+      return res.status(404).json({ message: 'Booking not found' });
+    }
+
+    const space = await ParkingSpace.findById(booking.spaceId);
+    const isOwner = space && space.ownerId && space.ownerId.toString() === req.user._id.toString();
+    const isSeeker = booking.seekerId && booking.seekerId.toString() === req.user._id.toString();
+    const isAdmin = req.user.role === 'admin';
+
+    if (!isOwner && !isSeeker && !isAdmin) {
+      return res.status(401).json({ message: 'Not authorized to cancel this booking' });
+    }
+
+    booking.status = 'cancelled';
+    if (booking.paymentStatus === 'unpaid') {
+      booking.paymentStatus = 'failed';
+    }
+    await booking.save();
+
+    res.json({ message: 'Booking cancelled successfully', booking });
+  } catch (error) {
+    console.error('Cancel booking error:', error);
+    res.status(500).json({ message: error.message });
+  }
+};
+router.post('/:id/cancel', protect, cancelBookingHandler);
+router.put('/:id/cancel', protect, cancelBookingHandler);
+
 module.exports = router;

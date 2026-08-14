@@ -271,10 +271,11 @@ const enrichSpaceWithSlotAvailability = async (spaces) => {
   const now = new Date();
   const spaceIds = spaces.map((s) => s._id);
 
-  // Find all active bookings (allotted or paid) where end time is in future or current
+  // Find all confirmed paid active bookings where end time is in future
   const activeBookings = await Booking.find({
     spaceId: { $in: spaceIds },
-    status: { $in: ['allotted', 'paid'] },
+    status: 'paid',
+    paymentStatus: 'paid',
     endTime: { $gt: now },
   });
 
