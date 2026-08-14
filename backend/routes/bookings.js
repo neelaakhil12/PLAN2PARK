@@ -44,21 +44,6 @@ router.post('/', protect, seekerOnly, upload.single('driverImageFile'), async (r
       return res.status(400).json({ message: 'This parking space is not active or approved' });
     }
 
-    let targetSlotId = slotId;
-    if (!targetSlotId) {
-      if (space.slots && space.slots.length > 0) {
-        targetSlotId = space.slots[0].slotId;
-      } else {
-        targetSlotId = 'Slot-1';
-      }
-    } else {
-      // Verify slotId exists
-      const slotExists = (space.slots || []).some(s => s.slotId === targetSlotId);
-      if (!slotExists && space.slots && space.slots.length > 0) {
-        targetSlotId = space.slots[0].slotId;
-      }
-    }
-
     const start = new Date(startTime);
     let actualHours = Number(hours) || 1;
     let endTime = new Date(start.getTime() + actualHours * 60 * 60 * 1000);
@@ -84,17 +69,30 @@ router.post('/', protect, seekerOnly, upload.single('driverImageFile'), async (r
       totalAmount = space.pricePerMonth;
     }
 
-    // Verify no overlap on the exact slotId for active bookings
-    const overlapping = await Booking.find({
+    // Find all active bookings in this time window to see which slots are taken
+    const activeBookings = await Booking.find({
       spaceId,
-      slotId: targetSlotId,
       status: { $in: ['allotted', 'paid'] },
       startTime: { $lt: endTime },
-      endTime: { $gt: start }
+      endTime: { $gt: start },
     });
+    const bookedSlotIds = new Set(activeBookings.map((b) => b.slotId));
 
-    if (overlapping.length > 0) {
-      return res.status(400).json({ message: 'This slot is already booked for the selected time window. Please choose another slot.' });
+    let targetSlotId = slotId;
+    if (!targetSlotId) {
+      // Find first available unbooked slot from all slots
+      const allSlots = (space.slots && space.slots.length > 0)
+        ? space.slots.map((s) => s.slotId)
+        : Array.from({ length: space.totalSlots || 1 }, (_, i) => `Slot-${i + 1}`);
+
+      targetSlotId = allSlots.find((id) => !bookedSlotIds.has(id));
+      if (!targetSlotId) {
+        return res.status(400).json({ message: 'All parking slots at this location are currently full for the selected time window.' });
+      }
+    } else {
+      if (bookedSlotIds.has(targetSlotId)) {
+        return res.status(400).json({ message: 'This slot is already booked for the selected time window. Please choose another slot.' });
+      }
     }
 
     // Calculate total amount was handled above
