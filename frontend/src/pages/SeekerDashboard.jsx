@@ -1,0 +1,2038 @@
+import React, { useState, useEffect, useContext, useRef } from 'react';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { AuthContext } from '../context/AuthContext';
+import { StatusBadge } from './AdminDashboard';
+import SpacesMap from '../components/SpacesMap';
+import {
+  Car, Clock, DollarSign, CreditCard, CheckCircle,
+  MapPin, Calendar, XCircle, User, Star,
+  Search, Heart, AlertTriangle, Layers, ChevronRight,
+  Wallet, Phone, TrendingUp, Activity, Map, List, Navigation, Loader2
+} from 'lucide-react';
+
+const loadRazorpayScript = () => {
+  return new Promise((resolve) => {
+    const script = document.createElement('script');
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
+};
+
+const getVehicleTypeLabel = (type) => {
+  const mapping = {
+    '2-wheeler': '2-Wheelers (Bike/Scooter)',
+    '4-wheeler': '4-Wheelers (Sedan/Hatchback)',
+    'large-car': 'Large Cars (SUV/MUV)',
+    'heavy-vehicle': 'Heavy Vehicles (Truck/Van)',
+  };
+  return mapping[type] || type;
+};
+
+const getShortVehicleTypeLabel = (type) => {
+  const mapping = {
+    '2-wheeler': '2-Wheeler',
+    '4-wheeler': '4-Wheeler',
+    'large-car': 'SUV/MUV',
+    'heavy-vehicle': 'Heavy',
+  };
+  return mapping[type] || type;
+};
+
+const SeekerDashboard = () => {
+  const { token, user, API_URL, logout } = useContext(AuthContext);
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Derive currentView from URL
+  const currentView = searchParams.get('view') || 'dashboard';
+  const setCurrentView = (view) => {
+    if (view === 'dashboard' || !view) {
+      setSearchParams({});
+    } else {
+      setSearchParams({ view });
+    }
+    // Clear transient UI states when switching tabs
+    setSelectedSpace(null);
+    setPayingBooking(null);
+    setReviewBooking(null);
+    setExtendingBooking(null);
+    setNavigatingSpace(null);
+    setRouteDetails(null);
+  };
+
+  const [bookings, setBookings] = useState([]);
+  const [analytics, setAnalytics] = useState(null);
+  const [spaces, setSpaces] = useState([]);
+  const [complaints, setComplaints] = useState([]);
+  const [favorites, setFavorites] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [payLoading, setPayLoading] = useState(false);
+
+  // Transient UI states (overlays)
+  const [selectedSpace, setSelectedSpace] = useState(null);
+  const [navigatingSpace, setNavigatingSpace] = useState(null);
+  const [routeDetails, setRouteDetails] = useState(null);
+  const [payingBooking, setPayingBooking] = useState(null);
+  const [reviewBooking, setReviewBooking] = useState(null);
+  const [extendingBooking, setExtendingBooking] = useState(null);
+  const [extendHours, setExtendHours] = useState(1);
+  const [extendError, setExtendError] = useState('');
+  const [extendLoading, setExtendLoading] = useState(false);
+  const [expiringBookings, setExpiringBookings] = useState([]);
+
+  // New Booking form
+  const [form, setForm] = useState({ vehicleNumber: '', seekerName: '', seekerContact: '', hours: '1', startTime: '', slotId: '', bookingType: 'hourly' });
+  const [bookingAvailableSlots, setBookingAvailableSlots] = useState([]);
+  const [fetchingSlots, setFetchingSlots] = useState(false);
+  const [card, setCard] = useState({ number: '', expiry: '', cvc: '' });
+
+  // Review form
+  const [rating, setRating] = useState(5);
+  const [reviewComment, setReviewComment] = useState('');
+
+  // Complaint ticket form
+  const [compSubject, setCompSubject] = useState('');
+  const [compDescription, setCompDescription] = useState('');
+
+  // Profile setup forms
+  const [profileForm, setProfileForm] = useState({ name: user?.name || '', contact: user?.contact || '', password: '', profileImage: user?.profileImage || '', driverLicenseNumber: user?.driverLicenseNumber || '', driverLicenseImage: user?.driverLicenseImage || '' });
+  const [newPlate, setNewPlate] = useState('');
+  const [newType, setNewType] = useState('4-wheeler');
+  const [newModel, setNewModel] = useState('');
+
+  const [searchQuery, setSearchQuery] = useState('');
+  const [mapView, setMapView] = useState(false); // toggle map/list in find_parking
+  const [userLat, setUserLat] = useState(null);
+  const [userLng, setUserLng] = useState(null);
+  const [nearMeLoading, setNearMeLoading] = useState(false);
+  const [nearMeRadius, setNearMeRadius] = useState(5); // km
+  const [activeSpaceId, setActiveSpaceId] = useState(null); // card ↔ map pin hover sync
+
+  // Live Navigation & Simulation States
+  const [simulationActive, setSimulationActive] = useState(false);
+  const [simulationPaused, setSimulationPaused] = useState(false);
+  const [simIndex, setSimIndex] = useState(0);
+  const [simulationSpeed, setSimulationSpeed] = useState(5); // coordinates ticked per second (1x to 20x)
+  const [arrived, setArrived] = useState(false);
+  const [originalRouteDetails, setOriginalRouteDetails] = useState(null);
+  const simulationActiveRef = useRef(false);
+
+  const fetchData = async () => {
+    try {
+      const h = { Authorization: `Bearer ${token}` };
+      const [rB, rA, rS, rC] = await Promise.all([
+        fetch(`${API_URL}/bookings/my-bookings`, { headers: h }),
+        fetch(`${API_URL}/analytics/seeker`, { headers: h }),
+        fetch(`${API_URL}/spaces?search=${searchQuery}`, { headers: h }),
+        fetch(`${API_URL}/complaints/my-complaints`, { headers: h }),
+      ]);
+      if (rB.ok) setBookings(await rB.json());
+      if (rA.ok) setAnalytics(await rA.json());
+      if (rS.ok) setSpaces(await rS.json());
+      if (rC.ok) setComplaints(await rC.json());
+
+      const rP = await fetch(`${API_URL}/auth/profile`, { headers: h });
+      if (rP.ok) {
+        const uData = await rP.json();
+        setFavorites(uData.favorites || []);
+      }
+    } catch (e) { console.error(e); }
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const bookSpaceId = params.get('bookSpace');
+    if (bookSpaceId && token) {
+      fetch(`${API_URL}/spaces/${bookSpaceId}`, { headers: { Authorization: `Bearer ${token}` } })
+        .then(r => r.json()).then(data => {
+          setSelectedSpace(data);
+          const now = new Date().toISOString().slice(0, 16);
+          setForm(p => ({ ...p, seekerName: user?.name || '', seekerContact: user?.contact || '', startTime: now, bookingType: 'hourly', hours: '1' }));
+          setSearchParams({ view: 'find_parking' });
+        });
+    }
+    fetchData();
+  }, [location.search, token, searchQuery]);
+
+  const resetToRealLocation = () => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          setUserLat(pos.coords.latitude);
+          setUserLng(pos.coords.longitude);
+        },
+        (err) => console.log('Error getting position on reset:', err),
+        { enableHighAccuracy: true }
+      );
+    }
+  };
+
+  const closeNavigation = () => {
+    setNavigatingSpace(null);
+    setSimulationActive(false);
+    simulationActiveRef.current = false;
+    setSimulationPaused(false);
+    setSimIndex(0);
+    setArrived(false);
+    setOriginalRouteDetails(null);
+    resetToRealLocation();
+  };
+
+  useEffect(() => {
+    let watchId;
+    if (navigator.geolocation) {
+      watchId = navigator.geolocation.watchPosition(
+        (pos) => {
+          if (!simulationActiveRef.current) {
+            setUserLat(pos.coords.latitude);
+            setUserLng(pos.coords.longitude);
+          }
+        },
+        (err) => console.log('Geolocation watch error:', err),
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      );
+    }
+    return () => {
+      if (watchId) {
+        navigator.geolocation.clearWatch(watchId);
+      }
+    };
+  }, []);
+
+  // Simulation Loop Hook
+  useEffect(() => {
+    if (!simulationActive || simulationPaused || !originalRouteDetails?.path || originalRouteDetails.path.length === 0) {
+      return;
+    }
+
+    const path = originalRouteDetails.path;
+    const totalDistance = originalRouteDetails.distance;
+    const totalDuration = originalRouteDetails.duration;
+    const steps = originalRouteDetails.steps || [];
+
+    // Parse step boundaries and instructions
+    let currentBoundary = 0;
+    const parsedSteps = steps.map(step => {
+      const start = currentBoundary;
+      const end = currentBoundary + (step.distance || 0);
+      currentBoundary = end;
+
+      let text = step.maneuver?.instruction || '';
+      if (!text) {
+        let action = (step.maneuver?.modifier || step.maneuver?.type || 'proceed').toLowerCase();
+        const road = step.name || 'road';
+        if (action === 'uturn') action = 'make a U-turn';
+        else if (action === 'left') action = 'turn left';
+        else if (action === 'right') action = 'turn right';
+        else if (action === 'slight left') action = 'slight turn left';
+        else if (action === 'slight right') action = 'slight turn right';
+        else if (action === 'sharp left') action = 'turn sharp left';
+        else if (action === 'sharp right') action = 'turn sharp right';
+        else action = `continue ${action}`;
+        text = `${action} onto ${road}`;
+      }
+      return { start, end, text };
+    });
+
+    const interval = setInterval(() => {
+      setSimIndex((prevIndex) => {
+        const nextIndex = prevIndex + 1;
+        if (nextIndex >= path.length) {
+          clearInterval(interval);
+          setSimulationActive(false);
+          simulationActiveRef.current = false;
+          setArrived(true);
+          return path.length - 1;
+        }
+
+        const point = path[nextIndex];
+        setUserLat(point.lat);
+        setUserLng(point.lng);
+
+        // Update routeDetails HUD values based on path progress
+        const ratio = nextIndex / (path.length - 1);
+        const remainingDistance = Math.max(0, totalDistance * (1 - ratio));
+        const remainingDuration = Math.max(0, totalDuration * (1 - ratio));
+
+        // Find active step based on distance traveled
+        const distanceTraveled = totalDistance * ratio;
+        const activeStep = parsedSteps.find(s => distanceTraveled >= s.start && distanceTraveled <= s.end) || parsedSteps[parsedSteps.length - 1];
+
+        let currentInstruction = 'Proceed to destination';
+        if (activeStep) {
+          const stepRemaining = Math.max(0, activeStep.end - distanceTraveled);
+          if (activeStep.text.toLowerCase().includes('arrive') || activeStep.text.toLowerCase().includes('destination')) {
+            currentInstruction = `In ${Math.round(stepRemaining)} meters, you will arrive at your destination`;
+          } else {
+            currentInstruction = `In ${Math.round(stepRemaining)} meters, ${activeStep.text}`;
+          }
+        }
+
+        setRouteDetails((prev) => ({
+          ...prev,
+          distance: remainingDistance,
+          duration: remainingDuration,
+          instruction: currentInstruction,
+        }));
+
+        return nextIndex;
+      });
+    }, 1000 / simulationSpeed);
+
+    return () => clearInterval(interval);
+  }, [simulationActive, simulationPaused, originalRouteDetails, simulationSpeed]);
+
+  useEffect(() => {
+    const checkExpiring = () => {
+      const activePaid = bookings.filter(b => b.status === 'paid' && b.endTime);
+      const now = new Date();
+      const expiring = activePaid.filter(b => {
+        const end = new Date(b.endTime);
+        const diffMs = end.getTime() - now.getTime();
+        return diffMs > 0 && diffMs <= 15 * 60 * 1000;
+      });
+      setExpiringBookings(expiring);
+    };
+
+    checkExpiring();
+    const interval = setInterval(checkExpiring, 15000);
+    return () => clearInterval(interval);
+  }, [bookings]);
+
+  // Dynamically query available slots for the selected space and time window
+  useEffect(() => {
+    const getSlots = async () => {
+      if (!selectedSpace || !form.startTime || !form.hours) {
+        setBookingAvailableSlots([]);
+        return;
+      }
+      setFetchingSlots(true);
+      try {
+        const res = await fetch(
+          `${API_URL}/spaces/${selectedSpace._id}/available-slots-by-time?startTime=${encodeURIComponent(form.startTime)}&hours=${form.hours}`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        if (res.ok) {
+          const data = await res.json();
+          setBookingAvailableSlots(data);
+          const free = data.filter(s => s.isAvailable);
+          if (free.length > 0) {
+            setForm(prev => ({ ...prev, slotId: free[0].slotId }));
+          } else {
+            setForm(prev => ({ ...prev, slotId: '' }));
+          }
+        }
+      } catch (e) {
+        console.error('Error getting slots:', e);
+      }
+      setFetchingSlots(false);
+    };
+    getSlots();
+  }, [selectedSpace, form.startTime, form.hours, token, API_URL]);
+
+  const handleBookSubmit = async (e) => {
+    e.preventDefault();
+    if (!form.slotId) {
+      alert('Please select an available parking slot to book.');
+      return;
+    }
+    setLoading(true);
+    try {
+      const fd = new FormData();
+      fd.append('spaceId', selectedSpace._id);
+      fd.append('vehicleNumber', form.vehicleNumber);
+      fd.append('seekerName', form.seekerName);
+      fd.append('seekerContact', form.seekerContact);
+      fd.append('hours', Number(form.hours));
+      fd.append('startTime', form.startTime);
+      fd.append('slotId', form.slotId);
+      fd.append('bookingType', form.bookingType);
+      if (form.driverImageFile) fd.append('driverImageFile', form.driverImageFile);
+
+      const res = await fetch(`${API_URL}/bookings`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: fd,
+      });
+      const data = await res.json();
+      if (res.ok) {
+        alert('Booking created successfully! Please complete payment under Active Reservations to lock your spot.');
+        setSelectedSpace(null);
+        setCurrentView('bookings');
+        fetchData();
+      } else alert(data.message);
+    } catch (e) { console.error(e); }
+    setLoading(false);
+  };
+
+  const handleNavigate = (space) => {
+    if (!space) return;
+    setNavigatingSpace(space);
+    if (!userLat || !userLng) {
+      if (space.coordinates?.lat && space.coordinates?.lng) {
+        setUserLat(space.coordinates.lat - 0.02);
+        setUserLng(space.coordinates.lng - 0.02);
+      } else {
+        setUserLat(12.9716);
+        setUserLng(77.5946);
+      }
+    }
+  };
+
+  const handleExtendSubmit = async (e) => {
+    e.preventDefault();
+    setExtendError('');
+    setExtendLoading(true);
+    try {
+      const res = await fetch(`${API_URL}/bookings/${extendingBooking._id}/extend`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ extendHours: Number(extendHours) }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        alert('Booking extended successfully!');
+        setExtendingBooking(null);
+        setExtendHours(1);
+        fetchData();
+      } else {
+        setExtendError(data.message || 'Failed to extend booking');
+      }
+    } catch (err) {
+      console.error(err);
+      setExtendError('Connection error. Please try again.');
+    }
+    setExtendLoading(false);
+  };
+
+  const handlePay = async (e) => {
+    if (e) e.preventDefault();
+    setPayLoading(true);
+
+    try {
+      // 1. Load Razorpay Script
+      const scriptLoaded = await loadRazorpayScript();
+      
+      // 2. Fetch Razorpay Order from backend
+      const orderRes = await fetch(`${API_URL}/bookings/${payingBooking._id}/razorpay-order`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        }
+      });
+
+      if (!orderRes.ok) {
+        const errData = await orderRes.json();
+        alert(errData.message || 'Failed to initialize payment order');
+        setPayLoading(false);
+        return;
+      }
+
+      const orderData = await orderRes.json();
+      const { orderId, amount, currency, keyId, isMock } = orderData;
+
+      if (isMock || !scriptLoaded) {
+        // Run Sandbox/Mock simulation flow
+        const mockVerifyRes = await fetch(`${API_URL}/bookings/${payingBooking._id}/verify-payment`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            razorpay_order_id: orderId,
+            razorpay_payment_id: 'pay_mock_' + Math.random().toString(36).substring(2, 9),
+            isMock: true
+          })
+        });
+
+        if (mockVerifyRes.ok) {
+          alert('💳 [SANDBOX MOCK] Payment successful! Your parking slot is confirmed.');
+          setPayingBooking(null);
+          setCurrentView('bookings');
+          fetchData();
+        } else {
+          const errData = await mockVerifyRes.json();
+          alert(errData.message || 'Payment simulation verification failed');
+        }
+        setPayLoading(false);
+        return;
+      }
+
+      // Real Razorpay checkout flow
+      const options = {
+        key: keyId,
+        amount: amount,
+        currency: currency,
+        name: 'PlantoPark Safe P2P',
+        description: `Booking Reference: ${payingBooking._id}`,
+        order_id: orderId,
+        handler: async function (response) {
+          // Send signature and ids to verify-payment
+          const verifyRes = await fetch(`${API_URL}/bookings/${payingBooking._id}/verify-payment`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`
+            },
+            body: JSON.stringify({
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_signature: response.razorpay_signature,
+              isMock: false
+            })
+          });
+
+          if (verifyRes.ok) {
+            alert('🎉 Razorpay Payment successful! Booking confirmed.');
+            setPayingBooking(null);
+            setCurrentView('bookings');
+            fetchData();
+          } else {
+            const errData = await verifyRes.json();
+            alert(errData.message || 'Payment signature verification failed.');
+          }
+        },
+        prefill: {
+          name: user?.name || '',
+          email: user?.email || '',
+          contact: user?.contact || ''
+        },
+        theme: {
+          color: '#10b981'
+        }
+      };
+
+      const paymentObject = new window.Razorpay(options);
+      paymentObject.open();
+
+    } catch (error) {
+      console.error('Razorpay Error:', error);
+      alert('An error occurred while launching Razorpay payment gateway.');
+    }
+    setPayLoading(false);
+  };
+
+  const handleReviewSubmit = async (e) => {
+    e.preventDefault();
+    const res = await fetch(`${API_URL}/reviews`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ spaceId: reviewBooking.spaceId._id, rating, comment: reviewComment }),
+    });
+    if (res.ok) {
+      alert('Thank you! Your review has been posted.');
+      setReviewBooking(null);
+      setReviewComment('');
+      setCurrentView('dashboard');
+      fetchData();
+    }
+  };
+
+  const handleCancel = async (id) => {
+    if (!window.confirm('Cancel this booking request?')) return;
+    const res = await fetch(`${API_URL}/bookings/${id}/cancel`, { method: 'PUT', headers: { Authorization: `Bearer ${token}` } });
+    if (res.ok) { alert('Booking cancelled.'); fetchData(); }
+  };
+
+  const handleComplete = async (id) => {
+    const res = await fetch(`${API_URL}/bookings/${id}/complete`, { method: 'PUT', headers: { Authorization: `Bearer ${token}` } });
+    if (res.ok) { alert('Check-out completed. Thank you!'); fetchData(); }
+  };
+
+  const handleToggleFavorite = async (spaceId) => {
+    const res = await fetch(`${API_URL}/auth/favorites/${spaceId}`, {
+      method: 'POST', headers: { Authorization: `Bearer ${token}` }
+    });
+    if (res.ok) fetchData();
+  };
+
+  const handleComplaintSubmit = async (e) => {
+    e.preventDefault();
+    const res = await fetch(`${API_URL}/complaints`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ subject: compSubject, description: compDescription }),
+    });
+    if (res.ok) {
+      alert('Support ticket raised. Admin will assist shortly.');
+      setCompSubject('');
+      setCompDescription('');
+      fetchData();
+    }
+  };
+
+  const handleProfileSubmit = async (e) => {
+    e.preventDefault();
+    const res = await fetch(`${API_URL}/auth/profile`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify(profileForm),
+    });
+    if (res.ok) alert('Profile updated successfully!');
+    else alert('Failed to update profile');
+  };
+
+  const handleAddVehicle = async (e) => {
+    e.preventDefault();
+    const res = await fetch(`${API_URL}/auth/vehicles`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ plateNumber: newPlate, vehicleType: newType, model: newModel }),
+    });
+    if (res.ok) {
+      alert('Vehicle registered!');
+      setNewPlate('');
+      setNewModel('');
+      fetchData();
+    }
+  };
+
+  const handleDeleteVehicle = async (vId) => {
+    const res = await fetch(`${API_URL}/auth/vehicles/${vId}`, {
+      method: 'DELETE', headers: { Authorization: `Bearer ${token}` }
+    });
+    if (res.ok) fetchData();
+  };
+
+  const mapSrc = (address) =>
+    `https://maps.google.com/maps?q=${encodeURIComponent(address)}&t=&z=14&ie=UTF8&iwloc=&output=embed`;
+
+  const getGreeting = () => {
+    const h = new Date().getHours();
+    if (h < 12) return 'Good morning';
+    if (h < 17) return 'Good afternoon';
+    return 'Good evening';
+  };
+
+  const activeBookings = bookings.filter(b => ['pending_approval', 'allotted', 'paid'].includes(b.status));
+  const completedBookings = bookings.filter(b => b.status === 'completed');
+  const totalSpent = analytics?.totalSpent || 0;
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // LOADING STATE
+  // ─────────────────────────────────────────────────────────────────────────
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="h-10 w-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // MAIN RENDER — no sidebar, full-width layout
+  // ─────────────────────────────────────────────────────────────────────────
+  return (
+    <div className="min-h-screen bg-slate-50 font-sans">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+
+        {/* Expiring Bookings Alert Banner */}
+        {expiringBookings.length > 0 && expiringBookings.map(eb => {
+          const end = new Date(eb.endTime);
+          const diffMin = Math.ceil((end.getTime() - new Date().getTime()) / 60000);
+          return (
+            <div key={eb._id} className="mb-6 bg-rose-50 border border-rose-200 text-rose-800 p-4 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm animate-pulse">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="h-5 w-5 text-rose-600 mt-0.5 shrink-0" />
+                <div>
+                  <h4 className="font-bold text-sm">🚨 Parking Session Expiring Soon!</h4>
+                  <p className="text-xs text-rose-600 mt-0.5 font-medium">
+                    Your slot <strong className="font-mono text-rose-800">{eb.slotId}</strong> at <strong>{eb.spaceId?.address}</strong> expires in <strong className="text-sm font-black">{diffMin} mins</strong>. Please extend your booking or check out now.
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  onClick={() => { setExtendingBooking(eb); setExtendError(''); setExtendHours(1); }}
+                  className="bg-rose-650 hover:bg-rose-700 text-white font-extrabold px-3.5 py-2 rounded-xl text-xs transition-colors shadow-sm bg-rose-600"
+                >
+                  Extend Booking
+                </button>
+                <button
+                  onClick={() => handleComplete(eb._id)}
+                  className="bg-white border border-rose-300 hover:bg-rose-100 text-rose-700 font-extrabold px-3.5 py-2 rounded-xl text-xs transition-colors"
+                >
+                  Check Out
+                </button>
+              </div>
+            </div>
+          );
+        })}
+
+        {/* ── VIEW: DASHBOARD ─────────────────────────────────────────── */}
+        {currentView === 'dashboard' && (
+          <div className="space-y-6">
+            {/* Greeting */}
+            <div>
+              <h1 className="text-2xl font-extrabold text-slate-900">
+                {getGreeting()}, {user?.name?.split(' ')[0]}!
+              </h1>
+              <p className="text-slate-500 text-sm mt-0.5">
+                {activeBookings.length > 0
+                  ? `You have ${activeBookings.length} active booking${activeBookings.length > 1 ? 's' : ''}. We've secured your spot.`
+                  : 'Your city is busy today. Find and book a spot easily.'}
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* LEFT COLUMN */}
+              <div className="lg:col-span-2 space-y-5">
+
+                {/* Active booking banner */}
+                {activeBookings.length > 0 && (() => {
+                  const b = activeBookings[0];
+                  return (
+                    <div className="bg-white border border-slate-200 rounded-2xl p-4 flex items-center gap-4 shadow-sm">
+                      <div className="h-12 w-12 rounded-xl bg-emerald-100 flex items-center justify-center shrink-0">
+                        <span className="text-emerald-700 font-black text-lg">P</span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-bold text-slate-900 truncate text-sm">{b.spaceId?.address || 'Parking Spot'}</p>
+                        <p className="text-xs text-slate-400 mt-0.5">
+                          {b.vehicleNumber && <span className="font-mono font-bold text-slate-600">{b.vehicleNumber}</span>}
+                          {b.slotId && <span> · Slot {b.slotId}</span>}
+                          {b.startTime && <span> · {new Date(b.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} departure</span>}
+                        </p>
+                      </div>
+                      <span className="shrink-0 px-2.5 py-1 bg-emerald-500 text-white text-[10px] font-black uppercase rounded-full tracking-wide">
+                        {b.status === 'paid' ? 'In Progress' : b.status === 'allotted' ? 'Pay Now' : 'Pending'}
+                      </span>
+                    </div>
+                  );
+                })()}
+
+                {/* Stats row */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {[
+                    { label: 'Total Spent', value: `₹${totalSpent}`, icon: <DollarSign className="h-4 w-4 text-emerald-600" />, bg: 'bg-emerald-50', text: 'text-emerald-700' },
+                    { label: 'Bookings', value: analytics?.totalBookings || 0, icon: <Car className="h-4 w-4 text-blue-600" />, bg: 'bg-blue-50', text: 'text-blue-700' },
+                    { label: 'Active', value: activeBookings.length, icon: <Activity className="h-4 w-4 text-amber-600" />, bg: 'bg-amber-50', text: 'text-amber-700' },
+                    { label: 'Completed', value: completedBookings.length, icon: <CheckCircle className="h-4 w-4 text-slate-500" />, bg: 'bg-slate-100', text: 'text-slate-600' },
+                  ].map((s, i) => (
+                    <div key={i} className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
+                      <div className={`h-8 w-8 rounded-xl ${s.bg} flex items-center justify-center mb-2`}>{s.icon}</div>
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{s.label}</p>
+                      <p className={`text-xl font-black mt-0.5 ${s.text}`}>{s.value}</p>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Nearby / Available spaces */}
+                <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+                  <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+                    <div>
+                      <h2 className="font-bold text-slate-800">Nearby Spots</h2>
+                      <p className="text-xs text-slate-400 mt-0.5">{spaces.length} Found</p>
+                    </div>
+                    <button
+                      onClick={() => setCurrentView('find_parking')}
+                      className="text-xs font-semibold text-emerald-600 hover:text-emerald-700 flex items-center gap-1"
+                    >
+                      View all <ChevronRight className="h-3 w-3" />
+                    </button>
+                  </div>
+
+                  {/* Mini space cards */}
+                  <div className="divide-y divide-slate-50">
+                    {spaces.slice(0, 4).map(space => {
+                      const freeSlots = space.slots?.filter(s => s.isAvailable).length || 0;
+                      return (
+                        <div key={space._id} className="flex items-center gap-4 px-5 py-4 hover:bg-slate-50 transition-colors">
+                          <img src={space.image} alt="" className="h-14 w-14 rounded-xl object-cover border shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-slate-800 text-sm truncate">{space.address}</p>
+                            <p className="text-xs text-slate-400 flex items-center gap-1 mt-0.5">
+                              <MapPin className="h-3 w-3" />{space.location}
+                            </p>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <p className="font-bold text-emerald-600 text-sm">₹{space.pricePerHour}/hr</p>
+                            <p className={`text-[10px] font-semibold mt-0.5 ${freeSlots > 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                              {freeSlots} slots free
+                            </p>
+                          </div>
+                          <button
+                            onClick={() => {
+                              setSelectedSpace(space);
+                              const now = new Date().toISOString().slice(0, 16);
+                              setForm(p => ({ ...p, seekerName: user?.name || '', seekerContact: user?.contact || '', startTime: now, bookingType: 'hourly', hours: '1' }));
+                              setCurrentView('find_parking');
+                            }}
+                            disabled={freeSlots === 0}
+                            className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${freeSlots > 0 ? 'bg-emerald-500 hover:bg-emerald-600 text-white' : 'bg-slate-100 text-slate-400 cursor-not-allowed'}`}
+                          >
+                            Book
+                          </button>
+                        </div>
+                      );
+                    })}
+                    {spaces.length === 0 && (
+                      <div className="px-5 py-10 text-center text-slate-400 text-sm">
+                        No parking spaces available in your area right now.
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Review prompts for completed bookings */}
+                {completedBookings.length > 0 && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5">
+                    <h3 className="font-bold text-amber-800 mb-1">⭐ Leave a Review</h3>
+                    <p className="text-xs text-amber-600 mb-4">Help the community by rating your parking experience.</p>
+                    <div className="space-y-3">
+                      {completedBookings.slice(0, 2).map(b => (
+                        <div key={b._id} className="bg-white border border-amber-100 rounded-xl p-3.5 flex items-center justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="font-semibold text-slate-800 text-sm truncate">{b.spaceId?.address}</p>
+                            <p className="text-xs text-slate-400">Slot: {b.slotId || '—'}</p>
+                          </div>
+                          <button
+                            onClick={() => { setReviewBooking(b); setRating(5); }}
+                            className="shrink-0 bg-amber-500 hover:bg-amber-600 text-white font-bold px-3 py-1.5 rounded-lg text-xs transition-colors"
+                          >
+                            Write Review
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* RIGHT COLUMN */}
+              <div className="space-y-5">
+                {/* Booking History / Spent card */}
+                <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-2xl p-5 text-white shadow-lg shadow-emerald-200">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-emerald-100 text-xs font-bold uppercase tracking-wider">Total Amount Spent</p>
+                    <Wallet className="h-4 w-4 text-emerald-200" />
+                  </div>
+                  <p className="text-3xl font-black">₹{totalSpent > 0 ? totalSpent : '0'}</p>
+                  <p className="text-emerald-200 text-xs mt-1">on completed parking bookings</p>
+                  <button 
+                    onClick={() => setCurrentView('bookings')}
+                    className="mt-4 w-full py-2 bg-white/20 hover:bg-white/30 text-white font-bold text-xs rounded-xl transition-colors border border-white/20">
+                    View Booking History →
+                  </button>
+                </div>
+
+                {/* Quick Actions */}
+                <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Quick Actions</p>
+                  <div className="space-y-2">
+                    {[
+                      { label: 'Find Parking', sub: 'Nearby at destination', icon: <Search className="h-4 w-4 text-emerald-600" />, bg: 'bg-emerald-50', view: 'find_parking' },
+                      { label: 'My Vehicles', sub: `Manage ${user?.vehicles?.length || 0} vehicles`, icon: <Car className="h-4 w-4 text-blue-600" />, bg: 'bg-blue-50', view: 'profile' },
+                      { label: 'Support Desk', sub: '24/7 help desk hotline', icon: <AlertTriangle className="h-4 w-4 text-amber-600" />, bg: 'bg-amber-50', view: 'complaints' },
+                    ].map((a, i) => (
+                      <button
+                        key={i}
+                        onClick={() => setCurrentView(a.view)}
+                        className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-slate-50 transition-colors text-left"
+                      >
+                        <div className={`h-9 w-9 rounded-xl ${a.bg} flex items-center justify-center shrink-0`}>
+                          {a.icon}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-slate-800">{a.label}</p>
+                          <p className="text-xs text-slate-400">{a.sub}</p>
+                        </div>
+                        <ChevronRight className="h-4 w-4 text-slate-300 ml-auto shrink-0" />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Recent Activity */}
+                <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Recent Activity</p>
+                    <button onClick={() => setCurrentView('history')} className="text-[11px] text-emerald-600 font-semibold hover:text-emerald-700">View All</button>
+                  </div>
+                  <div className="space-y-3">
+                    {bookings.slice(0, 4).map(b => (
+                      <div key={b._id} className="flex items-start gap-3">
+                        <span className={`mt-1 h-2 w-2 rounded-full shrink-0 ${
+                          b.status === 'completed' ? 'bg-emerald-500' :
+                          b.status === 'cancelled' ? 'bg-rose-400' :
+                          b.status === 'paid' ? 'bg-blue-500' : 'bg-amber-400'
+                        }`} />
+                        <div className="min-w-0">
+                          <p className="text-xs font-medium text-slate-700 truncate">{b.spaceId?.address || 'Parking Spot'}</p>
+                          <p className="text-[10px] text-slate-400 mt-0.5">₹{b.totalAmount} · {b.hours} hrs · {new Date(b.createdAt).toLocaleDateString()}</p>
+                        </div>
+                      </div>
+                    ))}
+                    {bookings.length === 0 && (
+                      <p className="text-xs text-slate-400 text-center py-3">No activity yet.</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── VIEW: FIND PARKING ──────────────────────────────────────────── */}
+        {currentView === 'find_parking' && (
+          <div className="space-y-5">
+            {/* Header */}
+            <div>
+              <h1 className="text-2xl font-extrabold text-slate-900">Find Parking</h1>
+              <p className="text-slate-500 text-sm mt-0.5">Search and book available parking spaces near you.</p>
+            </div>
+
+            {selectedSpace ? (
+              /* ── BOOKING FORM ─────────────────────────────────────────── */
+              <div className="max-w-2xl mx-auto space-y-5">
+                {/* Space summary */}
+                <div className="bg-white border border-slate-200 rounded-2xl p-4 flex items-center gap-4 shadow-sm">
+                  <img src={selectedSpace.image} alt="" className="w-20 h-16 object-cover rounded-xl shrink-0 border" />
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-bold text-slate-900 text-base truncate">{selectedSpace.address}</h3>
+                    <p className="text-xs text-slate-400 flex items-center gap-1 mt-0.5"><MapPin className="h-3 w-3" />{selectedSpace.location}</p>
+                    <p className="text-emerald-600 font-bold text-sm mt-1">₹{selectedSpace.pricePerHour}/hour</p>
+                  </div>
+                  <button onClick={() => setSelectedSpace(null)} className="shrink-0 text-slate-400 hover:text-slate-600">
+                    <XCircle className="h-5 w-5" />
+                  </button>
+                </div>
+
+                {/* Mini map of selected space */}
+                {selectedSpace?.coordinates?.lat && selectedSpace?.coordinates?.lng ? (
+                  <div className="rounded-2xl overflow-hidden border border-slate-200 shadow-sm" style={{height:'220px'}}>
+                    <SpacesMap
+                      spaces={[selectedSpace]}
+                      userLat={userLat}
+                      userLng={userLng}
+                      activeSpaceId={selectedSpace._id}
+                      height="220px"
+                    />
+                  </div>
+                ) : selectedSpace?.address ? (
+                  <div className="rounded-2xl overflow-hidden border border-slate-200 shadow-sm h-48">
+                    <iframe
+                      title="Map"
+                      src={`https://maps.google.com/maps?q=${encodeURIComponent(selectedSpace.address + ' ' + selectedSpace.location)}&output=embed`}
+                      width="100%" height="100%"
+                      style={{ border: 0 }}
+                      allowFullScreen loading="lazy"
+                    />
+                  </div>
+                ) : null}
+
+                {/* Booking form */}
+                <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+                  <h4 className="font-bold text-slate-800 text-base mb-5">Confirm Booking</h4>
+                  <form onSubmit={handleBookSubmit} className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Driver Name</label>
+                        <input type="text" required value={form.seekerName} onChange={e => setForm(p => ({ ...p, seekerName: e.target.value }))}
+                          className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-emerald-400 focus:ring-1 focus:ring-emerald-100" />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Contact</label>
+                        <input type="text" required value={form.seekerContact} onChange={e => setForm(p => ({ ...p, seekerContact: e.target.value }))}
+                          className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-emerald-400 focus:ring-1 focus:ring-emerald-100" />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Driver Image (Optional)</label>
+                      <input type="file" accept="image/*" onChange={e => {
+                        const file = e.target.files[0];
+                        if (file) setForm(p => ({ ...p, driverImageFile: file }));
+                      }}
+                        className="w-full px-4 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-emerald-400 bg-white" />
+                      {form.driverImageFile && (
+                        <p className="text-xs text-emerald-600 font-semibold mt-1">Image selected: {form.driverImageFile.name}</p>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Vehicle Plate</label>
+                        <select value={form.vehicleNumber} onChange={e => setForm(p => ({ ...p, vehicleNumber: e.target.value }))}
+                          className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-emerald-400 bg-white cursor-pointer">
+                          <option value="" disabled>Select vehicle</option>
+                          {user?.vehicles?.map(v => (
+                            <option key={v._id} value={v.plateNumber}>{v.plateNumber} ({v.model || v.vehicleType})</option>
+                          ))}
+                          <option value="TEMPORARY">Other / Rental</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Manual Plate</label>
+                        <input type="text" value={form.vehicleNumber} onChange={e => setForm(p => ({ ...p, vehicleNumber: e.target.value }))} placeholder="TS 09 AB 1234"
+                          className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-emerald-400 uppercase" />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Booking Type</label>
+                        <select value={form.bookingType} onChange={e => {
+                          const bt = e.target.value;
+                          setForm(p => ({ ...p, bookingType: bt, hours: bt === 'hourly' ? '1' : bt === 'daily' ? '24' : bt === 'weekly' ? '168' : '720' }))
+                        }}
+                          className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-emerald-400 bg-white cursor-pointer">
+                          <option value="hourly">Hourly</option>
+                          <option value="daily">Daily</option>
+                          {selectedSpace?.pricePerWeek && <option value="weekly">Weekly Pack</option>}
+                          {selectedSpace?.pricePerMonth && <option value="monthly">Monthly Pack</option>}
+                        </select>
+                      </div>
+                      {form.bookingType === 'hourly' && (
+                        <div>
+                          <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Duration (Hours)</label>
+                          <input type="number" required min="1" value={form.hours} onChange={e => setForm(p => ({ ...p, hours: e.target.value }))}
+                            className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-emerald-400" />
+                        </div>
+                      )}
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Start Time</label>
+                        <input type="datetime-local" required value={form.startTime} onChange={e => setForm(p => ({ ...p, startTime: e.target.value }))}
+                          className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-emerald-400" />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Select Available Slot</label>
+                      {fetchingSlots ? (
+                        <div className="text-xs text-slate-400 italic flex items-center gap-1">
+                          <Loader2 className="h-3.5 w-3.5 animate-spin text-emerald-500" />
+                          Checking slot timings...
+                        </div>
+                      ) : bookingAvailableSlots.length === 0 ? (
+                        <div className="text-xs text-rose-500 font-semibold bg-rose-50 border border-rose-100 p-3 rounded-xl">
+                          Please select Start Time and Duration to check slot availability.
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-4 gap-2">
+                          {bookingAvailableSlots.map(s => {
+                            const isSelected = form.slotId === s.slotId;
+                            return (
+                              <button
+                                key={s.slotId}
+                                type="button"
+                                disabled={!s.isAvailable}
+                                onClick={() => setForm(p => ({ ...p, slotId: s.slotId }))}
+                                className={`py-2 px-1 rounded-xl text-xs font-bold transition-all border text-center ${
+                                  !s.isAvailable
+                                    ? 'bg-slate-50 text-slate-300 border-slate-100 cursor-not-allowed line-through'
+                                    : isSelected
+                                    ? 'bg-emerald-500 text-white border-emerald-500 shadow-md shadow-emerald-500/20 scale-105'
+                                    : 'bg-white text-slate-700 border-slate-200 hover:border-emerald-450 hover:text-emerald-600'
+                                }`}
+                              >
+                                {s.slotId}
+                                {!s.isAvailable && <span className="block text-[8px] font-bold text-rose-500 mt-0.5 uppercase">Booked</span>}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex items-center justify-between p-4 bg-emerald-50 border border-emerald-100 rounded-xl">
+                      <span className="font-bold text-emerald-800 text-sm">Estimated Total</span>
+                      <span className="text-2xl font-black text-emerald-600">₹{
+                        form.bookingType === 'daily' ? selectedSpace.pricePerDay :
+                        form.bookingType === 'weekly' ? selectedSpace.pricePerWeek :
+                        form.bookingType === 'monthly' ? selectedSpace.pricePerMonth :
+                        (Number(form.hours || 1) * selectedSpace.pricePerHour).toFixed(0)
+                      }</span>
+                    </div>
+                    <div className="flex gap-3">
+                      <button type="submit" className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3.5 rounded-xl text-sm shadow-sm transition-colors">
+                        Confirm Slot &amp; Book
+                      </button>
+                      <button type="button" onClick={() => setSelectedSpace(null)} className="px-5 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-600 font-semibold rounded-xl text-sm transition-colors">
+                        Back
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            ) : (
+              /* ── SPLIT PANEL: LIST + MAP ──────────────────────────────── */
+              <div className="space-y-4">
+                {/* Toolbar */}
+                <div className="flex flex-col sm:flex-row gap-3">
+                  {/* Search */}
+                  <div className="flex-1 bg-white border border-slate-200 rounded-2xl px-4 py-2.5 flex items-center gap-3 shadow-sm">
+                    <Search className="h-4 w-4 text-slate-400 shrink-0" />
+                    <input
+                      type="text"
+                      placeholder="Search by city, area or street…"
+                      value={searchQuery}
+                      onChange={e => setSearchQuery(e.target.value)}
+                      className="flex-grow bg-transparent text-sm focus:outline-none text-slate-700"
+                    />
+                  </div>
+
+                  {/* Near Me */}
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (!navigator.geolocation) return alert('Geolocation not supported.');
+                      setNearMeLoading(true);
+                      navigator.geolocation.getCurrentPosition(
+                        async (pos) => {
+                          const la = pos.coords.latitude;
+                          const ln = pos.coords.longitude;
+                          setUserLat(la); setUserLng(ln);
+                          try {
+                            const res = await fetch(
+                              `${API_URL}/spaces/nearby?lat=${la}&lng=${ln}&radius=${nearMeRadius}`,
+                              { headers: { Authorization: `Bearer ${token}` } }
+                            );
+                            if (res.ok) { const d = await res.json(); setSpaces(d); }
+                          } catch(e) { console.error(e); }
+                          setNearMeLoading(false);
+                        },
+                        () => { alert('Allow location access.'); setNearMeLoading(false); }
+                      );
+                    }}
+                    className="flex items-center gap-2 px-4 py-2.5 bg-blue-500 hover:bg-blue-600 text-white font-bold text-sm rounded-2xl transition-colors shadow-sm whitespace-nowrap"
+                  >
+                    {nearMeLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Navigation className="h-4 w-4" />}
+                    Near Me
+                  </button>
+
+                  {/* Radius */}
+                  <select
+                    value={nearMeRadius}
+                    onChange={e => setNearMeRadius(Number(e.target.value))}
+                    className="px-3 py-2 bg-white border border-slate-200 rounded-2xl text-sm font-semibold text-slate-700 focus:outline-none cursor-pointer"
+                  >
+                    {[1,2,5,10,20].map(r => <option key={r} value={r}>{r} km</option>)}
+                  </select>
+                </div>
+
+                {/* Near-me result count */}
+                {userLat && userLng && (
+                  <p className="text-xs text-blue-600 font-semibold flex items-center gap-1">
+                    <Navigation className="h-3.5 w-3.5" />
+                    {spaces.filter(s => s.coordinates?.lat).length} spaces with map pins within {nearMeRadius} km
+                  </p>
+                )}
+
+                {/* ── SPLIT PANEL ─────────────────────────────────────────── */}
+                <div className="flex flex-col lg:flex-row gap-4" style={{ minHeight: '580px' }}>
+
+                  {/* LEFT — scrollable card list */}
+                  <div className="lg:w-[420px] xl:w-[460px] shrink-0 space-y-3 lg:overflow-y-auto lg:max-h-[600px] lg:pr-1">
+                    {spaces.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center py-20 text-slate-400 text-sm gap-3">
+                        <MapPin className="h-10 w-10 text-slate-300" />
+                        <p>No parking spaces available.</p>
+                        <p className="text-xs">Try the Near Me button or adjust search.</p>
+                      </div>
+                    ) : spaces.map(space => {
+                      const freeSlots = space.slots?.filter(s => s.isAvailable).length || 0;
+                      const isFav     = favorites.includes(space._id);
+                      const isActive  = activeSpaceId === space._id;
+                      return (
+                        <div
+                          key={space._id}
+                          onMouseEnter={() => setActiveSpaceId(space._id)}
+                          onMouseLeave={() => setActiveSpaceId(null)}
+                          onClick={() => space.coordinates?.lat && setActiveSpaceId(space._id)}
+                          className={`bg-white border rounded-2xl overflow-hidden shadow-sm cursor-pointer transition-all duration-200 ${
+                            isActive
+                              ? 'border-emerald-400 shadow-emerald-100 shadow-md ring-2 ring-emerald-200'
+                              : 'border-slate-200 hover:shadow-md hover:border-slate-300'
+                          }`}
+                        >
+                          <div className="flex gap-0">
+                            {/* Image */}
+                            <div className="relative shrink-0 w-32 sm:w-36">
+                              <img src={space.image} alt="" className="h-full w-full object-cover min-h-[110px]" />
+                              {freeSlots > 0 && (
+                                <span className="absolute top-2 left-2 bg-emerald-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded-md">
+                                  AVAILABLE
+                                </span>
+                              )}
+                              <button
+                                onClick={e => { e.stopPropagation(); handleToggleFavorite(space._id); }}
+                                className="absolute top-2 right-2 h-7 w-7 bg-white/90 backdrop-blur rounded-full flex items-center justify-center shadow text-rose-500 hover:scale-110 transition-transform"
+                              >
+                                <Heart className={`h-3.5 w-3.5 ${isFav ? 'fill-rose-500' : ''}`} />
+                              </button>
+                            </div>
+
+                            {/* Details */}
+                            <div className="flex-1 p-4 flex flex-col justify-between min-w-0">
+                              <div className="space-y-1">
+                                <h4 className="font-bold text-slate-900 text-sm leading-tight truncate">{space.address}</h4>
+                                <p className="text-xs text-slate-400 flex items-center gap-1">
+                                  <MapPin className="h-3 w-3 shrink-0" />
+                                  <span className="truncate">{space.location}</span>
+                                </p>
+                                <div className="flex items-center gap-2 flex-wrap mt-1">
+                                  <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${freeSlots > 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-600'}`}>
+                                    {freeSlots > 0 ? `${freeSlots} Free` : 'Full'}
+                                  </span>
+                                  <span className="text-[9px] font-bold bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded-full">
+                                    {space.totalSlots} total
+                                  </span>
+                                  {space.coordinates?.lat && (
+                                    <span className="text-[9px] font-bold bg-blue-50 text-blue-500 px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
+                                      <MapPin className="h-2.5 w-2.5" />GPS
+                                    </span>
+                                  )}
+                                  {space.suitableVehicles && space.suitableVehicles.length > 0 && (
+                                    <span className="text-[9px] font-bold bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded-full">
+                                      Fits: {space.suitableVehicles.map(getShortVehicleTypeLabel).join(', ')}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+
+                              <div className="flex items-center justify-between mt-3">
+                                <div>
+                                  <span className="text-base font-black text-emerald-600">₹{space.pricePerHour}</span>
+                                  <span className="text-xs text-slate-400 font-semibold">/hr</span>
+                                </div>
+                                <button
+                                  onClick={e => { e.stopPropagation(); setSelectedSpace(space); const now = new Date().toISOString().slice(0,16); setForm(p => ({ ...p, seekerName: user?.name||'', seekerContact: user?.contact||'', startTime: now })); }}
+                                  disabled={freeSlots === 0}
+                                  className={`px-4 py-1.5 rounded-xl font-bold text-xs transition-colors ${freeSlots > 0 ? 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-sm' : 'bg-slate-100 text-slate-400 cursor-not-allowed'}`}
+                                >
+                                  {freeSlots > 0 ? 'Book Now' : 'Full'}
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* RIGHT — sticky map */}
+                  <div className="flex-1 rounded-2xl overflow-hidden border border-slate-200 shadow-sm relative" style={{ minHeight: '400px' }}>
+                    <div className="sticky top-4 h-full" style={{ minHeight: '560px' }}>
+                      {routeDetails && activeSpaceId && (
+                        <div className="absolute top-4 left-4 right-4 z-20 bg-slate-900/95 backdrop-blur text-white rounded-2xl p-4 shadow-xl border border-slate-800 flex items-center gap-3">
+                          <div className="h-9 w-9 bg-emerald-500 rounded-xl flex items-center justify-center shrink-0 shadow-md">
+                            <Navigation className="h-4 w-4 text-white transform rotate-45 animate-pulse" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-extrabold text-[13px] text-white truncate">{routeDetails.instruction || 'Proceed to destination'}</p>
+                            <div className="flex items-center gap-2 mt-1 text-[11px] text-emerald-400 font-extrabold">
+                              <span>⏱️ {Math.round(routeDetails.duration / 60)} mins</span>
+                              <span>·</span>
+                              <span>🚗 {(routeDetails.distance / 1000).toFixed(1)} km</span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      <SpacesMap
+                        spaces={spaces}
+                        userLat={userLat}
+                        userLng={userLng}
+                        activeSpaceId={activeSpaceId}
+                        height="100%"
+                        onBook={(space) => {
+                          setSelectedSpace(space);
+                          const now = new Date().toISOString().slice(0,16);
+                          setForm(p => ({ ...p, seekerName: user?.name||'', seekerContact: user?.contact||'', startTime: now, bookingType: 'hourly', hours: '1' }));
+                        }}
+                        onMarkerHover={(sid) => setActiveSpaceId(sid)}
+                        onRouteUpdate={setRouteDetails}
+                      />
+                    </div>
+                  </div>
+
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+
+
+        {/* ── VIEW: BOOKINGS ───────────────────────────────────────────────── */}
+        {currentView === 'bookings' && (
+          <div className="space-y-5">
+            <div>
+              <h1 className="text-2xl font-extrabold text-slate-900">My Bookings</h1>
+              <p className="text-slate-500 text-sm mt-0.5">Active and upcoming parking reservations.</p>
+            </div>
+            <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+              <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+                <h3 className="font-bold text-slate-800">Active Reservations</h3>
+                <span className="bg-emerald-100 text-emerald-700 text-xs font-bold px-2.5 py-0.5 rounded-full">{activeBookings.length} active</span>
+              </div>
+              <div className="bg-slate-50 border-t border-slate-100">
+                {activeBookings.length === 0 ? (
+                  <div className="text-center py-16 px-6 text-slate-400 bg-white">
+                    <p className="font-semibold text-sm">No active reservations found.</p>
+                    <button 
+                      onClick={() => setCurrentView('find_parking')} 
+                      className="mt-3 bg-emerald-500 hover:bg-emerald-600 text-white font-extrabold px-5 py-2.5 rounded-xl text-xs shadow-md transition-colors"
+                    >
+                      Find a Spot →
+                    </button>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6">
+                    {activeBookings.map(b => (
+                      <div key={b._id} className={`rounded-3xl border shadow-sm p-5 flex flex-col justify-between hover:shadow-md transition-all duration-300 relative overflow-hidden group ${
+                          b.bookingType === 'monthly' ? 'bg-blue-50/60 border-blue-200' :
+                          b.status === 'paid' ? 'bg-emerald-50/60 border-emerald-200' :
+                          'bg-slate-50 border-slate-200'
+                        }`}>
+                        
+                        <div className="space-y-4">
+                          {/* Header: Address & Status */}
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <h4 className="font-extrabold text-slate-900 text-base tracking-tight truncate group-hover:text-emerald-600 transition-colors" title={b.spaceId?.address}>
+                                {b.spaceId?.address || 'Parking Property'}
+                              </h4>
+                              <p className="text-xs text-slate-400 font-medium flex items-center gap-1 mt-1 truncate">
+                                <MapPin className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                                {b.spaceId?.location || 'Unknown Location'}
+                              </p>
+                            </div>
+                            <div className="shrink-0">
+                              <StatusBadge status={b.status} />
+                            </div>
+                          </div>
+
+                          {/* Info Grid details */}
+                          <div className="grid grid-cols-2 gap-3 bg-slate-50 rounded-2xl p-3 border border-slate-100/80 text-xs">
+                            <div>
+                              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Allotted Slot</p>
+                              <p className="mt-1 font-mono font-extrabold text-slate-800 text-sm">
+                                {b.slotId ? (
+                                  <span className="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-lg text-[11px] border border-emerald-200">
+                                    {b.slotId}
+                                  </span>
+                                ) : (
+                                  <span className="text-amber-600 italic">Pending Host</span>
+                                )}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Vehicle Plate</p>
+                              <p className="mt-1 font-mono font-extrabold text-slate-800 text-sm uppercase">
+                                {b.vehicleNumber}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Duration</p>
+                              {b.bookingType === 'monthly' ? (
+                                <>
+                                  <p className="mt-1 font-extrabold text-purple-700">Monthly Pack</p>
+                                  <p className="text-[10px] text-purple-500 font-bold">
+                                    {Math.max(0, Math.ceil((new Date(b.startTime).getTime() + (b.hours || 720) * 3600000 - new Date().getTime()) / (1000 * 3600 * 24)))} Days left
+                                  </p>
+                                </>
+                              ) : (
+                                <p className="mt-1 font-extrabold text-slate-700">
+                                  {b.hours} hours
+                                </p>
+                              )}
+                            </div>
+                            <div>
+                              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Scheduled Start</p>
+                              <p className="mt-1 font-extrabold text-slate-700">
+                                {new Date(b.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Footer: Amount & Action buttons */}
+                        <div className="flex items-center justify-between border-t border-slate-100 mt-5 pt-4 gap-4">
+                          <div>
+                            <p className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider">Total Fee</p>
+                            <p className="text-xl font-black text-slate-900 mt-0.5">₹{b.totalAmount}</p>
+                          </div>
+                          
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            {b.status === 'allotted' && (
+                              <button 
+                                onClick={() => setPayingBooking(b)} 
+                                className="bg-emerald-500 hover:bg-emerald-600 text-white font-extrabold px-3 py-2 rounded-xl text-xs flex items-center gap-1 shadow-md shadow-emerald-500/10 transition-all hover:-translate-y-0.5"
+                              >
+                                <CreditCard className="h-3.5 w-3.5" /> Pay Now
+                              </button>
+                            )}
+
+                            {b.status === 'paid' && (
+                              <>
+                                <button 
+                                  onClick={() => navigate(`/invoice/${b._id}`)} 
+                                  className="bg-blue-50 border border-blue-200 text-blue-600 hover:bg-blue-100 font-bold px-3 py-2 rounded-xl text-xs transition-all hover:-translate-y-0.5"
+                                >
+                                  Invoice
+                                </button>
+                                {b.bookingType !== 'monthly' && (
+                                  <button 
+                                    onClick={() => handleComplete(b._id)} 
+                                    className="bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 font-extrabold px-3 py-2 rounded-xl text-xs transition-all hover:-translate-y-0.5"
+                                  >
+                                    Check Out
+                                  </button>
+                                )}
+                                <button 
+                                  onClick={() => { setExtendingBooking(b); setExtendError(''); setExtendHours(1); }} 
+                                  className="bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 text-indigo-700 font-bold px-3 py-2 rounded-xl text-xs transition-all hover:-translate-y-0.5"
+                                >
+                                  Extend
+                                </button>
+                              </>
+                            )}
+
+                            {b.status === 'pending_approval' && (
+                              <button 
+                                onClick={() => handleCancel(b._id)} 
+                                className="bg-rose-50 border border-rose-200 text-rose-600 hover:bg-rose-100 font-bold px-3 py-2 rounded-xl text-xs transition-all hover:-translate-y-0.5"
+                              >
+                                Cancel
+                              </button>
+                            )}
+
+                            {b.spaceId && (
+                              <>
+                                <button 
+                                  onClick={() => handleNavigate(b.spaceId)} 
+                                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold px-3.5 py-2 rounded-xl text-xs flex items-center gap-1.5 shadow-md shadow-indigo-500/10 transition-all hover:-translate-y-0.5"
+                                >
+                                  <Navigation className="h-3.5 w-3.5" /> In-App Nav
+                                </button>
+                                <button 
+                                  onClick={() => {
+                                    const c = b.spaceId.coordinates;
+                                    const dest = (c && c.lat && c.lng) ? `${c.lat},${c.lng}` : encodeURIComponent(b.spaceId.address);
+                                    window.open(`https://www.google.com/maps/dir/?api=1&destination=${dest}`, '_blank');
+                                  }}
+                                  className="bg-blue-600 hover:bg-blue-700 text-white font-extrabold px-3.5 py-2 rounded-xl text-xs flex items-center gap-1.5 shadow-md shadow-blue-500/10 transition-all hover:-translate-y-0.5"
+                                >
+                                  <Map className="h-3.5 w-3.5" /> Google Maps
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── VIEW: HISTORY ────────────────────────────────────────────────── */}
+        {currentView === 'history' && (
+          <div className="space-y-5">
+            <div>
+              <h1 className="text-2xl font-extrabold text-slate-900">History</h1>
+              <p className="text-slate-500 text-sm mt-0.5">Past completed and cancelled parking sessions.</p>
+            </div>
+            <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+              <div className="px-6 py-4 border-b border-slate-100">
+                <h3 className="font-bold text-slate-800">Parking History Log</h3>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm text-left">
+                  <thead className="bg-slate-50 text-slate-400 text-xs font-bold uppercase">
+                    <tr>
+                      <th className="px-6 py-3">Property</th>
+                      <th className="px-6 py-3">Vehicle</th>
+                      <th className="px-6 py-3">Slot</th>
+                      <th className="px-6 py-3">Hours</th>
+                      <th className="px-6 py-3">Fee Paid</th>
+                      <th className="px-6 py-3">Status</th>
+                      <th className="px-6 py-3">Date</th>
+                      <th className="px-6 py-3 text-right">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 text-slate-600">
+                    {bookings.filter(b => ['completed', 'cancelled'].includes(b.status)).length === 0 ? (
+                      <tr><td colSpan="7" className="text-center py-12 text-slate-400">No parking history yet.</td></tr>
+                    ) : bookings.filter(b => ['completed', 'cancelled'].includes(b.status)).map(b => (
+                      <tr key={b._id} className="hover:bg-slate-50">
+                        <td className="px-6 py-4 font-semibold text-slate-800 truncate max-w-[160px]">{b.spaceId?.address || 'Property Deleted'}</td>
+                        <td className="px-6 py-4 font-mono text-xs uppercase font-bold">{b.vehicleNumber}</td>
+                        <td className="px-6 py-4 font-mono text-xs">{b.slotId || '—'}</td>
+                        <td className="px-6 py-4">{b.hours} hrs</td>
+                        <td className="px-6 py-4 font-bold text-slate-900">₹{b.totalAmount}</td>
+                        <td className="px-6 py-4"><StatusBadge status={b.status} /></td>
+                        <td className="px-6 py-4 text-slate-400 text-xs">{new Date(b.createdAt).toLocaleDateString()}</td>
+                        <td className="px-6 py-4 text-right">
+                          {(b.paymentStatus === 'paid' || b.invoiceId) && (
+                            <button onClick={() => navigate(`/invoice/${b._id}`)} className="text-blue-600 hover:underline font-bold text-xs bg-blue-50 px-3 py-1.5 rounded-lg border border-blue-100">
+                              Invoice
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── VIEW: FAVOURITES ─────────────────────────────────────────────── */}
+        {currentView === 'favourites' && (
+          <div className="space-y-5">
+            <div>
+              <h1 className="text-2xl font-extrabold text-slate-900">Favourites</h1>
+              <p className="text-slate-500 text-sm mt-0.5">Your starred parking spaces for quick booking.</p>
+            </div>
+            {spaces.filter(s => favorites.includes(s._id)).length === 0 ? (
+              <div className="bg-white border border-slate-200 rounded-2xl p-16 text-center shadow-sm">
+                <Heart className="h-10 w-10 text-slate-200 mx-auto mb-3" />
+                <p className="text-slate-400 font-semibold">No favourited spaces yet.</p>
+                <button onClick={() => setCurrentView('find_parking')} className="mt-4 text-emerald-600 font-bold text-sm hover:underline">
+                  Browse parking spaces →
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                {spaces.filter(s => favorites.includes(s._id)).map(space => {
+                  const freeSlots = space.slots?.filter(sl => sl.isAvailable).length || 0;
+                  return (
+                    <div key={space._id} className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm relative">
+                      <img src={space.image} alt="" className="w-full h-36 object-cover" />
+                      <button onClick={() => handleToggleFavorite(space._id)} className="absolute top-3 right-3 h-8 w-8 bg-white/90 rounded-full flex items-center justify-center text-rose-500 shadow border hover:scale-110 transition-transform">
+                        <Heart className="h-4 w-4 fill-rose-500" />
+                      </button>
+                      <div className="p-4 space-y-3">
+                        <div>
+                          <span className="text-[9px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full uppercase">{space.location}</span>
+                          <h4 className="font-bold text-slate-900 truncate mt-1">{space.address}</h4>
+                          <p className="text-slate-400 text-xs mt-0.5">₹{space.pricePerHour}/hr · {freeSlots} slots free</p>
+                        </div>
+                        <button
+                          onClick={() => { setSelectedSpace(space); setCurrentView('find_parking'); }}
+                          disabled={freeSlots === 0}
+                          className={`w-full py-2.5 rounded-xl font-bold text-xs transition-colors ${freeSlots > 0 ? 'bg-emerald-500 hover:bg-emerald-600 text-white' : 'bg-slate-100 text-slate-400 cursor-not-allowed'}`}
+                        >
+                          {freeSlots > 0 ? 'Book Now' : 'Fully Booked'}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── VIEW: COMPLAINTS ─────────────────────────────────────────────── */}
+        {currentView === 'complaints' && (
+          <div className="space-y-5 max-w-3xl mx-auto">
+            <div>
+              <h1 className="text-2xl font-extrabold text-slate-900">Support & Complaints</h1>
+              <p className="text-slate-500 text-sm mt-0.5">Raise a support ticket and track your previous requests.</p>
+            </div>
+            {/* New ticket form */}
+            <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+              <h3 className="font-bold text-slate-800 mb-1">Raise Support Ticket</h3>
+              <p className="text-xs text-slate-400 mb-5">Issues with booking, checkout, or parking host? We're here to help.</p>
+              <form onSubmit={handleComplaintSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Subject</label>
+                  <input type="text" required value={compSubject} onChange={e => setCompSubject(e.target.value)} placeholder="e.g. Host was unavailable at checkout"
+                    className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-emerald-400 focus:ring-1 focus:ring-emerald-100" />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Description</label>
+                  <textarea required value={compDescription} onChange={e => setCompDescription(e.target.value)} placeholder="Describe your issue in detail..."
+                    className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-emerald-400 focus:ring-1 focus:ring-emerald-100 h-24 resize-none" />
+                </div>
+                <button type="submit" className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 rounded-xl text-sm transition-colors shadow-sm">
+                  Submit Ticket
+                </button>
+              </form>
+            </div>
+
+            {/* Previous tickets */}
+            <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+              <div className="px-6 py-4 border-b border-slate-100">
+                <h3 className="font-bold text-slate-800">Ticket History</h3>
+              </div>
+              <div className="p-6 space-y-4">
+                {complaints.length === 0 ? (
+                  <p className="text-center text-slate-400 text-sm py-6">No tickets raised yet.</p>
+                ) : complaints.map(c => (
+                  <div key={c._id} className="border border-slate-200 rounded-xl p-4 bg-slate-50/50">
+                    <div className="flex justify-between items-start mb-2">
+                      <h4 className="font-bold text-slate-800 text-sm">{c.subject}</h4>
+                      <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full border ${c.status === 'resolved' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>
+                        {c.status}
+                      </span>
+                    </div>
+                    <p className="text-slate-600 text-xs bg-white p-2.5 rounded-lg border border-slate-100">{c.description}</p>
+                    {c.reply && (
+                      <div className="mt-2.5 bg-emerald-50 border border-emerald-100 rounded-lg p-2.5 text-xs">
+                        <span className="font-bold text-emerald-700 uppercase text-[9px] block mb-0.5">Admin Response</span>
+                        <p className="text-slate-700">"{c.reply}"</p>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── VIEW: PROFILE ────────────────────────────────────────────────── */}
+        {currentView === 'profile' && (
+          <div className="space-y-5 max-w-4xl mx-auto">
+            <div>
+              <h1 className="text-2xl font-extrabold text-slate-900">My Profile</h1>
+              <p className="text-slate-500 text-sm mt-0.5">Manage your account details and registered vehicles.</p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Account settings */}
+              <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+                <h3 className="font-bold text-slate-800 mb-1">Account Settings</h3>
+                <p className="text-xs text-slate-400 mb-5">Update name, contact or password.</p>
+                <form onSubmit={handleProfileSubmit} className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Full Name</label>
+                    <input type="text" required value={profileForm.name} onChange={e => setProfileForm(p => ({ ...p, name: e.target.value }))}
+                      className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-emerald-400" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Phone</label>
+                    <input type="text" value={profileForm.contact} onChange={e => setProfileForm(p => ({ ...p, contact: e.target.value }))}
+                      className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-emerald-400" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Profile Image</label>
+                    <div className="flex items-center gap-4">
+                      {profileForm.profileImage && <img src={profileForm.profileImage} alt="Profile" className="h-10 w-10 rounded-full object-cover border border-slate-200" />}
+                      <input type="file" accept="image/*" onChange={e => {
+                        const file = e.target.files[0];
+                        if (file) {
+                          const reader = new FileReader();
+                          reader.onloadend = () => setProfileForm(p => ({ ...p, profileImage: reader.result }));
+                          reader.readAsDataURL(file);
+                        }
+                      }} className="w-full px-4 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-emerald-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-bold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100" />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Driver License #</label>
+                      <input type="text" value={profileForm.driverLicenseNumber} onChange={e => setProfileForm(p => ({ ...p, driverLicenseNumber: e.target.value }))} placeholder="DL..."
+                        className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-emerald-400" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">License Image</label>
+                      <input type="file" accept="image/*" onChange={e => {
+                        const file = e.target.files[0];
+                        if (file) {
+                          const reader = new FileReader();
+                          reader.onloadend = () => setProfileForm(p => ({ ...p, driverLicenseImage: reader.result }));
+                          reader.readAsDataURL(file);
+                        }
+                      }} className="w-full px-4 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-emerald-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-bold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100" />
+                      {profileForm.driverLicenseImage && <p className="text-[10px] text-emerald-600 font-semibold mt-1">Image uploaded ✓</p>}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">New Password <span className="text-slate-300 normal-case">(leave blank to keep)</span></label>
+                    <input type="password" value={profileForm.password} onChange={e => setProfileForm(p => ({ ...p, password: e.target.value }))} placeholder="••••••••"
+                      className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-emerald-400" />
+                  </div>
+                  <button type="submit" className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 rounded-xl text-sm transition-colors shadow-sm">
+                    Save Changes
+                  </button>
+                </form>
+              </div>
+
+              {/* Vehicle registration */}
+              <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+                <h3 className="font-bold text-slate-800 mb-1">Registered Vehicles</h3>
+                <p className="text-xs text-slate-400 mb-5">Save your vehicle plates for faster booking.</p>
+                <form onSubmit={handleAddVehicle} className="space-y-3 bg-slate-50 p-4 rounded-xl border border-slate-200 mb-5">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">License Plate</label>
+                      <input type="text" required value={newPlate} onChange={e => setNewPlate(e.target.value)} placeholder="TS 09 AB 1234"
+                        className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-emerald-400 uppercase bg-white" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Model</label>
+                      <input type="text" required value={newModel} onChange={e => setNewModel(e.target.value)} placeholder="Hyundai i20"
+                        className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-emerald-400 bg-white" />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Type</label>
+                    <select value={newType} onChange={e => setNewType(e.target.value)} className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:outline-none bg-white">
+                      <option value="2-wheeler">2-Wheelers (Bike / Scooter)</option>
+                      <option value="4-wheeler">4-Wheelers / Standard Cars (Sedan/Hatchback)</option>
+                      <option value="large-car">Large Cars (SUV / MUV)</option>
+                      <option value="heavy-vehicle">Heavy Vehicles (Truck / Van)</option>
+                    </select>
+                  </div>
+                  <button type="submit" className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-2 rounded-xl text-xs transition-colors">
+                    Add Vehicle +
+                  </button>
+                </form>
+                <div className="space-y-2 max-h-52 overflow-y-auto">
+                  {!user?.vehicles?.length ? (
+                    <p className="text-slate-400 text-xs text-center py-4">No registered vehicles yet.</p>
+                  ) : user.vehicles.map(veh => (
+                    <div key={veh._id} className="flex justify-between items-center p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs">
+                      <div>
+                        <p className="font-mono font-bold text-slate-800 uppercase">{veh.plateNumber}</p>
+                        <p className="text-slate-400 text-[10px]">{veh.model} · {getVehicleTypeLabel(veh.vehicleType)}</p>
+                      </div>
+                      <button onClick={() => handleDeleteVehicle(veh._id)} className="text-rose-500 hover:text-rose-700 font-semibold hover:underline">Remove</button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ── PAYMENT OVERLAY MODAL ─────────────────────────────────────────── */}
+      {payingBooking && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl p-8 relative">
+            <button onClick={() => setPayingBooking(null)} className="absolute top-5 right-5 text-slate-400 hover:text-slate-700">
+              <XCircle className="h-6 w-6" />
+            </button>
+            <div className="h-12 w-12 bg-emerald-50 rounded-2xl flex items-center justify-center mx-auto mb-4 border">
+              <CreditCard className="h-6 w-6 text-emerald-600" />
+            </div>
+            <h3 className="text-xl font-extrabold text-slate-900 text-center mb-1">Complete Payment</h3>
+            <p className="text-slate-400 text-sm text-center mb-5">Secure checkout for slot: <strong className="text-emerald-600">{payingBooking.slotId}</strong></p>
+            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-2 mb-5 text-sm">
+              <div className="flex justify-between">
+                <span className="text-slate-500">Slot charge</span>
+                <span className="font-semibold text-slate-900">₹{payingBooking.totalAmount}</span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-slate-400">Platform fee (10%)</span>
+                <span className="text-slate-400">₹{(payingBooking.totalAmount * 0.1).toFixed(2)}</span>
+              </div>
+              <div className="border-t border-slate-200 pt-2 flex justify-between font-bold">
+                <span className="text-slate-700">You Pay</span>
+                <span className="text-emerald-600 text-lg">₹{payingBooking.totalAmount}</span>
+              </div>
+            </div>
+            <form onSubmit={handlePay} className="space-y-4">
+              <p className="text-xs text-slate-400 text-center leading-relaxed">
+                Clicking pay will open a secure checkout window where you can complete payment via UPI, Cards, Netbanking, or Wallets.
+              </p>
+              <button type="submit" disabled={payLoading}
+                className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-extrabold py-3.5 rounded-xl text-sm shadow-md disabled:opacity-60 flex items-center justify-center gap-2 transition-colors">
+                {payLoading
+                  ? <><div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />Launching Gateway...</>
+                  : `Pay ₹${payingBooking.totalAmount} with Razorpay`}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── REVIEW MODAL ──────────────────────────────────────────────────── */}
+      {reviewBooking && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl p-8 relative">
+            <button onClick={() => setReviewBooking(null)} className="absolute top-5 right-5 text-slate-400 hover:text-slate-700">
+              <XCircle className="h-6 w-6" />
+            </button>
+            <div className="h-12 w-12 bg-amber-50 rounded-2xl flex items-center justify-center mx-auto mb-4 border">
+              <Star className="h-6 w-6 text-amber-500 fill-amber-500" />
+            </div>
+            <h3 className="text-xl font-extrabold text-slate-900 text-center mb-1">Write a Review</h3>
+            <p className="text-slate-400 text-sm text-center mb-5">Rate your experience at <strong className="text-slate-700">{reviewBooking.spaceId?.address}</strong></p>
+            <form onSubmit={handleReviewSubmit} className="space-y-4 text-left">
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Your Rating</label>
+                <div className="flex gap-2">
+                  {[1, 2, 3, 4, 5].map(val => (
+                    <button key={val} type="button" onClick={() => setRating(val)} className="hover:scale-110 transition-transform">
+                      <Star className={`h-8 w-8 ${val <= rating ? 'fill-amber-500 text-amber-500' : 'text-slate-200'}`} />
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Comments</label>
+                <textarea required value={reviewComment} onChange={e => setReviewComment(e.target.value)} placeholder="How was the parking space? Safety, cleanliness, host helpfulness..."
+                  className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-amber-400 h-24 resize-none" />
+              </div>
+              <button type="submit" className="w-full bg-amber-500 hover:bg-amber-600 text-white font-extrabold py-3.5 rounded-xl text-sm shadow transition-colors">
+                Submit Review
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── EXTENSION MODAL ────────────────────────────────────────────────── */}
+      {extendingBooking && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl p-8 relative">
+            <button onClick={() => setExtendingBooking(null)} className="absolute top-5 right-5 text-slate-400 hover:text-slate-700">
+              <XCircle className="h-6 w-6" />
+            </button>
+            <div className="h-12 w-12 bg-indigo-50 rounded-2xl flex items-center justify-center mx-auto mb-4 border">
+              <Clock className="h-6 w-6 text-indigo-600" />
+            </div>
+            <h3 className="text-xl font-extrabold text-slate-900 text-center mb-1">Extend Parking Duration</h3>
+            <p className="text-slate-400 text-sm text-center mb-5">Current Slot: <strong className="text-indigo-650">{extendingBooking.slotId}</strong></p>
+
+            {extendError && (
+              <div className="flex items-start gap-2 bg-rose-50 border border-rose-200 text-rose-600 p-3.5 rounded-xl mb-5 text-xs font-semibold leading-relaxed">
+                <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+                <span>{extendError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleExtendSubmit} className="space-y-5 text-left">
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Hours to Extend</label>
+                <select
+                  value={extendHours}
+                  onChange={e => setExtendHours(Number(e.target.value))}
+                  className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-indigo-400 bg-white"
+                >
+                  <option value="1">1 Hour</option>
+                  <option value="2">2 Hours</option>
+                  <option value="3">3 Hours</option>
+                  <option value="4">4 Hours</option>
+                  <option value="6">6 Hours</option>
+                </select>
+              </div>
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 text-xs text-slate-500 leading-relaxed">
+                Extension fee: <strong className="text-slate-800">₹{(extendHours * (extendingBooking.spaceId?.pricePerHour || 0)).toFixed(0)}</strong> · Extension is only permitted if the slot remains unoccupied during the extended time window.
+              </div>
+              <button
+                type="submit"
+                disabled={extendLoading}
+                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold py-3.5 rounded-xl text-sm shadow transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
+              >
+                {extendLoading ? (
+                  <>
+                    <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    Checking Slot Availability...
+                  </>
+                ) : 'Confirm Extension'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── LIVE NAVIGATION MODAL (RAPIDO/SWIGGY STYLE) ───────────────────── */}
+      {navigatingSpace && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-4">
+          <div className="w-full max-w-3xl bg-white rounded-3xl shadow-2xl overflow-hidden relative flex flex-col" style={{ height: '85vh', maxHeight: '680px' }}>
+            <div className="px-6 py-4 bg-slate-900 text-white flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Navigation className="h-5 w-5 text-emerald-400 animate-pulse" />
+                <div>
+                  <h3 className="font-extrabold text-sm sm:text-base">Live Route Navigation</h3>
+                  <p className="text-[10px] text-slate-400 font-semibold truncate max-w-[280px] sm:max-w-md">Dest: {navigatingSpace.address}</p>
+                </div>
+              </div>
+              <button onClick={closeNavigation} className="text-slate-400 hover:text-white transition-colors bg-slate-800/80 p-1.5 rounded-full">
+                <XCircle className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="flex-1 relative bg-slate-100">
+              {routeDetails && (
+                <div className="absolute top-4 left-4 right-4 z-20 bg-slate-900/95 backdrop-blur text-white rounded-2xl p-4 shadow-xl border border-slate-800 flex items-center gap-3">
+                  <div className="h-10 w-10 bg-emerald-500 rounded-xl flex items-center justify-center shrink-0 shadow-md">
+                    <Navigation className="h-5 w-5 text-white transform rotate-45 animate-pulse" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold text-[10px] text-slate-400 uppercase tracking-wider">Next Maneuver</p>
+                    <p className="font-extrabold text-sm sm:text-base text-white mt-0.5">{routeDetails.instruction || 'Proceed to destination'}</p>
+                    <div className="flex items-center gap-2 mt-1.5 text-xs text-emerald-400 font-extrabold">
+                      <span>⏱️ {Math.round(routeDetails.duration / 60)} mins remaining</span>
+                      <span>·</span>
+                      <span>🚗 {(routeDetails.distance / 1000).toFixed(1)} km left</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+              {navigatingSpace.coordinates?.lat && navigatingSpace.coordinates?.lng ? (
+                <SpacesMap
+                  spaces={[navigatingSpace]}
+                  userLat={userLat}
+                  userLng={userLng}
+                  activeSpaceId={navigatingSpace._id}
+                  height="100%"
+                  onRouteUpdate={(details) => {
+                    setRouteDetails(details);
+                    if (details && !simulationActiveRef.current) {
+                      setOriginalRouteDetails(details);
+                      setSimIndex(0);
+                    }
+                  }}
+                  simulationActive={simulationActive}
+                />
+              ) : (
+                <div className="flex items-center justify-center h-full text-slate-500 text-sm">
+                  No map coordinates set for this space.
+                </div>
+              )}
+
+              {/* Arrived Modal Overlay */}
+              {arrived && (
+                <div className="absolute inset-0 bg-slate-900/80 backdrop-blur-sm z-30 flex items-center justify-center p-6">
+                  <div className="bg-white rounded-3xl p-6 max-w-sm w-full text-center shadow-2xl border border-slate-100 transform scale-100 transition-all duration-300">
+                    <div className="h-16 w-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4 animate-bounce">
+                      <CheckCircle className="h-10 w-10 text-emerald-600" />
+                    </div>
+                    <h4 className="text-xl font-black text-slate-900 mb-2">🎉 Arrived at Destination!</h4>
+                    <p className="text-xs text-slate-500 leading-relaxed mb-6">
+                      You have arrived at <strong className="text-slate-800">{navigatingSpace.address}</strong>.<br />
+                      Your reserved slot is <strong className="text-emerald-600 font-mono text-sm">{activeBookings.find(b => b.spaceId?._id === navigatingSpace._id)?.slotId || 'A1'}</strong>.
+                    </p>
+                    <button
+                      onClick={() => {
+                        setArrived(false);
+                        closeNavigation();
+                      }}
+                      className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-extrabold py-3 rounded-2xl text-sm shadow-md transition-colors"
+                    >
+                      Park Now & Close
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex flex-col gap-3">
+              {/* Progress Bar */}
+              {simulationActive && originalRouteDetails?.path && (
+                <div className="w-full">
+                  <div className="flex justify-between items-center text-[10px] text-slate-500 font-bold uppercase mb-1">
+                    <span>Route Progress</span>
+                    <span>{Math.round((simIndex / (originalRouteDetails.path.length - 1)) * 100)}%</span>
+                  </div>
+                  <div className="w-full bg-slate-200 rounded-full h-2 relative overflow-hidden border border-slate-300">
+                    <div 
+                      className="bg-emerald-500 h-full rounded-full transition-all duration-300 ease-out" 
+                      style={{ width: `${(simIndex / (originalRouteDetails.path.length - 1)) * 100}%` }} 
+                    />
+                  </div>
+                </div>
+              )}
+
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                <div className="flex items-center gap-2 text-slate-600">
+                  {simulationActive ? (
+                    <>
+                      <div className="h-2.5 w-2.5 rounded-full bg-indigo-500 animate-pulse shrink-0" />
+                      <span className="font-extrabold text-indigo-700">🚘 Drive Simulation Active</span>
+                      <span className="text-slate-400 font-semibold">· speed: {simulationSpeed} ticks/s</span>
+                    </>
+                  ) : arrived ? (
+                    <>
+                      <div className="h-2.5 w-2.5 rounded-full bg-emerald-500 shrink-0" />
+                      <span className="font-extrabold text-emerald-700">🎉 Arrived at Destination</span>
+                    </>
+                  ) : (
+                    <>
+                      <div className="h-2 w-2 rounded-full bg-emerald-500 animate-ping shrink-0" />
+                      <span className="font-bold">Live Tracking GPS Enabled</span>
+                      <span className="text-slate-400 font-semibold">· auto-updating coordinates</span>
+                    </>
+                  )}
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  {/* Simulation Controls */}
+                  {!simulationActive && !arrived && originalRouteDetails?.path && (
+                    <button
+                      onClick={() => {
+                        setSimulationActive(true);
+                        simulationActiveRef.current = true;
+                        setSimulationPaused(false);
+                        setSimIndex(0);
+                      }}
+                      className="bg-emerald-500 hover:bg-emerald-600 text-white font-extrabold px-4 py-2 rounded-xl text-xs shadow-sm transition-colors flex items-center gap-1.5"
+                    >
+                      <Car className="h-3.5 w-3.5" /> Start Simulation
+                    </button>
+                  )}
+
+                  {simulationActive && (
+                    <>
+                      <button
+                        onClick={() => setSimulationPaused(!simulationPaused)}
+                        className="bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold px-3 py-2 rounded-xl text-xs shadow-sm transition-colors"
+                      >
+                        {simulationPaused ? '▶️ Resume' : '⏸️ Pause'}
+                      </button>
+                      <button
+                        onClick={() => {
+                          setSimulationActive(false);
+                          simulationActiveRef.current = false;
+                          setSimIndex(0);
+                          resetToRealLocation();
+                        }}
+                        className="bg-rose-600 hover:bg-rose-700 text-white font-extrabold px-3 py-2 rounded-xl text-xs shadow-sm transition-colors"
+                      >
+                        ⏹️ Stop
+                      </button>
+                      <div className="flex items-center gap-1 border border-slate-200 rounded-lg px-2 py-1 bg-white">
+                        <span className="text-slate-400 font-bold uppercase text-[9px]">Speed:</span>
+                        <select
+                          value={simulationSpeed}
+                          onChange={(e) => setSimulationSpeed(Number(e.target.value))}
+                          className="bg-white border-0 font-bold text-slate-700 focus:outline-none cursor-pointer text-xs"
+                        >
+                          <option value="2">1x (Slow)</option>
+                          <option value="5">2x (Normal)</option>
+                          <option value="12">5x (Fast)</option>
+                          <option value="25">10x (Turbo)</option>
+                        </select>
+                      </div>
+                    </>
+                  )}
+
+                  {arrived && (
+                    <button
+                      onClick={() => {
+                        setArrived(false);
+                        setSimIndex(0);
+                        resetToRealLocation();
+                      }}
+                      className="bg-slate-200 hover:bg-slate-300 text-slate-700 font-extrabold px-3 py-2 rounded-xl text-xs transition-colors"
+                    >
+                      🔄 Reset Simulation
+                    </button>
+                  )}
+
+                  <button
+                    onClick={closeNavigation}
+                    className="bg-slate-900 hover:bg-slate-800 text-white font-extrabold px-4 py-2 rounded-xl text-xs shadow-sm transition-colors"
+                  >
+                    Close Navigation
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default SeekerDashboard;

@@ -1,0 +1,169 @@
+import React, { useContext } from 'react';
+import { View, Text, StyleSheet, Platform } from 'react-native';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+import { AuthContext } from '../context/AuthContext';
+import { COLORS } from '../theme/colors';
+
+// Auth Screens
+import RoleSelectScreen from '../screens/Auth/RoleSelectScreen';
+import LoginScreen from '../screens/Auth/LoginScreen';
+import RegisterScreen from '../screens/Auth/RegisterScreen';
+
+// Seeker Screens
+import SeekerHomeScreen from '../screens/Seeker/SeekerHomeScreen';
+import SpotDetailsScreen from '../screens/Seeker/SpotDetailsScreen';
+import BookingsScreen from '../screens/Seeker/BookingsScreen';
+import WalletScreen from '../screens/Seeker/WalletScreen';
+import ProfileScreen from '../screens/Seeker/ProfileScreen';
+
+// Owner Screens
+import OwnerHomeScreen from '../screens/Owner/OwnerHomeScreen';
+import AddSpotScreen from '../screens/Owner/AddSpotScreen';
+
+// Admin Screens
+import AdminHomeScreen from '../screens/Admin/AdminHomeScreen';
+
+const Stack = createNativeStackNavigator();
+const Tab = createBottomTabNavigator();
+
+function SeekerTabs() {
+  const insets = useSafeAreaInsets();
+
+  return (
+    <Tab.Navigator
+      screenOptions={{
+        headerShown: false,
+        tabBarStyle: [
+          styles.tabBar,
+          {
+            height: 60 + Math.max(insets.bottom, Platform.OS === 'android' ? 8 : 0),
+            paddingBottom: Math.max(insets.bottom, 8),
+          },
+        ],
+        tabBarActiveTintColor: COLORS.primary,
+        tabBarInactiveTintColor: COLORS.textMuted,
+      }}
+    >
+      <Tab.Screen
+        name="Discover"
+        component={SeekerHomeScreen}
+        options={{
+          tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 18 }}>🔍</Text>,
+        }}
+      />
+      <Tab.Screen
+        name="Bookings"
+        component={BookingsScreen}
+        options={{
+          tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 18 }}>🎟️</Text>,
+        }}
+      />
+      <Tab.Screen
+        name="Wallet"
+        component={WalletScreen}
+        options={{
+          tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 18 }}>💳</Text>,
+        }}
+      />
+      <Tab.Screen
+        name="Profile"
+        component={ProfileScreen}
+        options={{
+          tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 18 }}>👤</Text>,
+        }}
+      />
+    </Tab.Navigator>
+  );
+}
+
+function SeekerStack() {
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="SeekerMain" component={SeekerTabs} />
+      <Stack.Screen name="SpotDetails" component={SpotDetailsScreen} />
+    </Stack.Navigator>
+  );
+}
+
+function OwnerStack() {
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="OwnerMain" component={OwnerHomeScreen} />
+      <Stack.Screen name="AddSpot" component={AddSpotScreen} />
+    </Stack.Navigator>
+  );
+}
+
+function AdminStack() {
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="AdminMain" component={AdminHomeScreen} />
+    </Stack.Navigator>
+  );
+}
+
+function AuthStack() {
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="RoleSelect" component={RoleSelectScreen} />
+      <Stack.Screen name="Login" component={LoginScreen} />
+      <Stack.Screen name="Register" component={RegisterScreen} />
+    </Stack.Navigator>
+  );
+}
+
+export default function AppNavigator() {
+  const { user, loading } = useContext(AuthContext);
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <Text style={styles.loadingLogo}>🅿️ PlanToPark</Text>
+        <Text style={styles.loadingTxt}>Loading Mobile Workspace...</Text>
+      </View>
+    );
+  }
+
+  if (!user) {
+    return <AuthStack />;
+  }
+
+  switch (user.role) {
+    case 'owner':
+      return <OwnerStack />;
+    case 'admin':
+      return <AdminStack />;
+    case 'seeker':
+    default:
+      return <SeekerStack />;
+  }
+}
+
+const styles = StyleSheet.create({
+  tabBar: {
+    backgroundColor: COLORS.cardBg,
+    borderTopColor: COLORS.borderDark,
+    borderTopWidth: 1,
+    paddingTop: 6,
+  },
+  loadingContainer: {
+    flex: 1,
+    backgroundColor: COLORS.darkBg,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingLogo: {
+    fontSize: 28,
+    fontWeight: '900',
+    color: COLORS.white,
+    marginBottom: 8,
+  },
+  loadingTxt: {
+    color: COLORS.primary,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+});

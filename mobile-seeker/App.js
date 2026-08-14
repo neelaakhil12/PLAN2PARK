@@ -1,0 +1,22 @@
+import React from 'react';
+import { StatusBar } from 'expo-status-bar';
+import { NavigationContainer } from '@react-navigation/native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { AuthProvider } from './src/context/AuthContext';
+import AppNavigator from './src/navigation/AppNavigator';
+import WebDesktopFrame from './src/components/WebDesktopFrame';
+
+export default function App() {
+  return (
+    <SafeAreaProvider>
+      <AuthProvider>
+        <WebDesktopFrame appName="Plan2Park Seeker App">
+          <NavigationContainer>
+            <StatusBar style="light" backgroundColor="#0f172a" translucent={false} />
+            <AppNavigator />
+          </NavigationContainer>
+        </WebDesktopFrame>
+      </AuthProvider>
+    </SafeAreaProvider>
+  );
+}
