@@ -89,6 +89,37 @@ export default function OwnerHomeScreen({ navigation }) {
     }
   };
 
+  const handleDeleteSpot = async (spotId, spotTitle) => {
+    const doDelete = async () => {
+      try {
+        const baseUrl = await getBaseApiUrl();
+        const res = await fetch(`${baseUrl}/spaces/${spotId}`, {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          fetchOwnerSpots();
+        } else {
+          const err = await res.json();
+          alert(err.message || 'Could not delete spot');
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    };
+
+    if (typeof window !== 'undefined' && window.confirm) {
+      if (window.confirm(`Are you sure you want to delete "${spotTitle || 'this spot'}"?`)) {
+        doDelete();
+      }
+    } else if (typeof Alert !== 'undefined' && Alert.alert) {
+      Alert.alert('Delete Spot', `Are you sure you want to delete "${spotTitle || 'this spot'}"?`, [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete', style: 'destructive', onPress: doDelete },
+      ]);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container} edges={['left', 'right']}>
       {/* Header with notch padding */}
@@ -152,26 +183,50 @@ export default function OwnerHomeScreen({ navigation }) {
         ) : (
           spots.map((spot) => {
             const isActive = spot.isActive !== false;
+            const spotRate = spot.pricePerHour !== undefined ? spot.pricePerHour : (spot.hourlyRate || 40);
+            const spotSlots = spot.totalSlots || (spot.slots ? spot.slots.length : null) || spot.totalSpots || 1;
+
             return (
               <View key={spot._id} style={styles.spotItem}>
-                <View style={styles.spotInfo}>
-                  <Text style={styles.spotTitle}>{spot.title}</Text>
-                  <Text style={styles.spotAddress}>📍 {spot.address}, {spot.city}</Text>
-                  <Text style={styles.spotPrice}>Rate: ₹{spot.hourlyRate}/hr • {spot.totalSpots} spots</Text>
-                </View>
-                <TouchableOpacity
-                  style={styles.toggleCol}
-                  onPress={() => handleToggleStatus(spot._id, isActive)}
-                  onClick={() => handleToggleStatus(spot._id, isActive)}
-                  activeOpacity={0.7}
-                >
-                  <Text style={[styles.toggleLabel, { color: isActive ? '#10b981' : '#94a3b8' }]}>
-                    {isActive ? 'Active' : 'Offline'}
-                  </Text>
-                  <View style={[styles.customToggleTrack, { backgroundColor: isActive ? '#10b981' : '#334155' }]}>
-                    <View style={[styles.customToggleThumb, { alignSelf: isActive ? 'flex-end' : 'flex-start' }]} />
+                <View style={styles.spotHeaderRow}>
+                  <View style={styles.spotInfo}>
+                    <Text style={styles.spotTitle}>{spot.title || 'Parking Spot'}</Text>
+                    <Text style={styles.spotAddress}>📍 {spot.address || 'Address'}, {spot.city || 'Hyderabad'}</Text>
+                    <Text style={styles.spotPrice}>Rate: ₹{spotRate}/hr • {spotSlots} slots</Text>
                   </View>
-                </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.toggleCol}
+                    onPress={() => handleToggleStatus(spot._id, isActive)}
+                    onClick={() => handleToggleStatus(spot._id, isActive)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.toggleLabel, { color: isActive ? '#10b981' : '#94a3b8' }]}>
+                      {isActive ? 'Active' : 'Offline'}
+                    </Text>
+                    <View style={[styles.customToggleTrack, { backgroundColor: isActive ? '#10b981' : '#334155' }]}>
+                      <View style={[styles.customToggleThumb, { alignSelf: isActive ? 'flex-end' : 'flex-start' }]} />
+                    </View>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Edit & Delete Action Buttons */}
+                <View style={styles.spotActionsRow}>
+                  <TouchableOpacity
+                    style={styles.editBtn}
+                    onPress={() => navigation.navigate('AddSpot', { spot })}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.editBtnTxt}>✏️ Edit Spot</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.deleteBtn}
+                    onPress={() => handleDeleteSpot(spot._id, spot.title)}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.deleteBtnTxt}>🗑️ Delete</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             );
           })
@@ -281,14 +336,17 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     padding: 16,
     marginBottom: 12,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
     borderWidth: 1,
     borderColor: COLORS.borderDark,
   },
+  spotHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
   spotInfo: {
     flex: 1,
+    paddingRight: 10,
   },
   spotTitle: {
     color: COLORS.white,
@@ -304,6 +362,44 @@ const styles = StyleSheet.create({
     color: COLORS.ownerAccent,
     fontSize: 12,
     fontWeight: '600',
+  },
+  spotActionsRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 14,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.borderDark,
+  },
+  editBtn: {
+    flex: 1,
+    backgroundColor: '#3b82f620',
+    borderWidth: 1,
+    borderColor: '#3b82f6',
+    borderRadius: 8,
+    paddingVertical: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  editBtnTxt: {
+    color: '#60a5fa',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  deleteBtn: {
+    backgroundColor: '#ef444420',
+    borderWidth: 1,
+    borderColor: '#ef4444',
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  deleteBtnTxt: {
+    color: '#f87171',
+    fontSize: 13,
+    fontWeight: '700',
   },
   toggleCol: {
     alignItems: 'center',

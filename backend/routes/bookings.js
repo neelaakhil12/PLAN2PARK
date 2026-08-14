@@ -44,14 +44,19 @@ router.post('/', protect, seekerOnly, upload.single('driverImageFile'), async (r
       return res.status(400).json({ message: 'This parking space is not active or approved' });
     }
 
-    if (!slotId) {
-      return res.status(400).json({ message: 'A slot selection is required.' });
-    }
-
-    // Verify slotId exists
-    const slotExists = (space.slots || []).some(s => s.slotId === slotId);
-    if (!slotExists) {
-      return res.status(400).json({ message: 'The requested slot does not exist.' });
+    let targetSlotId = slotId;
+    if (!targetSlotId) {
+      if (space.slots && space.slots.length > 0) {
+        targetSlotId = space.slots[0].slotId;
+      } else {
+        targetSlotId = 'Slot-1';
+      }
+    } else {
+      // Verify slotId exists
+      const slotExists = (space.slots || []).some(s => s.slotId === targetSlotId);
+      if (!slotExists && space.slots && space.slots.length > 0) {
+        targetSlotId = space.slots[0].slotId;
+      }
     }
 
     const start = new Date(startTime);
@@ -97,7 +102,7 @@ router.post('/', protect, seekerOnly, upload.single('driverImageFile'), async (r
     const booking = await Booking.create({
       seekerId: req.user._id,
       spaceId,
-      slotId,
+      slotId: targetSlotId,
       vehicleNumber,
       seekerName,
       seekerContact,

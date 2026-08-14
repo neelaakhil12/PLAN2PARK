@@ -18,22 +18,23 @@ import { COLORS } from '../../theme/colors';
 import Header from '../../components/Header';
 import Button from '../../components/Button';
 
-export default function AddSpotScreen({ navigation }) {
+export default function AddSpotScreen({ route, navigation }) {
   const { token } = useContext(AuthContext);
+  const editingSpot = route?.params?.spot || null;
 
-  const [title, setTitle] = useState('');
+  const [title, setTitle] = useState(editingSpot?.title || '');
   const [plotNo, setPlotNo] = useState('');
   const [colonyArea, setColonyArea] = useState('');
   const [landmark, setLandmark] = useState('');
-  const [address, setAddress] = useState('');
-  const [city, setCity] = useState('Hyderabad');
+  const [address, setAddress] = useState(editingSpot?.address || '');
+  const [city, setCity] = useState(editingSpot?.city || 'Hyderabad');
   const [pincode, setPincode] = useState('500097');
-  const [googleMapsLink, setGoogleMapsLink] = useState('');
-  const [lat, setLat] = useState(null);
-  const [lng, setLng] = useState(null);
-  const [hourlyRate, setHourlyRate] = useState('50');
-  const [totalSpots, setTotalSpots] = useState('5');
-  const [hasEvCharger, setHasEvCharger] = useState(false);
+  const [googleMapsLink, setGoogleMapsLink] = useState(editingSpot?.locationLink || editingSpot?.googleMapsLink || '');
+  const [lat, setLat] = useState(editingSpot?.coordinates?.lat || editingSpot?.lat || null);
+  const [lng, setLng] = useState(editingSpot?.coordinates?.lng || editingSpot?.lng || null);
+  const [hourlyRate, setHourlyRate] = useState(String(editingSpot?.pricePerHour || editingSpot?.hourlyRate || '50'));
+  const [totalSpots, setTotalSpots] = useState(String(editingSpot?.totalSlots || (editingSpot?.slots ? editingSpot.slots.length : null) || editingSpot?.totalSpots || '5'));
+  const [hasEvCharger, setHasEvCharger] = useState(Boolean(editingSpot?.hasEvCharger));
   const [loading, setLoading] = useState(false);
   const [locating, setLocating] = useState(false);
 
@@ -458,8 +459,11 @@ export default function AddSpotScreen({ navigation }) {
     setLoading(true);
     try {
       const baseUrl = await getBaseApiUrl();
-      const res = await fetch(`${baseUrl}/spaces`, {
-        method: 'POST',
+      const url = editingSpot ? `${baseUrl}/spaces/${editingSpot._id}` : `${baseUrl}/spaces`;
+      const method = editingSpot ? 'PUT' : 'POST';
+
+      const res = await fetch(url, {
+        method,
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
@@ -474,17 +478,19 @@ export default function AddSpotScreen({ navigation }) {
           lat,
           lng,
           hourlyRate: Number(hourlyRate),
+          pricePerHour: Number(hourlyRate),
           totalSpots: Number(totalSpots),
+          totalSlots: Number(totalSpots),
           hasEvCharger,
         }),
       });
 
       const data = await res.json();
       if (res.ok) {
-        showAlert('Success', 'Parking Space listed successfully!');
+        showAlert('Success', editingSpot ? 'Parking Space updated successfully!' : 'Parking Space listed successfully!');
         navigation.goBack();
       } else {
-        showAlert('Error', data.message || 'Could not add space');
+        showAlert('Error', data.message || 'Could not save space');
       }
     } catch (err) {
       showAlert('Error', err.message || 'Network error');
@@ -495,7 +501,7 @@ export default function AddSpotScreen({ navigation }) {
 
   return (
     <SafeAreaView style={styles.container}>
-      <Header title="List New Parking Spot" onBack={() => navigation.goBack()} />
+      <Header title={editingSpot ? "Edit Parking Spot" : "List New Parking Spot"} onBack={() => navigation.goBack()} />
 
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.formCard}>
@@ -623,26 +629,30 @@ export default function AddSpotScreen({ navigation }) {
             </View>
           </View>
 
-          <TouchableOpacity 
-            style={styles.switchRow}
-            onPress={() => setHasEvCharger(!hasEvCharger)}
-            onClick={() => setHasEvCharger(!hasEvCharger)}
-            activeOpacity={0.8}
-          >
+          <View style={styles.switchRow}>
             <View style={{ flex: 1 }}>
               <Text style={styles.switchTitle}>⚡ EV Charger Facility</Text>
               <Text style={styles.switchSub}>Is electric vehicle charging available?</Text>
             </View>
-            <Switch
-              value={hasEvCharger}
-              onValueChange={(val) => setHasEvCharger(val)}
-              trackColor={{ false: '#334155', true: '#10b981' }}
-              thumbColor={hasEvCharger ? '#ffffff' : '#94a3b8'}
-            />
-          </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.customToggleTrack,
+                { backgroundColor: hasEvCharger ? '#10b981' : '#334155' }
+              ]}
+              onPress={() => setHasEvCharger(!hasEvCharger)}
+              activeOpacity={0.8}
+            >
+              <View
+                style={[
+                  styles.customToggleThumb,
+                  { alignSelf: hasEvCharger ? 'flex-end' : 'flex-start' }
+                ]}
+              />
+            </TouchableOpacity>
+          </View>
 
           <Button
-            title="Publish Parking Listing"
+            title={editingSpot ? "Save Changes & Update Spot" : "Publish Parking Listing"}
             onPress={handleCreateSpot}
             loading={loading}
             style={{ backgroundColor: COLORS.ownerAccent, marginTop: 20 }}
@@ -782,6 +792,19 @@ const styles = StyleSheet.create({
     color: COLORS.textMuted,
     fontSize: 11,
     marginTop: 2,
+  },
+  customToggleTrack: {
+    width: 44,
+    height: 24,
+    borderRadius: 12,
+    padding: 2,
+    justifyContent: 'center',
+  },
+  customToggleThumb: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#ffffff',
   },
   locationHeaderRow: {
     flexDirection: 'row',

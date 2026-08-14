@@ -32,11 +32,13 @@ export const endpoints = {
   deleteSpace: (id) => `${API_URL}/spaces/${id}`,
   toggleSpaceStatus: (id) => `${API_URL}/spaces/${id}/toggle`,
 
-  // Bookings
+  // Bookings & Payments
   createBooking: `${API_URL}/bookings`,
   getMyBookings: `${API_URL}/bookings/my-bookings`,
   getOwnerBookings: `${API_URL}/bookings/owner-bookings`,
   cancelBooking: (id) => `${API_URL}/bookings/${id}/cancel`,
+  razorpayOrder: (id) => `${API_URL}/bookings/${id}/razorpay-order`,
+  verifyPayment: (id) => `${API_URL}/bookings/${id}/verify-payment`,
 
   // Analytics
   getOwnerAnalytics: `${API_URL}/analytics/owner`,

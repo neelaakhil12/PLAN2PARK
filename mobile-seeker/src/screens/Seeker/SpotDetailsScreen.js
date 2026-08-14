@@ -15,16 +15,28 @@ import { COLORS } from '../../theme/colors';
 import Button from '../../components/Button';
 import Header from '../../components/Header';
 
+const loadRazorpayScript = () => {
+  return new Promise((resolve) => {
+    if (typeof window === 'undefined' || !window.document) return resolve(false);
+    if (window.Razorpay) return resolve(true);
+    const script = document.createElement('script');
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
+};
+
 export default function SpotDetailsScreen({ route, navigation }) {
   const space = route.params?.space || {};
-  const { token } = useContext(AuthContext);
+  const { user, token } = useContext(AuthContext);
 
   const [vehicleNumber, setVehicleNumber] = useState('TS07AB1234');
   const [vehicleType, setVehicleType] = useState('4-wheeler');
   const [durationHours, setDurationHours] = useState('2');
   const [loading, setLoading] = useState(false);
 
-  const hourlyRate = space.hourlyRate || 40;
+  const hourlyRate = space.pricePerHour !== undefined ? space.pricePerHour : (space.hourlyRate || 40);
   const totalPrice = Number(durationHours || 1) * hourlyRate;
 
   const handleCreateBooking = async () => {
@@ -47,6 +59,7 @@ export default function SpotDetailsScreen({ route, navigation }) {
         totalAmount: totalPrice,
       };
 
+      // 1. Create booking in backend
       const res = await fetch(endpoints.createBooking, {
         method: 'POST',
         headers: {
@@ -58,16 +71,95 @@ export default function SpotDetailsScreen({ route, navigation }) {
 
       const data = await res.json();
 
-      if (res.ok) {
-        Alert.alert('🎉 Booking Confirmed!', `Spot reserved at ${space.title}!`, [
-          {
-            text: 'View My Bookings',
-            onPress: () => navigation.navigate('Bookings'),
-          },
-        ]);
-      } else {
+      if (!res.ok) {
         Alert.alert('Booking Error', data.message || 'Could not complete booking');
+        setLoading(false);
+        return;
       }
+
+      const newBooking = data.booking || data;
+
+      // 2. Fetch Razorpay Order from backend
+      try {
+        const orderRes = await fetch(endpoints.razorpayOrder(newBooking._id), {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (orderRes.ok) {
+          const orderData = await orderRes.json();
+          const { orderId, amount, currency, keyId, isMock } = orderData;
+
+          // 3. Load script & launch Razorpay Checkout on Web
+          const scriptLoaded = await loadRazorpayScript();
+
+          if (!isMock && scriptLoaded && window.Razorpay) {
+            const options = {
+              key: keyId,
+              amount: amount,
+              currency: currency || 'INR',
+              name: 'PlanToPark Safe P2P',
+              description: `Parking: ${space.title || 'Reserved Spot'}`,
+              order_id: orderId,
+              handler: async function (response) {
+                try {
+                  const verifyRes = await fetch(endpoints.verifyPayment(newBooking._id), {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      Authorization: `Bearer ${token}`,
+                    },
+                    body: JSON.stringify({
+                      razorpay_payment_id: response.razorpay_payment_id,
+                      razorpay_order_id: response.razorpay_order_id,
+                      razorpay_signature: response.razorpay_signature,
+                      isMock: false,
+                    }),
+                  });
+
+                  if (verifyRes.ok) {
+                    Alert.alert('🎉 Payment Successful!', `Booking confirmed for ${space.title}!`, [
+                      { text: 'View My Bookings', onPress: () => navigation.navigate('Bookings') },
+                    ]);
+                  } else {
+                    Alert.alert('Notice', 'Payment processed. Checking status in Bookings.', [
+                      { text: 'OK', onPress: () => navigation.navigate('Bookings') },
+                    ]);
+                  }
+                } catch (vErr) {
+                  navigation.navigate('Bookings');
+                }
+              },
+              prefill: {
+                name: user?.name || '',
+                email: user?.email || '',
+                contact: user?.contact || '',
+              },
+              theme: {
+                color: '#10b981',
+              },
+            };
+
+            const rzp = new window.Razorpay(options);
+            rzp.open();
+            setLoading(false);
+            return;
+          }
+        }
+      } catch (orderErr) {
+        console.warn('Razorpay order error:', orderErr);
+      }
+
+      // Default fallback confirmation
+      Alert.alert('🎉 Booking Confirmed!', `Spot reserved at ${space.title}!`, [
+        {
+          text: 'View My Bookings',
+          onPress: () => navigation.navigate('Bookings'),
+        },
+      ]);
     } catch (err) {
       Alert.alert('Error', err.message || 'Network error during booking');
     } finally {

@@ -241,7 +241,7 @@ router.post('/', protect, ownerOnly, upload.single('imageFile'), async (req, res
       location: finalLocation,
       city: finalCity,
       googleMapsLink: finalMapsLink,
-      hasEvCharger: Boolean(hasEvCharger),
+      hasEvCharger: (hasEvCharger === true || hasEvCharger === 'true' || hasEvCharger === 1 || hasEvCharger === '1'),
       totalSlots: finalTotalSlots,
       pricePerHour: finalRate,
       pricePerDay: pricePerDay ? Number(pricePerDay) : finalRate * 8,
@@ -393,9 +393,17 @@ router.put('/:id', protect, ownerOnly, upload.single('imageFile'), async (req, r
     }
 
     // ── Other field updates ──────────────────────────────────────────────────
+    if (req.body.title)        space.title       = req.body.title;
     if (req.body.address)      space.address     = req.body.address;
+    if (req.body.city)         space.city        = req.body.city;
     if (req.body.location)     space.location    = req.body.location;
-    if (req.body.pricePerHour) space.pricePerHour = Number(req.body.pricePerHour);
+    if (req.body.locationLink) space.locationLink = req.body.locationLink;
+    if (req.body.hasEvCharger !== undefined) {
+      space.hasEvCharger = req.body.hasEvCharger === true || req.body.hasEvCharger === 'true' || req.body.hasEvCharger === 1 || req.body.hasEvCharger === '1';
+    }
+    
+    const rate = req.body.pricePerHour !== undefined ? req.body.pricePerHour : req.body.hourlyRate;
+    if (rate !== undefined)    space.pricePerHour = Number(rate);
     if (req.body.pricePerDay)   space.pricePerDay  = Number(req.body.pricePerDay);
     if (req.body.pricePerWeek !== undefined) space.pricePerWeek = Number(req.body.pricePerWeek);
     if (req.body.pricePerMonth !== undefined) space.pricePerMonth = Number(req.body.pricePerMonth);
@@ -404,8 +412,9 @@ router.put('/:id', protect, ownerOnly, upload.single('imageFile'), async (req, r
       space.coordinates = { lat: parseFloat(req.body.lat), lng: parseFloat(req.body.lng) };
     }
 
-    if (req.body.totalSlots && Number(req.body.totalSlots) !== space.totalSlots) {
-      space.totalSlots = Number(req.body.totalSlots);
+    const spotsCount = req.body.totalSlots !== undefined ? req.body.totalSlots : req.body.totalSpots;
+    if (spotsCount && Number(spotsCount) !== space.totalSlots) {
+      space.totalSlots = Number(spotsCount);
       const prefix = 'Slot-';
       const slots = [];
       for (let i = 1; i <= space.totalSlots; i++) {
