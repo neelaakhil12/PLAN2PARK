@@ -12,22 +12,22 @@ const run = async () => {
     console.log(`Found ${bookings.length} total bookings`);
 
     for (let b of bookings) {
-      if (b.refundStatus === 'half' || b.refundPolicyApplied === 'half') {
-        const retained = Math.max(0, (b.totalAmount || 0) - (b.refundAmount || 0));
-        b.ownerEarnings = Number((retained * 0.9).toFixed(2));
-        b.paymentStatus = 'paid';
+      if (b.status === 'cancelled') {
+        const refund = b.refundAmount || 0;
+        const retained = Math.max(0, (b.totalAmount || 0) - refund);
+        b.ownerEarnings = Number(retained.toFixed(2));
+        b.adminCommission = 0;
         await b.save();
-        console.log(`Updated half-refund booking ${b._id}: refundAmount=${b.refundAmount}, ownerEarnings=${b.ownerEarnings}`);
-      } else if (b.paymentStatus === 'paid' && b.status !== 'cancelled') {
-        if (!b.ownerEarnings || b.ownerEarnings === 0) {
-          b.ownerEarnings = Number(((b.totalAmount || 0) * 0.9).toFixed(2));
-          await b.save();
-          console.log(`Updated active paid booking ${b._id}: ownerEarnings=${b.ownerEarnings}`);
-        }
+        console.log(`Updated cancelled booking ${b._id}: refundAmount=${refund}, ownerEarnings=${b.ownerEarnings}`);
+      } else if (b.paymentStatus === 'paid' || b.status === 'paid') {
+        b.ownerEarnings = Number((b.totalAmount || 0).toFixed(2));
+        b.adminCommission = 0;
+        await b.save();
+        console.log(`Updated active paid booking ${b._id}: totalAmount=${b.totalAmount}, ownerEarnings=${b.ownerEarnings}`);
       }
     }
 
-    console.log('Finished updating bookings!');
+    console.log('Finished updating all bookings to 100% owner payout!');
     process.exit(0);
   } catch (e) {
     console.error(e);

@@ -168,7 +168,7 @@ export default function OwnerHomeScreen({ navigation }) {
             <Text style={styles.metricVal}>
               ₹{Number(totalEarnings).toFixed(2).replace(/\.00$/, '')}
             </Text>
-            <Text style={styles.metricLabel}>Net Earnings (90%)</Text>
+            <Text style={styles.metricLabel}>Total Earnings (100% Payout)</Text>
           </View>
           <TouchableOpacity
             style={styles.metricCard}

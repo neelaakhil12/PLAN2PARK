@@ -136,7 +136,7 @@ export default function OwnerBookingsScreen({ navigation }) {
         <View style={styles.summaryCard}>
           <View style={styles.summaryCol}>
             <Text style={styles.summaryVal}>₹{Number(totalEarnings).toFixed(2).replace(/\.00$/, '')}</Text>
-            <Text style={styles.summaryLabel}>Total Net Earnings (90%)</Text>
+            <Text style={styles.summaryLabel}>Total Earnings (100% Payout)</Text>
           </View>
           <View style={styles.summaryCol}>
             <Text style={[styles.summaryVal, { color: '#10b981' }]}>{bookings.length}</Text>
@@ -186,7 +186,7 @@ export default function OwnerBookingsScreen({ navigation }) {
             const seekerPhone = booking.seekerContact || booking.seekerId?.contact || '';
             const slot = booking.slotId || 'Slot-1';
             const amount = booking.totalAmount || 0;
-            const myShare = booking.ownerEarnings || Math.round(amount * 0.9);
+            const myShare = booking.ownerEarnings !== undefined && booking.ownerEarnings !== null ? booking.ownerEarnings : amount;
             const dateStr = new Date(booking.createdAt).toLocaleString('en-IN', {
               month: 'short',
               day: 'numeric',
@@ -231,7 +231,9 @@ export default function OwnerBookingsScreen({ navigation }) {
                   </View>
                   <View style={styles.detailItem}>
                     <Text style={styles.detailLabel}>💰 Your Payout</Text>
-                    <Text style={[styles.detailVal, { color: '#10b981', fontWeight: '800' }]}>₹{myShare} ({amount} total)</Text>
+                    <Text style={[styles.detailVal, { color: '#10b981', fontWeight: '800' }]}>
+                      ₹{isCancelled && booking.refundAmount > 0 ? `${myShare} (Retained)` : myShare}
+                    </Text>
                   </View>
                 </View>
 

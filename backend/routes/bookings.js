@@ -492,8 +492,8 @@ router.post('/:id/verify-payment', protect, seekerOnly, async (req, res) => {
       booking.paymentStatus = 'paid';
       booking.status = 'paid';
       booking.transactionReference = razorpay_payment_id || 'pay_mock_' + crypto.randomBytes(8).toString('hex');
-      booking.adminCommission = Number((booking.totalAmount * 0.1).toFixed(2));
-      booking.ownerEarnings = Number((booking.totalAmount * 0.9).toFixed(2));
+      booking.adminCommission = 0;
+      booking.ownerEarnings = Number(booking.totalAmount.toFixed(2));
       await booking.save();
 
       return res.json({ message: 'Mock payment verified successfully!', booking });
@@ -513,8 +513,8 @@ router.post('/:id/verify-payment', protect, seekerOnly, async (req, res) => {
     booking.paymentStatus = 'paid';
     booking.status = 'paid';
     booking.transactionReference = razorpay_payment_id;
-    booking.adminCommission = Number((booking.totalAmount * 0.1).toFixed(2));
-    booking.ownerEarnings = Number((booking.totalAmount * 0.9).toFixed(2));
+    booking.adminCommission = 0;
+    booking.ownerEarnings = Number(booking.totalAmount.toFixed(2));
     await booking.save();
 
     res.json({ message: 'Payment verified and captured successfully!', booking });
@@ -812,9 +812,9 @@ const cancelBookingHandler = async (req, res) => {
       booking.refundStatus = policyApplied === 'full' ? 'full' : policyApplied === 'half' ? 'half' : 'rejected';
       booking.refundPolicyApplied = policyApplied;
 
-      // Adjust owner earnings to retained portion after refund
+      // Adjust owner earnings to retained portion after refund (100% full retained payout)
       const retainedAmount = Math.max(0, booking.totalAmount - refundAmount);
-      booking.ownerEarnings = Number((retainedAmount * 0.9).toFixed(2));
+      booking.ownerEarnings = Number(retainedAmount.toFixed(2));
 
       if (refundAmount > 0) {
         // Credit refund to seeker's wallet
