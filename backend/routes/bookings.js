@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const User = require('../models/User');
 const Booking = require('../models/Booking');
 const ParkingSpace = require('../models/ParkingSpace');
 const { protect, adminOnly, ownerOnly, seekerOnly } = require('../middleware/auth');
@@ -372,7 +373,6 @@ router.put('/:id/cancel', protect, async (req, res) => {
 // ─── RAZORPAY INTEGRATION & FINANCIAL MANAGEMENT ROUTES ───────────────────
 const Razorpay = require('razorpay');
 const crypto = require('crypto');
-const User = require('../models/User');
 
 // Helper to determine if we are in mock mode
 const isRazorpayMock = () => {
@@ -758,12 +758,64 @@ const cancelBookingHandler = async (req, res) => {
     }
 
     booking.status = 'cancelled';
-    if (booking.paymentStatus === 'unpaid') {
+
+    let refundAmount = 0;
+    let policyApplied = (space && space.cancellationPolicy) ? space.cancellationPolicy : 'full';
+
+    // Allow owner/admin override from body if specified
+    if (req.body && req.body.cancellationPolicy) {
+      policyApplied = req.body.cancellationPolicy;
+    }
+
+    if (booking.paymentStatus === 'paid' && booking.totalAmount > 0) {
+      if (policyApplied === 'full') {
+        refundAmount = booking.totalAmount;
+      } else if (policyApplied === 'half') {
+        refundAmount = Number((booking.totalAmount * 0.5).toFixed(2));
+      } else if (policyApplied === 'none') {
+        refundAmount = 0;
+      }
+
+      booking.refundAmount = refundAmount;
+      booking.refundStatus = policyApplied === 'full' ? 'full' : policyApplied === 'half' ? 'half' : 'rejected';
+      booking.refundPolicyApplied = policyApplied;
+
+      // Adjust owner earnings
+      if (refundAmount > 0) {
+        booking.ownerEarnings = Math.max(0, (booking.ownerEarnings || 0) - refundAmount);
+
+        // Credit refund to seeker's wallet
+        const seeker = await User.findById(booking.seekerId);
+        if (seeker) {
+          seeker.walletBalance = Number(((seeker.walletBalance || 0) + refundAmount).toFixed(2));
+          if (!seeker.walletTransactions) seeker.walletTransactions = [];
+          seeker.walletTransactions.push({
+            type: 'credit',
+            amount: refundAmount,
+            description: `Refund (${policyApplied === 'half' ? '50% Half Refund' : '100% Full Refund'}) for cancelled booking at ${space ? space.title : 'Parking Space'}`,
+            date: new Date(),
+            bookingId: booking._id,
+          });
+          await seeker.save();
+        }
+      }
+    } else {
       booking.paymentStatus = 'failed';
     }
+
     await booking.save();
 
-    res.json({ message: 'Booking cancelled successfully', booking });
+    const policyText = policyApplied === 'full' ? '100% Full Refund' : policyApplied === 'half' ? '50% Half Refund' : 'No Refund';
+    const message = refundAmount > 0
+      ? `Reservation cancelled successfully. ₹${refundAmount} (${policyText}) has been refunded to your PlanToPark Wallet!`
+      : `Reservation cancelled successfully (${policyText}).`;
+
+    res.json({
+      message,
+      refundAmount,
+      policyApplied,
+      booking,
+    });
   } catch (error) {
     console.error('Cancel booking error:', error);
     res.status(500).json({ message: error.message });

@@ -84,6 +84,11 @@ const parkingSpaceSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
+    cancellationPolicy: {
+      type: String,
+      enum: ['full', 'half', 'none'],
+      default: 'full', // 'full' = 100% Refund, 'half' = 50% Refund, 'none' = 0% No Refund
+    },
     suitableVehicles: {
       type: [String],
       enum: ['2-wheeler', '4-wheeler', 'large-car', 'heavy-vehicle'],

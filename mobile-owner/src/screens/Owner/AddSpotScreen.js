@@ -36,6 +36,7 @@ export default function AddSpotScreen({ route, navigation }) {
   const [totalSpots, setTotalSpots] = useState(String(editingSpot?.totalSlots || (editingSpot?.slots ? editingSpot.slots.length : null) || editingSpot?.totalSpots || '5'));
   const [hasEvCharger, setHasEvCharger] = useState(Boolean(editingSpot?.hasEvCharger));
   const [isActive, setIsActive] = useState(editingSpot?.isActive !== false);
+  const [cancellationPolicy, setCancellationPolicy] = useState(editingSpot?.cancellationPolicy || 'full');
   const [loading, setLoading] = useState(false);
   const [locating, setLocating] = useState(false);
 
@@ -52,6 +53,7 @@ export default function AddSpotScreen({ route, navigation }) {
       setTotalSpots(String(s.totalSlots || (s.slots ? s.slots.length : null) || s.totalSpots || '5'));
       setHasEvCharger(Boolean(s.hasEvCharger));
       setIsActive(s.isActive !== false);
+      setCancellationPolicy(s.cancellationPolicy || 'full');
     }
   }, [route?.params?.spot]);
 
@@ -500,6 +502,7 @@ export default function AddSpotScreen({ route, navigation }) {
           totalSlots: Number(totalSpots),
           hasEvCharger,
           isActive,
+          cancellationPolicy,
         }),
       });
 
@@ -579,51 +582,71 @@ export default function AddSpotScreen({ route, navigation }) {
               onPress={handleLocateMe}
               onClick={handleLocateMe}
               disabled={locating}
-              activeOpacity={0.7}
+              activeOpacity={0.8}
             >
               {locating ? (
-                <ActivityIndicator size="small" color="#ffffff" />
+                <ActivityIndicator size="small" color="#25D366" />
               ) : (
-                <Text style={styles.locateBtnTxt}>📍 Locate Me (Auto-Fill)</Text>
+                <Text style={styles.locateBtnTxt}>📍 Use GPS</Text>
               )}
             </TouchableOpacity>
           </View>
 
           <TextInput
-            style={styles.input}
-            placeholder="e.g. Plot No. 42, Chaitanya Hills, BN Reddy Nagar, Hyderabad, 500097"
+            style={[styles.input, styles.textArea]}
+            placeholder="Complete address with colony, landmark & city"
             placeholderTextColor={COLORS.textMuted}
             value={address}
             onChangeText={setAddress}
             multiline
+            numberOfLines={3}
           />
 
-          {/* Google Maps Location Link Manual Paste */}
-          <Text style={styles.label}>Google Maps / Location Link (Paste Option)</Text>
+          {/* City and Pincode Row */}
+          <View style={styles.row}>
+            <View style={styles.col}>
+              <Text style={styles.label}>City</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Hyderabad"
+                placeholderTextColor={COLORS.textMuted}
+                value={city}
+                onChangeText={(txt) => {
+                  setCity(txt);
+                  handleAddressSubFieldChange(plotNo, colonyArea, landmark, txt, pincode);
+                }}
+              />
+            </View>
+            <View style={styles.col}>
+              <Text style={styles.label}>Pincode</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="500097"
+                placeholderTextColor={COLORS.textMuted}
+                keyboardType="numeric"
+                value={pincode}
+                onChangeText={(txt) => {
+                  setPincode(txt);
+                  handleAddressSubFieldChange(plotNo, colonyArea, landmark, city, txt);
+                }}
+              />
+            </View>
+          </View>
+
+          {/* Google Maps Link Field */}
+          <Text style={styles.label}>Google Maps Link (Optional)</Text>
           <TextInput
             style={styles.input}
-            placeholder="e.g. https://maps.app.goo.gl/... or paste location link"
+            placeholder="Paste Google Maps URL or use GPS above"
             placeholderTextColor={COLORS.textMuted}
             value={googleMapsLink}
-            onChangeText={handleLocationLinkChange}
-            autoCapitalize="none"
-          />
-          <Text style={styles.helperText}>
-            💡 Tip: Click "Locate Me" to auto-detect current spot address, or paste a Google Maps link manually if listing another location.
-          </Text>
-
-          <Text style={styles.label}>City</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="e.g. Hyderabad"
-            placeholderTextColor={COLORS.textMuted}
-            value={city}
-            onChangeText={setCity}
+            onChangeText={setGoogleMapsLink}
           />
 
+          {/* Rate and Capacity */}
           <View style={styles.row}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.label}>Hourly Rate (₹/hr)</Text>
+            <View style={styles.col}>
+              <Text style={styles.label}>Hourly Rate (₹)</Text>
               <TextInput
                 style={styles.input}
                 placeholder="50"
@@ -633,9 +656,8 @@ export default function AddSpotScreen({ route, navigation }) {
                 onChangeText={setHourlyRate}
               />
             </View>
-
-            <View style={{ flex: 1 }}>
-              <Text style={styles.label}>Total Capacity (Spots)</Text>
+            <View style={styles.col}>
+              <Text style={styles.label}>Total Capacity (Slots)</Text>
               <TextInput
                 style={styles.input}
                 placeholder="5"
@@ -644,6 +666,60 @@ export default function AddSpotScreen({ route, navigation }) {
                 value={totalSpots}
                 onChangeText={setTotalSpots}
               />
+            </View>
+          </View>
+
+          {/* Cancellation & Refund Policy Options (Owner Choice) */}
+          <View style={{ marginTop: 14, marginBottom: 14 }}>
+            <Text style={styles.switchTitle}>🛡️ Cancellation & Refund Policy</Text>
+            <Text style={styles.switchSub}>Select refund amount driver receives if they cancel:</Text>
+
+            <View style={{ gap: 8, marginTop: 10 }}>
+              {[
+                { id: 'full', title: '🟢 100% Full Refund', sub: 'Seeker receives full 100% paid amount credited to wallet' },
+                { id: 'half', title: '🟡 50% Half Refund', sub: 'Seeker receives 50% refund; you keep 50% compensation' },
+                { id: 'none', title: '🔴 0% No Refund', sub: 'Strict non-refundable booking' },
+              ].map((policy) => {
+                const isSelected = cancellationPolicy === policy.id;
+                return (
+                  <TouchableOpacity
+                    key={policy.id}
+                    style={{
+                      backgroundColor: isSelected ? '#a855f720' : '#0f172a80',
+                      borderColor: isSelected ? COLORS.ownerAccent : COLORS.borderDark,
+                      borderWidth: 1.5,
+                      borderRadius: 12,
+                      padding: 12,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                    }}
+                    onPress={() => setCancellationPolicy(policy.id)}
+                    activeOpacity={0.8}
+                  >
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ color: isSelected ? COLORS.white : COLORS.textMuted, fontSize: 14, fontWeight: '800' }}>
+                        {policy.title}
+                      </Text>
+                      <Text style={{ color: COLORS.textMuted, fontSize: 11, marginTop: 2 }}>
+                        {policy.sub}
+                      </Text>
+                    </View>
+                    <View style={{
+                      width: 20,
+                      height: 20,
+                      borderRadius: 10,
+                      borderWidth: 2,
+                      borderColor: isSelected ? COLORS.ownerAccent : '#475569',
+                      backgroundColor: isSelected ? COLORS.ownerAccent : 'transparent',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}>
+                      {isSelected && <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: COLORS.white }} />}
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
           </View>
 

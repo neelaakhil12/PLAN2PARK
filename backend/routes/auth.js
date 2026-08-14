@@ -461,4 +461,21 @@ router.post('/favorites/:spaceId', protect, async (req, res) => {
   }
 });
 
+// ─── WALLET DATA (Seeker/User) ──────────────────────────────────────────────
+// @desc    Get user wallet balance and transaction ledger
+// @route   GET /api/auth/wallet
+// @access  Private
+router.get('/wallet', protect, async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    res.json({
+      walletBalance: user.walletBalance || 0,
+      walletTransactions: (user.walletTransactions || []).slice().reverse(),
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
 module.exports = router;

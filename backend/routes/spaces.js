@@ -254,6 +254,7 @@ router.post('/', protect, ownerOnly, upload.single('imageFile'), async (req, res
       },
       slots,
       suitableVehicles: suitableList,
+      cancellationPolicy: req.body.cancellationPolicy || 'full',
       status: 'approved', // Auto-approved for verified owners
     });
 
@@ -493,6 +494,10 @@ router.put('/:id', protect, ownerOnly, upload.single('imageFile'), async (req, r
 
     if (req.body.isActive !== undefined) {
       space.isActive = req.body.isActive === true || req.body.isActive === 'true' || req.body.isActive === 1 || req.body.isActive === '1';
+    }
+
+    if (req.body.cancellationPolicy) {
+      space.cancellationPolicy = req.body.cancellationPolicy;
     }
 
     const updated = await space.save();

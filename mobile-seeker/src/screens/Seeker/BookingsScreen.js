@@ -45,7 +45,13 @@ export default function BookingsScreen({ navigation }) {
     }
   };
 
-  const handleCancelBooking = async (bookingId) => {
+  const handleCancelBooking = async (item) => {
+    const bookingId = item._id;
+    const space = item.spaceId;
+    const policy = space?.cancellationPolicy || 'full';
+    const estimatedRefund = policy === 'full' ? item.totalAmount : policy === 'half' ? Number((item.totalAmount * 0.5).toFixed(2)) : 0;
+    const policyName = policy === 'full' ? '100% Full Refund' : policy === 'half' ? '50% Half Refund' : '0% Non-Refundable';
+
     const doCancel = async () => {
       try {
         const baseUrl = await getBaseApiUrl();
@@ -53,19 +59,22 @@ export default function BookingsScreen({ navigation }) {
           method: 'POST',
           headers: { Authorization: `Bearer ${token}` },
         });
+        const resData = await res.json();
         if (res.ok) {
+          const msg = resData.message || (estimatedRefund > 0 
+            ? `Reservation cancelled successfully! ₹${estimatedRefund} has been refunded to your PlanToPark Wallet.` 
+            : 'Reservation cancelled.');
           if (typeof window !== 'undefined' && window.alert) {
-            window.alert('Reservation cancelled successfully');
+            window.alert(msg);
           } else {
-            Alert.alert('Cancelled', 'Booking cancelled successfully');
+            Alert.alert('Cancelled & Refunded', msg);
           }
           fetchMyBookings();
         } else {
-          const err = await res.json();
           if (typeof window !== 'undefined' && window.alert) {
-            window.alert(err.message || 'Could not cancel booking');
+            window.alert(resData.message || 'Could not cancel booking');
           } else {
-            Alert.alert('Error', err.message || 'Could not cancel booking');
+            Alert.alert('Error', resData.message || 'Could not cancel booking');
           }
         }
       } catch (err) {
@@ -77,14 +86,16 @@ export default function BookingsScreen({ navigation }) {
       }
     };
 
+    const confirmMsg = `Cancel this reservation?\n\nOwner Refund Policy: ${policyName}\nRefund to Your Wallet: ₹${estimatedRefund}`;
+
     if (typeof window !== 'undefined' && window.confirm) {
-      if (window.confirm('Are you sure you want to cancel this reservation?')) {
+      if (window.confirm(confirmMsg)) {
         doCancel();
       }
     } else {
-      Alert.alert('Cancel Booking', 'Are you sure you want to cancel this reservation?', [
-        { text: 'No', style: 'cancel' },
-        { text: 'Yes, Cancel', style: 'destructive', onPress: doCancel },
+      Alert.alert('Cancel Reservation', confirmMsg, [
+        { text: 'No, Keep Pass', style: 'cancel' },
+        { text: `Yes, Cancel (Get ₹${estimatedRefund} Refund)`, style: 'destructive', onPress: doCancel },
       ]);
     }
   };
@@ -140,6 +151,7 @@ export default function BookingsScreen({ navigation }) {
     const isFailed = !isPaid && !isCancelled;
     const space = item.spaceId;
     const slot = item.slotId || 'Slot-1';
+    const refundAmt = item.refundAmount || 0;
 
     return (
       <View style={styles.card}>
@@ -171,13 +183,13 @@ export default function BookingsScreen({ navigation }) {
           </View>
         </View>
 
-        {/* Big Slot Highlight */}
-        <View style={[styles.slotHighlightBox, !isPaid && { borderColor: '#ef4444', backgroundColor: '#ef444415' }]}>
-          <Text style={[styles.slotHighlightLabel, !isPaid && { color: '#f87171' }]}>
-            {isPaid ? 'YOUR ASSIGNED SLOT' : 'RESERVATION STATUS'}
+        {/* Big Slot Highlight / Refund Highlight */}
+        <View style={[styles.slotHighlightBox, !isPaid && { borderColor: isCancelled ? '#64748b' : '#ef4444', backgroundColor: isCancelled ? '#64748b15' : '#ef444415' }]}>
+          <Text style={[styles.slotHighlightLabel, !isPaid && { color: isCancelled ? '#94a3b8' : '#f87171' }]}>
+            {isPaid ? 'YOUR ASSIGNED SLOT' : isCancelled ? (refundAmt > 0 ? 'REFUND CREDITED TO WALLET' : 'RESERVATION CANCELLED') : 'RESERVATION STATUS'}
           </Text>
-          <Text style={[styles.slotHighlightVal, !isPaid && { color: '#ef4444', fontSize: 16 }]}>
-            {isPaid ? `🅿️ ${slot}` : isCancelled ? 'Reservation Cancelled' : 'Payment Incomplete (Failed)'}
+          <Text style={[styles.slotHighlightVal, !isPaid && { color: isCancelled ? (refundAmt > 0 ? '#10b981' : '#94a3b8') : '#ef4444', fontSize: isCancelled ? 16 : 16 }]}>
+            {isPaid ? `🅿️ ${slot}` : isCancelled ? (refundAmt > 0 ? `💸 ₹${refundAmt} Refunded to Wallet` : 'Cancelled (Non-Refundable)') : 'Payment Incomplete (Failed)'}
           </Text>
         </View>
 
@@ -229,7 +241,7 @@ export default function BookingsScreen({ navigation }) {
           {isPaid && !isCancelled && !isCompleted && (
             <TouchableOpacity
               style={[styles.cancelBtn, { flex: 1 }]}
-              onPress={() => handleCancelBooking(item._id)}
+              onPress={() => handleCancelBooking(item)}
             >
               <Text style={styles.cancelTxt}>Cancel Reservation</Text>
             </TouchableOpacity>

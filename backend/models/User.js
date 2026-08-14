@@ -65,6 +65,19 @@ const userSchema = new mongoose.Schema(
       type: Number,
       default: 0, // Track how much the admin has paid to this host/owner
     },
+    walletBalance: {
+      type: Number,
+      default: 0,
+    },
+    walletTransactions: [
+      {
+        type: { type: String, enum: ['credit', 'debit'], default: 'credit' },
+        amount: { type: Number, required: true },
+        description: { type: String, default: 'Refund' },
+        date: { type: Date, default: Date.now },
+        bookingId: { type: mongoose.Schema.Types.ObjectId, ref: 'Booking' },
+      }
+    ],
     resetPasswordOtp: {
       type: String,
       default: null,
