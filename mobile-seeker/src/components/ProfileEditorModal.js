@@ -109,7 +109,40 @@ export default function ProfileEditorModal({
 
         <ScrollView style={styles.body} showsVerticalScrollIndicator={false}>
           {/* Avatar / Pass Photo Selection */}
-          <Text style={styles.fieldLabel}>Select Pass Photo / Avatar Icon</Text>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <Text style={styles.fieldLabel}>Select Pass Photo / Avatar</Text>
+            <TouchableOpacity
+              style={{
+                backgroundColor: '#10b98120',
+                borderWidth: 1,
+                borderColor: '#10b981',
+                borderRadius: 12,
+                paddingHorizontal: 8,
+                paddingVertical: 3,
+              }}
+              onPress={() => {
+                if (typeof document !== 'undefined') {
+                  const input = document.createElement('input');
+                  input.type = 'file';
+                  input.accept = 'image/*';
+                  input.onchange = (e) => {
+                    const file = e.target.files && e.target.files[0];
+                    if (file) {
+                      const reader = new FileReader();
+                      reader.onload = () => {
+                        setSelectedAvatar(reader.result);
+                      };
+                      reader.readAsDataURL(file);
+                    }
+                  };
+                  input.click();
+                }
+              }}
+            >
+              <Text style={{ color: '#10b981', fontSize: 11, fontWeight: '700' }}>📷 Upload Photo</Text>
+            </TouchableOpacity>
+          </View>
+
           <View style={styles.avatarRow}>
             {AVATAR_OPTIONS.map((item) => {
               const isSelected = selectedAvatar === item.emoji;

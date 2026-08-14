@@ -6,6 +6,9 @@ import {
   SafeAreaView,
   ScrollView,
   TouchableOpacity,
+  Image,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { AuthContext } from '../../context/AuthContext';
 import { COLORS } from '../../theme/colors';
@@ -13,9 +16,18 @@ import Header from '../../components/Header';
 import Button from '../../components/Button';
 import ProfileEditorModal from '../../components/ProfileEditorModal';
 
+const getAvatarUri = (imgPath) => {
+  if (!imgPath) return null;
+  if (imgPath.startsWith('data:') || imgPath.startsWith('http://') || imgPath.startsWith('https://')) {
+    return imgPath;
+  }
+  return `http://43.204.235.124:5000${imgPath.startsWith('/') ? '' : '/'}${imgPath}`;
+};
+
 export default function ProfileScreen() {
   const { user, updateProfile, logout } = useContext(AuthContext);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
 
   const primaryVehicle = user?.vehicles && user.vehicles.length > 0
     ? user.vehicles[0]
@@ -26,7 +38,51 @@ export default function ProfileScreen() {
     setShowEditModal(false);
   };
 
+  const handlePickProfileImage = () => {
+    if (typeof document !== 'undefined') {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*';
+      input.onchange = (e) => {
+        const file = e.target.files && e.target.files[0];
+        if (file) {
+          // Check size limit (max 5MB)
+          if (file.size > 5 * 1024 * 1024) {
+            if (typeof window !== 'undefined' && window.alert) {
+              window.alert('Selected image exceeds 5MB limit. Please choose a smaller photo.');
+            } else {
+              Alert.alert('File Too Large', 'Please select an image smaller than 5MB.');
+            }
+            return;
+          }
+
+          setUploadingImage(true);
+          const reader = new FileReader();
+          reader.onload = async () => {
+            const base64 = reader.result;
+            try {
+              await updateProfile({ profileImage: base64, passPhoto: base64 });
+              if (typeof window !== 'undefined' && window.alert) {
+                window.alert('Profile photo updated successfully! 📸');
+              }
+            } catch (err) {
+              console.error('Image upload failed', err);
+              if (typeof window !== 'undefined' && window.alert) {
+                window.alert('Failed to upload profile photo. Please try again.');
+              }
+            } finally {
+              setUploadingImage(false);
+            }
+          };
+          reader.readAsDataURL(file);
+        }
+      };
+      input.click();
+    }
+  };
+
   const isEmojiAvatar = user?.profileImage && user?.profileImage.length <= 4;
+  const hasCustomPhoto = user?.profileImage && !isEmojiAvatar;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -35,13 +91,46 @@ export default function ProfileScreen() {
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {/* User Card */}
         <View style={styles.profileCard}>
-          <View style={styles.avatarBox}>
-            {isEmojiAvatar ? (
-              <Text style={{ fontSize: 36 }}>{user.profileImage}</Text>
-            ) : (
-              <Text style={styles.avatarTxt}>{(user?.name || 'U').charAt(0).toUpperCase()}</Text>
-            )}
-          </View>
+          {/* Avatar with Camera Badge */}
+          <TouchableOpacity
+            style={styles.avatarWrapper}
+            onPress={handlePickProfileImage}
+            onClick={handlePickProfileImage}
+            activeOpacity={0.85}
+            disabled={uploadingImage}
+          >
+            <View style={styles.avatarBox}>
+              {uploadingImage ? (
+                <ActivityIndicator size="small" color={COLORS.white} />
+              ) : hasCustomPhoto ? (
+                <Image
+                  source={{ uri: getAvatarUri(user.profileImage) }}
+                  style={styles.avatarImg}
+                  resizeMode="cover"
+                />
+              ) : isEmojiAvatar ? (
+                <Text style={{ fontSize: 36 }}>{user.profileImage}</Text>
+              ) : (
+                <Text style={styles.avatarTxt}>{(user?.name || 'U').charAt(0).toUpperCase()}</Text>
+              )}
+            </View>
+            <View style={styles.cameraBadge}>
+              <Text style={styles.cameraBadgeTxt}>📷</Text>
+            </View>
+          </TouchableOpacity>
+
+          {/* Quick Photo Upload Action */}
+          <TouchableOpacity
+            style={styles.uploadPhotoBtn}
+            onPress={handlePickProfileImage}
+            onClick={handlePickProfileImage}
+            activeOpacity={0.8}
+            disabled={uploadingImage}
+          >
+            <Text style={styles.uploadPhotoTxt}>
+              {uploadingImage ? '⏳ Uploading...' : '📸 Upload Profile Photo'}
+            </Text>
+          </TouchableOpacity>
 
           <Text style={styles.userName}>{user?.name || 'Parking Seeker'}</Text>
           <Text style={styles.userEmail}>{user?.email || 'seeker@example.com'}</Text>
@@ -130,20 +219,61 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.borderDark,
   },
+  avatarWrapper: {
+    position: 'relative',
+    marginBottom: 8,
+  },
   avatarBox: {
-    width: 76,
-    height: 76,
-    borderRadius: 38,
+    width: 86,
+    height: 86,
+    borderRadius: 43,
     backgroundColor: COLORS.primary,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 12,
+    borderWidth: 2.5,
+    borderColor: '#10b981',
+    overflow: 'hidden',
+  },
+  avatarImg: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 43,
+  },
+  cameraBadge: {
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#10b981',
+    alignItems: 'center',
+    justifyContent: 'center',
     borderWidth: 2,
-    borderColor: COLORS.white,
+    borderColor: COLORS.cardBg,
+    elevation: 3,
+  },
+  cameraBadgeTxt: {
+    fontSize: 13,
+  },
+  uploadPhotoBtn: {
+    backgroundColor: '#10b98120',
+    borderWidth: 1,
+    borderColor: '#10b981',
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 20,
+    marginBottom: 10,
+    marginTop: 4,
+  },
+  uploadPhotoTxt: {
+    color: '#10b981',
+    fontSize: 12,
+    fontWeight: '700',
   },
   avatarTxt: {
     color: COLORS.white,
-    fontSize: 30,
+    fontSize: 34,
     fontWeight: '800',
   },
   userName: {
