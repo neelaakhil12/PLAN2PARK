@@ -265,11 +265,55 @@ router.post('/', protect, ownerOnly, upload.single('imageFile'), async (req, res
   }
 });
 
+// Helper to enrich spaces with real-time active bookings and slot availability
+const enrichSpaceWithSlotAvailability = async (spaces) => {
+  if (!spaces || spaces.length === 0) return [];
+  const now = new Date();
+  const spaceIds = spaces.map((s) => s._id);
+
+  // Find all active bookings (allotted or paid) where end time is in future or current
+  const activeBookings = await Booking.find({
+    spaceId: { $in: spaceIds },
+    status: { $in: ['allotted', 'paid'] },
+    endTime: { $gt: now },
+  });
+
+  const bookedMap = {};
+  activeBookings.forEach((b) => {
+    const sId = b.spaceId.toString();
+    if (!bookedMap[sId]) bookedMap[sId] = new Set();
+    if (b.slotId) bookedMap[sId].add(b.slotId);
+  });
+
+  return spaces.map((space) => {
+    const spaceObj = space.toObject ? space.toObject() : { ...space };
+    const sId = spaceObj._id.toString();
+    const bookedSet = bookedMap[sId] || new Set();
+
+    const total = spaceObj.totalSlots || (spaceObj.slots ? spaceObj.slots.length : 1);
+    const occupied = bookedSet.size;
+    const available = Math.max(0, total - occupied);
+
+    // Update slots array availability
+    if (spaceObj.slots && spaceObj.slots.length > 0) {
+      spaceObj.slots = spaceObj.slots.map((slot) => ({
+        ...slot,
+        isAvailable: !bookedSet.has(slot.slotId),
+      }));
+    }
+
+    spaceObj.availableSlots = available;
+    spaceObj.occupiedSlots = occupied;
+    return spaceObj;
+  });
+};
+
 // ─── GET /api/spaces  (Public / Seeker) ──────────────────────────────────────
 router.get('/', async (req, res) => {
   try {
     const spaces = await ParkingSpace.find({ status: 'approved' });
-    res.json(spaces);
+    const enriched = await enrichSpaceWithSlotAvailability(spaces);
+    res.json(enriched);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -279,7 +323,8 @@ router.get('/', async (req, res) => {
 router.get('/owner/my-spaces', protect, ownerOnly, async (req, res) => {
   try {
     const spaces = await ParkingSpace.find({ ownerId: req.user._id });
-    res.json(spaces);
+    const enriched = await enrichSpaceWithSlotAvailability(spaces);
+    res.json(enriched);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -362,7 +407,8 @@ router.get('/:id', async (req, res) => {
   try {
     const space = await ParkingSpace.findById(req.params.id).populate('ownerId', 'name email contact');
     if (!space) return res.status(404).json({ message: 'Space not found' });
-    res.json(space);
+    const [enriched] = await enrichSpaceWithSlotAvailability([space]);
+    res.json(enriched);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

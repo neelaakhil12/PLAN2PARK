@@ -174,13 +174,15 @@ export default function SeekerHomeScreen({ navigation }) {
   });
 
   const renderSpotCard = ({ item }) => {
-    const availableSlotsCount = item.slots
-      ? item.slots.filter((s) => s.isAvailable !== false).length
-      : item.availableSpots || item.totalSlots || 5;
+    const totalSlots = item.totalSlots || (item.slots ? item.slots.length : 5);
+    const availableSlots = item.availableSlots !== undefined
+      ? item.availableSlots
+      : (item.slots ? item.slots.filter((s) => s.isAvailable !== false).length : totalSlots);
+    const isFull = availableSlots <= 0;
 
     return (
       <TouchableOpacity
-        style={styles.spotCard}
+        style={[styles.spotCard, isFull && { opacity: 0.85 }]}
         onPress={() => navigation.navigate('SpotDetails', { space: item })}
         activeOpacity={0.88}
       >
@@ -208,13 +210,15 @@ export default function SeekerHomeScreen({ navigation }) {
         <View style={styles.cardFooter}>
           <View style={styles.metaCol}>
             <Text style={styles.metaLabel}>Available Slots</Text>
-            <Text style={styles.metaVal}>{availableSlotsCount} / {item.totalSlots || 5} Available</Text>
+            <Text style={[styles.metaVal, { color: isFull ? '#ef4444' : '#10b981', fontWeight: '800' }]}>
+              {isFull ? '🔴 FULL (0 Left)' : `🟢 ${availableSlots} of ${totalSlots} Slots Free`}
+            </Text>
           </View>
           <TouchableOpacity
-            style={styles.bookBtn}
+            style={[styles.bookBtn, isFull && { backgroundColor: '#334155' }]}
             onPress={() => navigation.navigate('SpotDetails', { space: item })}
           >
-            <Text style={styles.bookBtnTxt}>Book Spot →</Text>
+            <Text style={styles.bookBtnTxt}>{isFull ? 'View Info' : 'Book Spot →'}</Text>
           </TouchableOpacity>
         </View>
       </TouchableOpacity>

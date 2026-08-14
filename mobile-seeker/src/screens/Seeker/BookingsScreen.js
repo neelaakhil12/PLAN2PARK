@@ -9,9 +9,10 @@ import {
   ActivityIndicator,
   RefreshControl,
   Alert,
+  Linking,
 } from 'react-native';
 import { AuthContext } from '../../context/AuthContext';
-import { endpoints } from '../../config/api';
+import { getBaseApiUrl } from '../../config/api';
 import { COLORS } from '../../theme/colors';
 import Header from '../../components/Header';
 
@@ -28,7 +29,8 @@ export default function BookingsScreen({ navigation }) {
 
   const fetchMyBookings = async () => {
     try {
-      const res = await fetch(endpoints.getMyBookings, {
+      const baseUrl = await getBaseApiUrl();
+      const res = await fetch(`${baseUrl}/bookings/my-bookings`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await res.json();
@@ -44,66 +46,132 @@ export default function BookingsScreen({ navigation }) {
   };
 
   const handleCancelBooking = async (bookingId) => {
-    Alert.alert('Cancel Booking', 'Are you sure you want to cancel this reservation?', [
-      { text: 'No', style: 'cancel' },
-      {
-        text: 'Yes, Cancel',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            const res = await fetch(endpoints.cancelBooking(bookingId), {
-              method: 'POST',
-              headers: { Authorization: `Bearer ${token}` },
-            });
-            if (res.ok) {
-              Alert.alert('Cancelled', 'Booking cancelled successfully');
-              fetchMyBookings();
-            }
-          } catch (err) {
-            Alert.alert('Error', 'Failed to cancel booking');
+    const doCancel = async () => {
+      try {
+        const baseUrl = await getBaseApiUrl();
+        const res = await fetch(`${baseUrl}/bookings/${bookingId}/cancel`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          if (typeof window !== 'undefined' && window.alert) {
+            window.alert('Reservation cancelled successfully');
+          } else {
+            Alert.alert('Cancelled', 'Booking cancelled successfully');
           }
-        },
-      },
-    ]);
+          fetchMyBookings();
+        }
+      } catch (err) {
+        if (typeof window !== 'undefined' && window.alert) {
+          window.alert('Failed to cancel booking');
+        } else {
+          Alert.alert('Error', 'Failed to cancel booking');
+        }
+      }
+    };
+
+    if (typeof window !== 'undefined' && window.confirm) {
+      if (window.confirm('Are you sure you want to cancel this reservation?')) {
+        doCancel();
+      }
+    } else {
+      Alert.alert('Cancel Booking', 'Are you sure you want to cancel this reservation?', [
+        { text: 'No', style: 'cancel' },
+        { text: 'Yes, Cancel', style: 'destructive', onPress: doCancel },
+      ]);
+    }
+  };
+
+  const handleOpenMap = (space) => {
+    if (!space) return;
+    const lat = space.coordinates?.lat || space.lat;
+    const lng = space.coordinates?.lng || space.lng;
+    let url = space.locationLink || space.googleMapsLink;
+    if (!url && lat && lng) {
+      url = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
+    } else if (!url && space.address) {
+      url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(space.address + ', ' + (space.city || 'Hyderabad'))}`;
+    }
+    if (url) {
+      if (typeof window !== 'undefined') window.open(url, '_blank');
+      else Linking.openURL(url);
+    }
   };
 
   const renderBookingCard = ({ item }) => {
     const isCancelled = item.status === 'cancelled';
     const isCompleted = item.status === 'completed';
+    const isPaid = item.paymentStatus === 'paid' || item.status === 'paid';
+    const space = item.spaceId;
+    const slot = item.slotId || 'Slot-1';
 
     return (
       <View style={styles.card}>
+        {/* Pass Header */}
         <View style={styles.cardHeader}>
           <Text style={styles.passTitle}>🎟️ DIGITAL PARKING PASS</Text>
           <View
             style={[
               styles.statusBadge,
               isCancelled
-                ? { backgroundColor: COLORS.danger }
-                : isCompleted
-                ? { backgroundColor: COLORS.textMuted }
-                : { backgroundColor: COLORS.primary },
+                ? { backgroundColor: '#ef444425', borderColor: '#ef4444' }
+                : isPaid
+                ? { backgroundColor: '#10b98125', borderColor: '#10b981' }
+                : { backgroundColor: '#f59e0b25', borderColor: '#f59e0b' },
             ]}
           >
-            <Text style={styles.statusTxt}>{(item.status || 'CONFIRMED').toUpperCase()}</Text>
+            <Text
+              style={[
+                styles.statusTxt,
+                isCancelled
+                  ? { color: '#ef4444' }
+                  : isPaid
+                  ? { color: '#10b981' }
+                  : { color: '#f59e0b' },
+              ]}
+            >
+              {isCancelled ? 'CANCELLED' : isPaid ? '✓ PAID & CONFIRMED' : '⌛ UNPAID'}
+            </Text>
           </View>
         </View>
 
-        <Text style={styles.spotName}>{item.spaceId?.title || 'Parking Location'}</Text>
-        <Text style={styles.spotAddress}>📍 {item.spaceId?.address || 'City Center'}</Text>
+        {/* Big Slot Highlight */}
+        <View style={styles.slotHighlightBox}>
+          <Text style={styles.slotHighlightLabel}>YOUR ASSIGNED SLOT</Text>
+          <Text style={styles.slotHighlightVal}>🅿️ {slot}</Text>
+        </View>
 
+        {/* Spot Details */}
+        <Text style={styles.spotName}>{space?.title || 'Parking Location'}</Text>
+        <Text style={styles.spotAddress}>📍 {space?.address || 'City Center'}, {space?.city || 'Hyderabad'}</Text>
+
+        {/* Google Maps Turn-by-Turn GPS Navigation Button */}
+        <TouchableOpacity
+          style={styles.navigateBtn}
+          onPress={() => handleOpenMap(space)}
+          activeOpacity={0.85}
+        >
+          <Text style={styles.navigateBtnIcon}>🗺️</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.navigateBtnTitle}>Navigate to Parking Spot (Google Maps)</Text>
+            <Text style={styles.navigateBtnSub}>Turn-by-turn driving directions straight to the spot</Text>
+          </View>
+          <Text style={styles.navigateBtnArrow}>→</Text>
+        </TouchableOpacity>
+
+        {/* Booking Details Grid */}
         <View style={styles.infoGrid}>
           <View style={styles.infoCol}>
             <Text style={styles.infoLabel}>Vehicle Plate</Text>
             <Text style={styles.infoVal}>{item.vehicleNumber || item.vehiclePlate || 'N/A'}</Text>
           </View>
           <View style={styles.infoCol}>
-            <Text style={styles.infoLabel}>Type</Text>
-            <Text style={styles.infoVal}>{item.vehicleType || 'Vehicle'}</Text>
+            <Text style={styles.infoLabel}>Duration</Text>
+            <Text style={styles.infoVal}>{item.hours || 1} Hour(s)</Text>
           </View>
           <View style={styles.infoCol}>
-            <Text style={styles.infoLabel}>Total Paid</Text>
-            <Text style={[styles.infoVal, { color: COLORS.primary }]}>₹{item.totalAmount || 0}</Text>
+            <Text style={styles.infoLabel}>Total Amount</Text>
+            <Text style={[styles.infoVal, { color: '#10b981', fontWeight: '800' }]}>₹{item.totalAmount || 0}</Text>
           </View>
         </View>
 
@@ -183,25 +251,49 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 12,
   },
   passTitle: {
     fontSize: 11,
     fontWeight: '800',
     color: COLORS.primary,
+    letterSpacing: 0.5,
   },
   statusBadge: {
     paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
   },
   statusTxt: {
-    color: COLORS.white,
     fontSize: 10,
     fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  slotHighlightBox: {
+    backgroundColor: '#064e3b35',
+    borderWidth: 1.5,
+    borderColor: '#10b981',
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    marginBottom: 12,
+    alignItems: 'center',
+  },
+  slotHighlightLabel: {
+    color: '#6ee7b7',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 1,
+    marginBottom: 2,
+  },
+  slotHighlightVal: {
+    color: '#10b981',
+    fontSize: 20,
+    fontWeight: '900',
   },
   spotName: {
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: '800',
     color: COLORS.white,
     marginBottom: 2,
@@ -211,6 +303,36 @@ const styles = StyleSheet.create({
     color: COLORS.textMuted,
     marginBottom: 12,
   },
+  navigateBtn: {
+    backgroundColor: '#3b82f618',
+    borderWidth: 1,
+    borderColor: '#3b82f6',
+    borderRadius: 12,
+    padding: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  navigateBtnIcon: {
+    fontSize: 22,
+    marginRight: 10,
+  },
+  navigateBtnTitle: {
+    color: '#60a5fa',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  navigateBtnSub: {
+    color: '#94a3b8',
+    fontSize: 11,
+    marginTop: 2,
+  },
+  navigateBtnArrow: {
+    color: '#60a5fa',
+    fontSize: 16,
+    fontWeight: '800',
+    marginLeft: 8,
+  },
   infoGrid: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -219,7 +341,9 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     marginBottom: 10,
   },
-  infoCol: {},
+  infoCol: {
+    alignItems: 'center',
+  },
   infoLabel: {
     fontSize: 10,
     color: COLORS.textMuted,

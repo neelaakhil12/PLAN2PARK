@@ -8,6 +8,7 @@ import {
   ScrollView,
   Alert,
   TouchableOpacity,
+  Linking,
 } from 'react-native';
 import { AuthContext } from '../../context/AuthContext';
 import { endpoints, getBaseApiUrl } from '../../config/api';
@@ -200,6 +201,43 @@ export default function SpotDetailsScreen({ route, navigation }) {
           <Text style={styles.spotAddress}>📍 {space.address || 'Hitech City Road'}, {space.city || 'Hyderabad'}</Text>
           <Text style={styles.spotRate}>Rate: <Text style={styles.rateHighlight}>₹{hourlyRate}/hour</Text></Text>
 
+          {/* Real-Time Slot Capacity */}
+          <View style={styles.availBox}>
+            <Text style={styles.availLabel}>🅿️ Real-Time Capacity:</Text>
+            <Text style={[styles.availVal, { color: (space.availableSlots !== undefined ? space.availableSlots : (space.totalSlots || 5)) > 0 ? '#10b981' : '#ef4444' }]}>
+              {(space.availableSlots !== undefined ? space.availableSlots : (space.totalSlots || 5)) > 0
+                ? `🟢 ${space.availableSlots !== undefined ? space.availableSlots : (space.totalSlots || 5)} of ${space.totalSlots || 5} Slots Free`
+                : '🔴 All Slots Currently Booked'}
+            </Text>
+          </View>
+
+          {/* Live Turn-by-Turn GPS Navigation Button */}
+          <TouchableOpacity
+            style={styles.gpsNavBtn}
+            onPress={() => {
+              const lat = space.coordinates?.lat || space.lat;
+              const lng = space.coordinates?.lng || space.lng;
+              let url = space.locationLink || space.googleMapsLink;
+              if (!url && lat && lng) {
+                url = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
+              } else if (!url && space.address) {
+                url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(space.address + ', ' + (space.city || 'Hyderabad'))}`;
+              }
+              if (url) {
+                if (typeof window !== 'undefined') window.open(url, '_blank');
+                else Linking.openURL(url);
+              }
+            }}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.gpsNavIcon}>🧭</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.gpsNavTitle}>Open Live Turn-by-Turn GPS Navigation</Text>
+              <Text style={styles.gpsNavSub}>Get instant driving directions on Google Maps</Text>
+            </View>
+            <Text style={styles.gpsNavArrow}>→</Text>
+          </TouchableOpacity>
+
           <View style={styles.divider} />
 
           {/* Features */}
@@ -345,6 +383,59 @@ const styles = StyleSheet.create({
     color: COLORS.primary,
     fontWeight: '800',
     fontSize: 16,
+  },
+  availBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#0f172a',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    marginTop: 8,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#334155',
+  },
+  availLabel: {
+    color: COLORS.textMuted,
+    fontSize: 12,
+    fontWeight: '600',
+    marginRight: 6,
+  },
+  availVal: {
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  gpsNavBtn: {
+    backgroundColor: '#064e3b40',
+    borderWidth: 1,
+    borderColor: '#10b981',
+    borderRadius: 12,
+    padding: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 6,
+    marginBottom: 6,
+  },
+  gpsNavIcon: {
+    fontSize: 24,
+    marginRight: 10,
+  },
+  gpsNavTitle: {
+    color: '#10b981',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  gpsNavSub: {
+    color: '#94a3b8',
+    fontSize: 11,
+    marginTop: 2,
+  },
+  gpsNavArrow: {
+    color: '#10b981',
+    fontSize: 16,
+    fontWeight: '800',
+    marginLeft: 8,
   },
   divider: {
     height: 1,
