@@ -69,6 +69,42 @@ export default function OwnerBookingsScreen({ navigation }) {
     }
   };
 
+  const handleDeleteBooking = async (bookingId, vehicleNumber) => {
+    const doDelete = async () => {
+      try {
+        const baseUrl = await getBaseApiUrl();
+        const res = await fetch(`${baseUrl}/bookings/${bookingId}`, {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        if (res.ok) {
+          fetchOwnerBookings();
+        } else {
+          const err = await res.json();
+          if (typeof window !== 'undefined' && window.alert) {
+            window.alert(err.message || 'Could not delete booking order');
+          } else {
+            Alert.alert('Error', err.message || 'Could not delete booking order');
+          }
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    };
+
+    if (typeof window !== 'undefined' && window.confirm) {
+      if (window.confirm(`Delete booking order for vehicle "${vehicleNumber || 'this booking'}"?`)) {
+        doDelete();
+      }
+    } else if (typeof Alert !== 'undefined' && Alert.alert) {
+      Alert.alert('Delete Booking Order', `Are you sure you want to delete order for ${vehicleNumber || 'this booking'}?`, [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete', style: 'destructive', onPress: doDelete },
+      ]);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container} edges={['left', 'right']}>
       {/* Header */}
@@ -188,14 +224,23 @@ export default function OwnerBookingsScreen({ navigation }) {
                   </View>
                 </View>
 
-                {/* Footer with date and action */}
+                {/* Footer with date and actions */}
                 <View style={styles.cardFooter}>
                   <Text style={styles.dateTxt}>📅 {dateStr}</Text>
-                  {seekerPhone ? (
-                    <TouchableOpacity style={styles.callBtn} onPress={() => handleCallSeeker(seekerPhone)}>
-                      <Text style={styles.callBtnTxt}>📞 Call Driver</Text>
+                  <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+                    {seekerPhone ? (
+                      <TouchableOpacity style={styles.callBtn} onPress={() => handleCallSeeker(seekerPhone)}>
+                        <Text style={styles.callBtnTxt}>📞 Call</Text>
+                      </TouchableOpacity>
+                    ) : null}
+                    <TouchableOpacity
+                      style={styles.deleteOrderBtn}
+                      onPress={() => handleDeleteBooking(booking._id, booking.vehicleNumber)}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={styles.deleteOrderBtnTxt}>🗑️ Delete</Text>
                     </TouchableOpacity>
-                  ) : null}
+                  </View>
                 </View>
               </View>
             );
@@ -357,11 +402,24 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#3b82f6',
     paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingVertical: 5,
     borderRadius: 6,
   },
   callBtnTxt: {
     color: '#60a5fa',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  deleteOrderBtn: {
+    backgroundColor: '#ef444420',
+    borderWidth: 1,
+    borderColor: '#ef4444',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 6,
+  },
+  deleteOrderBtnTxt: {
+    color: '#f87171',
     fontSize: 12,
     fontWeight: '700',
   },
