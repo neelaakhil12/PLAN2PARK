@@ -22,6 +22,34 @@ export default function WebDesktopFrame({ children, downloadUrl = "https://expo.
     return <>{children}</>;
   }
 
+  React.useEffect(() => {
+    if (Platform.OS === 'web' && typeof document !== 'undefined') {
+      const styleId = 'razorpay-mobile-frame-style';
+      if (!document.getElementById(styleId)) {
+        const style = document.createElement('style');
+        style.id = styleId;
+        style.innerHTML = `
+          .razorpay-container {
+            max-width: 400px !important;
+            max-height: 800px !important;
+            left: 50% !important;
+            top: 50% !important;
+            transform: translate(-50%, -50%) !important;
+            border-radius: 34px !important;
+            overflow: hidden !important;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5) !important;
+          }
+          .razorpay-checkout-frame {
+            max-width: 400px !important;
+            max-height: 800px !important;
+            border-radius: 34px !important;
+          }
+        `;
+        document.head.appendChild(style);
+      }
+    }
+  }, []);
+
   const handleDownload = () => {
     if (typeof window !== 'undefined') {
       window.open(downloadUrl, '_blank');
