@@ -23,9 +23,12 @@ export let API_URL = PUBLIC_ONLINE_URL;
 
 export const getImageUrl = (url) => {
   if (!url) return 'https://images.unsplash.com/photo-1506015391300-4802dc74de2e?w=1200&q=80';
-  if (url.startsWith('/uploads/')) {
-    const baseUrl = PUBLIC_ONLINE_URL.replace('/api', '');
-    return `${baseUrl}${url}`;
+  if (url.startsWith('data:') || url.startsWith('http://') || url.startsWith('https://')) return url;
+  if (url.startsWith('/uploads/') || url.startsWith('uploads/')) {
+    const cleanPath = url.startsWith('/') ? url : `/${url}`;
+    const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+    const baseUrl = isLocal ? 'http://localhost:5000' : 'http://43.204.235.124:5000';
+    return `${baseUrl}${cleanPath}`;
   }
   return url;
 };

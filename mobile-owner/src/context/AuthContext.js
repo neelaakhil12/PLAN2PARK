@@ -78,6 +78,7 @@ export const AuthProvider = ({ children }) => {
       role: data.role || role,
       contact: data.contact,
       status: data.status,
+      profileImage: data.profileImage || '',
       isEmailVerified: data.isEmailVerified,
     };
 
@@ -118,6 +119,7 @@ export const AuthProvider = ({ children }) => {
         role: data.role || role,
         contact: data.contact,
         status: data.status,
+        profileImage: data.profileImage || '',
         isEmailVerified: data.isEmailVerified,
       };
       setToken(data.token);
@@ -127,6 +129,50 @@ export const AuthProvider = ({ children }) => {
     }
 
     return data;
+  };
+
+  const updateProfile = async (profileData) => {
+    const baseUrl = await getBaseApiUrl();
+    const currentToken = token || (await AsyncStorage.getItem('user_token'));
+
+    const localUpdatedUser = {
+      ...user,
+      ...profileData,
+      profileImage: profileData.profileImage || user?.profileImage,
+    };
+
+    setUser(localUpdatedUser);
+    try {
+      await AsyncStorage.setItem('user_data', JSON.stringify(localUpdatedUser));
+    } catch (e) {
+      console.error('AsyncStorage error:', e);
+    }
+
+    try {
+      const res = await fetch(`${baseUrl}/auth/profile`, {
+        method: 'PUT',
+        headers: {
+          ...COMMON_HEADERS,
+          Authorization: `Bearer ${currentToken}`,
+        },
+        body: JSON.stringify(profileData),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const finalMerged = {
+          ...localUpdatedUser,
+          ...data,
+        };
+        setUser(finalMerged);
+        await AsyncStorage.setItem('user_data', JSON.stringify(finalMerged));
+        return finalMerged;
+      }
+    } catch (err) {
+      console.log('Backend sync error:', err.message);
+    }
+
+    return localUpdatedUser;
   };
 
   const logout = async () => {
@@ -142,7 +188,7 @@ export const AuthProvider = ({ children }) => {
 
   return (
     <AuthContext.Provider
-      value={{ user, token, loading, loginForRole, signupForRole, logout, setUser }}
+      value={{ user, token, loading, loginForRole, signupForRole, updateProfile, logout, setUser }}
     >
       {children}
     </AuthContext.Provider>

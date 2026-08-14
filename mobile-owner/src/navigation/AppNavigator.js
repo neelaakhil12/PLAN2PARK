@@ -18,7 +18,7 @@ import ResetPasswordScreen from '../screens/Auth/ResetPasswordScreen';
 import OwnerHomeScreen from '../screens/Owner/OwnerHomeScreen';
 import OwnerBookingsScreen from '../screens/Owner/OwnerBookingsScreen';
 import AddSpotScreen from '../screens/Owner/AddSpotScreen';
-import ProfileScreen from '../screens/Seeker/ProfileScreen';
+import ProfileScreen from '../screens/Owner/ProfileScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
