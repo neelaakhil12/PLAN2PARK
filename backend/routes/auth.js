@@ -15,10 +15,19 @@ if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
 // Helper to save base64 data image to local disk
 const saveBase64Image = (base64Str) => {
   try {
-    const matches = base64Str.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
-    if (!matches || matches.length !== 3) return base64Str;
-    const ext = matches[1].split('/')[1] || 'png';
-    const buffer = Buffer.from(matches[2], 'base64');
+    if (!base64Str || typeof base64Str !== 'string' || !base64Str.startsWith('data:image/')) {
+      return base64Str;
+    }
+    const commaIdx = base64Str.indexOf(',');
+    if (commaIdx === -1) return base64Str;
+    const header = base64Str.slice(0, commaIdx);
+    const rawData = base64Str.slice(commaIdx + 1);
+    const extMatch = header.match(/image\/([a-zA-Z0-9+]+)/);
+    let ext = extMatch && extMatch[1] ? extMatch[1].toLowerCase() : 'png';
+    if (ext === 'jpeg') ext = 'jpg';
+    if (ext === 'svg+xml') ext = 'svg';
+
+    const buffer = Buffer.from(rawData, 'base64');
     const filename = `user-${Date.now()}-${Math.round(Math.random() * 1e9)}.${ext}`;
     const filePath = path.join(uploadsDir, filename);
     fs.writeFileSync(filePath, buffer);

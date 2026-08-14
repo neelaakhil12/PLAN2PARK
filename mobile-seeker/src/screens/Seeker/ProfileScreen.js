@@ -21,12 +21,14 @@ export default function ProfileScreen() {
   const { user, updateProfile, logout } = useContext(AuthContext);
   const [showEditModal, setShowEditModal] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [imageLoadError, setImageLoadError] = useState(false);
 
   const primaryVehicle = user?.vehicles && user.vehicles.length > 0
     ? user.vehicles[0]
     : { plateNumber: 'TS 07 AB 1234', vehicleType: 'Car' };
 
   const handleSaveProfile = async (profileData) => {
+    setImageLoadError(false);
     await updateProfile(profileData);
     setShowEditModal(false);
   };
@@ -50,6 +52,7 @@ export default function ProfileScreen() {
           }
 
           setUploadingImage(true);
+          setImageLoadError(false);
           const reader = new FileReader();
           reader.onload = async () => {
             const base64 = reader.result;
@@ -95,11 +98,12 @@ export default function ProfileScreen() {
             <View style={styles.avatarBox}>
               {uploadingImage ? (
                 <ActivityIndicator size="small" color={COLORS.white} />
-              ) : hasCustomPhoto ? (
+              ) : hasCustomPhoto && !imageLoadError ? (
                 <Image
                   source={{ uri: getImageUrl(user.profileImage) }}
                   style={styles.avatarImg}
                   resizeMode="cover"
+                  onError={() => setImageLoadError(true)}
                 />
               ) : isEmojiAvatar ? (
                 <Text style={{ fontSize: 36 }}>{user.profileImage}</Text>
