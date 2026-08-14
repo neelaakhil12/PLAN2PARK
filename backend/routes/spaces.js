@@ -444,10 +444,38 @@ router.put('/:id', protect, ownerOnly, upload.single('imageFile'), async (req, r
       }
     }
 
+    if (req.body.isActive !== undefined) {
+      space.isActive = req.body.isActive === true || req.body.isActive === 'true' || req.body.isActive === 1 || req.body.isActive === '1';
+    }
+
     const updated = await space.save();
     res.json({ message: 'Space updated successfully', space: updated });
   } catch (error) {
     console.error('Space update error:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// ─── PUT /api/spaces/:id/toggle  (Owner toggle Active/Offline) ────────────────
+router.put('/:id/toggle', protect, ownerOnly, async (req, res) => {
+  try {
+    const space = await ParkingSpace.findById(req.params.id);
+    if (!space) return res.status(404).json({ message: 'Parking space not found' });
+
+    if (space.ownerId.toString() !== req.user._id.toString()) {
+      return res.status(401).json({ message: 'Not authorized to update this space' });
+    }
+
+    if (req.body.isActive !== undefined) {
+      space.isActive = req.body.isActive === true || req.body.isActive === 'true' || req.body.isActive === 1 || req.body.isActive === '1';
+    } else {
+      space.isActive = !space.isActive;
+    }
+
+    const updated = await space.save();
+    res.json({ message: 'Space status toggled successfully', space: updated, isActive: space.isActive });
+  } catch (error) {
+    console.error('Toggle error:', error);
     res.status(500).json({ message: error.message });
   }
 });

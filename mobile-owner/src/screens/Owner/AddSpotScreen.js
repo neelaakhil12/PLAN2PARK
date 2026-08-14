@@ -1,4 +1,4 @@
-import React, { useState, useContext } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import {
   View,
   Text,
@@ -35,8 +35,25 @@ export default function AddSpotScreen({ route, navigation }) {
   const [hourlyRate, setHourlyRate] = useState(String(editingSpot?.pricePerHour || editingSpot?.hourlyRate || '50'));
   const [totalSpots, setTotalSpots] = useState(String(editingSpot?.totalSlots || (editingSpot?.slots ? editingSpot.slots.length : null) || editingSpot?.totalSpots || '5'));
   const [hasEvCharger, setHasEvCharger] = useState(Boolean(editingSpot?.hasEvCharger));
+  const [isActive, setIsActive] = useState(editingSpot?.isActive !== false);
   const [loading, setLoading] = useState(false);
   const [locating, setLocating] = useState(false);
+
+  useEffect(() => {
+    const s = route?.params?.spot;
+    if (s) {
+      setTitle(s.title || '');
+      setAddress(s.address || '');
+      setCity(s.city || 'Hyderabad');
+      setGoogleMapsLink(s.locationLink || s.googleMapsLink || '');
+      setLat(s.coordinates?.lat || s.lat || null);
+      setLng(s.coordinates?.lng || s.lng || null);
+      setHourlyRate(String(s.pricePerHour !== undefined ? s.pricePerHour : (s.hourlyRate || '50')));
+      setTotalSpots(String(s.totalSlots || (s.slots ? s.slots.length : null) || s.totalSpots || '5'));
+      setHasEvCharger(Boolean(s.hasEvCharger));
+      setIsActive(s.isActive !== false);
+    }
+  }, [route?.params?.spot]);
 
   const [showLocationModal, setShowLocationModal] = useState(false);
   const [nearbyPlaces, setNearbyPlaces] = useState([]);
@@ -482,6 +499,7 @@ export default function AddSpotScreen({ route, navigation }) {
           totalSpots: Number(totalSpots),
           totalSlots: Number(totalSpots),
           hasEvCharger,
+          isActive,
         }),
       });
 
@@ -655,6 +673,35 @@ export default function AddSpotScreen({ route, navigation }) {
               </Text>
             </View>
           </View>
+
+          {editingSpot && (
+            <View style={styles.switchRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.switchTitle}>🟢 Spot Availability Status</Text>
+                <Text style={styles.switchSub}>Is this spot open & accepting driver bookings?</Text>
+              </View>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <TouchableOpacity
+                  style={[
+                    styles.customToggleTrack,
+                    { backgroundColor: isActive ? '#10b981' : '#334155' }
+                  ]}
+                  onPress={() => setIsActive((prev) => !prev)}
+                  activeOpacity={0.8}
+                >
+                  <View
+                    style={[
+                      styles.customToggleThumb,
+                      { alignSelf: isActive ? 'flex-end' : 'flex-start' }
+                    ]}
+                  />
+                </TouchableOpacity>
+                <Text style={{ fontSize: 12, fontWeight: '800', width: 45, color: isActive ? '#10b981' : '#94a3b8' }}>
+                  {isActive ? 'ONLINE' : 'CLOSED'}
+                </Text>
+              </View>
+            </View>
+          )}
 
           <Button
             title={editingSpot ? "Save Changes & Update Spot" : "Publish Parking Listing"}
