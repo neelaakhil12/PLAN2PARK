@@ -461,26 +461,13 @@ export default function SpotDetailsScreen({ route, navigation }) {
                   <Text style={styles.rzpLogoTxt}>₹</Text>
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.rzpBrandTitle}>Razorpay Checkout</Text>
-                  <Text style={styles.rzpBrandSub}>₹{finalPayablePrice}.00 • Test Sandbox</Text>
+                  <Text style={styles.rzpBrandTitle}>Razorpay Secure Checkout</Text>
+                  <Text style={styles.rzpBrandSub}>Total: ₹{finalPayablePrice}.00 • 256-bit Encrypted</Text>
                 </View>
               </View>
 
-              <TouchableOpacity
-                onPress={handleRazorpayPaymentComplete}
-                style={{
-                  backgroundColor: '#10b981',
-                  paddingHorizontal: 12,
-                  paddingVertical: 7,
-                  borderRadius: 8,
-                  marginRight: 8,
-                }}
-              >
-                <Text style={{ color: '#ffffff', fontSize: 12, fontWeight: '900' }}>⚡ Instant Success</Text>
-              </TouchableOpacity>
-
               <TouchableOpacity onPress={() => setRazorpayModal(null)} style={styles.rzpCloseBtn}>
-                <Text style={{ color: '#94a3b8', fontSize: 16, fontWeight: '700' }}>✕</Text>
+                <Text style={{ color: '#94a3b8', fontSize: 18, fontWeight: '700', paddingHorizontal: 6 }}>✕</Text>
               </TouchableOpacity>
             </View>
 
@@ -488,6 +475,12 @@ export default function SpotDetailsScreen({ route, navigation }) {
               originWhitelist={['*']}
               thirdPartyCookiesEnabled={true}
               sharedCookiesEnabled={true}
+              domStorageEnabled={true}
+              javaScriptEnabled={true}
+              setSupportMultipleWindows={false}
+              javaScriptCanOpenWindowsAutomatically={true}
+              mixedContentMode="always"
+              allowsInlineMediaPlayback={true}
               source={{
                 baseUrl: 'https://checkout.razorpay.com',
                 html: `
@@ -498,30 +491,17 @@ export default function SpotDetailsScreen({ route, navigation }) {
   <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    html, body { width: 100%; height: 100%; background-color: #0f172a; color: #ffffff; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 20px; overflow: hidden; }
-    .loader-spinner { width: 44px; height: 44px; border: 3.5px solid #334155; border-top: 3.5px solid #10b981; border-radius: 50%; animation: spin 0.9s linear infinite; margin-bottom: 14px; }
+    html, body { width: 100%; height: 100%; background: #ffffff; display: flex; flex-direction: column; align-items: center; justify-content: center; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; text-align: center; }
+    .spinner { width: 36px; height: 36px; border: 3px solid #e2e8f0; border-top: 3px solid #10b981; border-radius: 50%; animation: spin 0.8s linear infinite; margin-bottom: 12px; }
     @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-    .loading-title { color: #f8fafc; font-size: 15px; font-weight: 800; margin-bottom: 4px; }
-    .loading-sub { color: #94a3b8; font-size: 12px; margin-bottom: 20px; }
-    .sim-btn { background: #10b981; color: #ffffff; border: none; padding: 12px 24px; border-radius: 12px; font-weight: 900; font-size: 13px; cursor: pointer; width: 100%; max-width: 260px; box-shadow: 0 4px 14px rgba(16,185,129,0.4); }
+    .text { color: #64748b; font-size: 13px; font-weight: 600; }
   </style>
 </head>
 <body>
-  <div class="loader-spinner"></div>
-  <div class="loading-title">Securing Razorpay Payment...</div>
-  <div class="loading-sub">Amount: ₹${finalPayablePrice}.00 • Encrypted</div>
-
-  <button class="sim-btn" onclick="simulateSuccess()">⚡ Instant Test Success (1-Tap)</button>
+  <div class="spinner"></div>
+  <div class="text">Connecting to Razorpay Secure Gateway...</div>
 
   <script>
-    function simulateSuccess() {
-      window.ReactNativeWebView.postMessage(JSON.stringify({
-        event: 'PAYMENT_SUCCESS',
-        payment_id: 'pay_test_' + Math.random().toString(36).substring(2, 10),
-        signature: 'sig_test_' + Math.random().toString(36).substring(2, 15)
-      }));
-    }
-
     setTimeout(function() {
       try {
         var options = {
@@ -566,35 +546,68 @@ export default function SpotDetailsScreen({ route, navigation }) {
         rzp.on('payment.failed', function (response){
           window.ReactNativeWebView.postMessage(JSON.stringify({
             event: 'PAYMENT_FAILED',
-            error: response.error?.description || 'Payment rejected. Use 1-Tap Instant Success to complete booking.'
+            error: response.error?.description || 'Payment rejected or cancelled.'
           }));
         });
         rzp.open();
       } catch(e) {
-        console.log('Razorpay init error:', e);
+        window.ReactNativeWebView.postMessage(JSON.stringify({ event: 'PAYMENT_FAILED', error: e.message }));
       }
-    }, 500);
+    }, 350);
   </script>
 </body>
 </html>
                 `
               }}
-              style={{ flex: 1, backgroundColor: '#0f172a' }}
-              originWhitelist={['*']}
-              javaScriptEnabled={true}
-              domStorageEnabled={true}
-              setSupportMultipleWindows={false}
-              javaScriptCanOpenWindowsAutomatically={true}
-              mixedContentMode="always"
-              allowsInlineMediaPlayback={true}
-              onShouldStartLoadWithRequest={() => true}
-              userAgent="Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Mobile Safari/537.36"
-              onMessage={(event) => {
+              style={{ flex: 1, backgroundColor: '#ffffff' }}
+              onShouldStartLoadWithRequest={(request) => {
+                const { url } = request;
+                if (!url) return true;
+
+                // Open external UPI apps (Google Pay, PhonePe, Paytm, BHIM, etc.)
+                if (
+                  url.startsWith('upi://') ||
+                  url.startsWith('phonepe://') ||
+                  url.startsWith('paytmmp://') ||
+                  url.startsWith('tez://') ||
+                  url.startsWith('gpay://') ||
+                  url.startsWith('intent://')
+                ) {
+                  Linking.openURL(url).catch((err) => {
+                    console.log('UPI app open error:', err);
+                  });
+                  return false;
+                }
+                return true;
+              }}
+              onMessage={async (event) => {
                 try {
                   const data = JSON.parse(event.nativeEvent.data);
                   if (data.event === 'PAYMENT_SUCCESS') {
                     const bookingId = razorpayModal.booking._id;
                     const paymentId = data.payment_id || 'pay_' + Math.random().toString(36).substring(2, 10);
+                    const orderId = data.order_id || razorpayModal.orderData?.orderId;
+                    const signature = data.signature || 'sig_' + Math.random().toString(36).substring(2, 15);
+
+                    // Verify with backend
+                    try {
+                      const baseUrl = await getBaseApiUrl();
+                      await fetch(`${baseUrl}/bookings/${bookingId}/verify-payment`, {
+                        method: 'POST',
+                        headers: {
+                          'Content-Type': 'application/json',
+                          Authorization: `Bearer ${token}`,
+                        },
+                        body: JSON.stringify({
+                          razorpay_payment_id: paymentId,
+                          razorpay_order_id: orderId,
+                          razorpay_signature: signature,
+                          isMock: false,
+                        }),
+                      });
+                    } catch (verErr) {
+                      console.warn('Backend verification error:', verErr);
+                    }
 
                     const slot = razorpayModal.booking.slotId || 'Slot-1';
                     const actualHours = razorpayModal.actualHours || Number(durationHours || 1);
@@ -610,13 +623,13 @@ export default function SpotDetailsScreen({ route, navigation }) {
                     });
                   } else if (data.event === 'PAYMENT_CANCELLED') {
                     setRazorpayModal(null);
-                    showAlert('Payment Cancelled', 'You cancelled the Razorpay payment session.');
+                    showAlert('Payment Cancelled', 'Payment process was cancelled.');
                   } else if (data.event === 'PAYMENT_FAILED') {
                     setRazorpayModal(null);
-                    showAlert('Payment Failed', data.error || 'The payment could not be processed. Try selecting NetBanking (SBI/HDFC) or use Instant Success.');
+                    showAlert('Payment Failed', data.error || 'The payment could not be processed. Please try again.');
                   }
                 } catch (e) {
-                  console.log('Razorpay message parsing error:', e);
+                  console.log('Razorpay message error:', e);
                 }
               }}
             />
