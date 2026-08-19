@@ -12,9 +12,14 @@ export const AuthProvider = ({ children }) => {
   // Helper to format image URLs (converts /uploads/... to full AWS EC2 server URL)
   const getImageUrl = (url) => {
     if (!url) return 'https://images.unsplash.com/photo-1506015391300-4802dc74de2e?w=1200&q=80';
+    if (typeof url !== 'string') return url;
+    if (url.startsWith('data:')) return url;
+    if (url.startsWith('http://') || url.startsWith('https://')) return url;
     if (url.startsWith('/uploads/')) {
-      const baseUrl = API_URL.replace('/api', '');
-      return `${baseUrl}${url}`;
+      return `https://api.plantopark.com${url}`;
+    }
+    if (url.startsWith('uploads/')) {
+      return `https://api.plantopark.com/${url}`;
     }
     return url;
   };

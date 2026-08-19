@@ -8,10 +8,11 @@ import {
 } from 'lucide-react';
 
 const Navbar = () => {
-  const { user, logout } = useContext(AuthContext);
+  const { user, logout, getImageUrl } = useContext(AuthContext);
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
+  const [navImgError, setNavImgError] = useState(false);
 
   // Dropdown states — all start CLOSED
   const [profileOpen, setProfileOpen] = useState(false);
@@ -258,9 +259,18 @@ const Navbar = () => {
                   className="flex items-center gap-1.5 pl-1 pr-2 py-1 rounded-full border border-slate-200 hover:border-emerald-300 hover:bg-slate-50 transition-all"
                   aria-label="Profile menu"
                 >
-                  {/* Avatar circle with initial */}
-                  <div className="h-7 w-7 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center text-white font-black text-xs shadow-sm shrink-0">
-                    {user.name?.[0]?.toUpperCase() || 'U'}
+                  {/* Avatar circle with image or initial */}
+                  <div className="h-7 w-7 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center text-white font-black text-xs shadow-sm shrink-0 overflow-hidden">
+                    {user.profileImage && user.profileImage.length > 5 && !navImgError ? (
+                      <img
+                        src={getImageUrl ? getImageUrl(user.profileImage) : user.profileImage}
+                        alt=""
+                        className="h-full w-full object-cover"
+                        onError={() => setNavImgError(true)}
+                      />
+                    ) : (
+                      <span>{user.name?.[0]?.toUpperCase() || 'U'}</span>
+                    )}
                   </div>
                   <span className="hidden sm:block text-sm font-semibold text-slate-700">
                     {user.name?.split(' ')[0]}
@@ -273,8 +283,17 @@ const Navbar = () => {
                     {/* User info header */}
                     <div className="px-4 py-3.5 border-b border-slate-100 bg-slate-50/50">
                       <div className="flex items-center gap-2.5 mb-2">
-                        <div className="h-9 w-9 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center text-white font-black text-sm shrink-0">
-                          {user.name?.[0]?.toUpperCase() || 'U'}
+                        <div className="h-9 w-9 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center text-white font-black text-sm shrink-0 overflow-hidden">
+                          {user.profileImage && user.profileImage.length > 5 && !navImgError ? (
+                            <img
+                              src={getImageUrl ? getImageUrl(user.profileImage) : user.profileImage}
+                              alt=""
+                              className="h-full w-full object-cover"
+                              onError={() => setNavImgError(true)}
+                            />
+                          ) : (
+                            <span>{user.name?.[0]?.toUpperCase() || 'U'}</span>
+                          )}
                         </div>
                         <div className="min-w-0">
                           <p className="text-sm font-bold text-slate-800 truncate">{user.name}</p>
