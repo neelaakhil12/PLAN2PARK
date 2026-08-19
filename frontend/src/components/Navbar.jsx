@@ -55,9 +55,6 @@ const Navbar = () => {
     { label: 'Dashboard', view: null, icon: <LayoutDashboard className="h-4 w-4" /> },
     { label: 'Find Parking', view: 'find_parking', icon: <Search className="h-4 w-4" /> },
     { label: 'Bookings', view: 'bookings', icon: <BookOpen className="h-4 w-4" /> },
-    { label: 'History & Invoices', view: 'history', icon: <Clock className="h-4 w-4" /> },
-    { label: 'Favourites', view: 'favourites', icon: <Heart className="h-4 w-4" /> },
-    { label: 'Complaints', view: 'complaints', icon: <MessageSquare className="h-4 w-4" /> },
   ];
 
   // Build URL for seeker tab link
