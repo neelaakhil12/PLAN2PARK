@@ -768,16 +768,16 @@ const OwnerDashboard = () => {
         )}
 
         {/* ═════════════════════════════════════════════════════════════════════ */}
-        {/* ── VIEW 3: ADD / EDIT SPOT (MATCHING OWNER APP 1:1) ──────────────── */}
+        {/* ── VIEW 3: ADD / EDIT SPOT (MATCHING OWNER APP 1:1 WITH WEBSITE COLORS) ─ */}
         {/* ═════════════════════════════════════════════════════════════════════ */}
         {currentView === 'add_spot' && (
           <div className="max-w-xl mx-auto space-y-5 animate-fadeIn pb-16">
-            {/* Header with Back Button matching Mobile Screenshot */}
-            <div className="flex items-center gap-4">
+            {/* Header with Back Button */}
+            <div className="flex items-center gap-3">
               <button
                 type="button"
                 onClick={() => { setEditingSpot(null); setCurrentView('dashboard'); }}
-                className="h-11 w-11 rounded-2xl bg-slate-800/90 hover:bg-slate-700 text-white flex items-center justify-center transition-colors cursor-pointer border border-slate-700"
+                className="h-10 w-10 rounded-2xl bg-white hover:bg-slate-100 text-slate-700 flex items-center justify-center transition-colors cursor-pointer border border-slate-200 shadow-xs font-bold"
               >
                 ←
               </button>
@@ -786,12 +786,12 @@ const OwnerDashboard = () => {
               </h1>
             </div>
 
-            {/* Dark Card Container Matching Mobile App */}
-            <form onSubmit={handleSpotSubmit} className="bg-[#0f172a] border border-slate-800 text-white rounded-3xl p-6 sm:p-7 shadow-2xl space-y-5">
+            {/* Clean White Card Container Matching Website Theme */}
+            <form onSubmit={handleSpotSubmit} className="bg-white border border-slate-200 text-slate-800 rounded-3xl p-6 sm:p-8 shadow-sm space-y-5">
 
               {/* 1. Spot Name / Title */}
               <div className="space-y-2">
-                <label className="block text-sm font-black text-slate-200">
+                <label className="block text-xs font-extrabold text-slate-600 uppercase tracking-wider">
                   Spot Name / Title
                 </label>
                 <input
@@ -800,21 +800,21 @@ const OwnerDashboard = () => {
                   placeholder="e.g. Covered Driveway near Metro"
                   value={spotForm.title}
                   onChange={e => setSpotForm(p => ({ ...p, title: e.target.value }))}
-                  className="w-full px-4 py-3.5 bg-[#1e293b] border border-slate-700/80 rounded-2xl text-sm font-semibold text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition-colors"
+                  className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-800 placeholder-slate-400 focus:outline-none focus:border-emerald-500 focus:bg-white transition-colors"
                 />
               </div>
 
               {/* 2. Full Address (Complete) with Use GPS Button */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <label className="block text-sm font-black text-slate-200">
+                  <label className="block text-xs font-extrabold text-slate-600 uppercase tracking-wider">
                     Full Address (Complete)
                   </label>
                   <button
                     type="button"
                     onClick={handleDetectGps}
                     disabled={locatingGps}
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs px-3.5 py-1.5 rounded-xl shadow-md transition-all cursor-pointer flex items-center gap-1.5 shrink-0"
+                    className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-300 font-extrabold text-xs px-3.5 py-1.5 rounded-xl shadow-xs transition-all cursor-pointer flex items-center gap-1.5 shrink-0"
                   >
                     📍 {locatingGps ? 'Locating...' : 'Use GPS'}
                   </button>
@@ -825,39 +825,39 @@ const OwnerDashboard = () => {
                   placeholder="Complete address with colony, landmark & city"
                   value={spotForm.address}
                   onChange={e => setSpotForm(p => ({ ...p, address: e.target.value }))}
-                  className="w-full px-4 py-3 bg-[#1e293b] border border-slate-700/80 rounded-2xl text-sm font-medium text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition-colors resize-none"
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:border-emerald-500 focus:bg-white transition-colors resize-none"
                 />
               </div>
 
               {/* 3. City and Pincode */}
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
-                  <label className="block text-sm font-black text-slate-200">City</label>
+                  <label className="block text-xs font-extrabold text-slate-600 uppercase tracking-wider">City</label>
                   <input
                     type="text"
                     required
                     placeholder="Hyderabad"
                     value={spotForm.city}
                     onChange={e => setSpotForm(p => ({ ...p, city: e.target.value, location: e.target.value }))}
-                    className="w-full px-4 py-3.5 bg-[#1e293b] border border-slate-700/80 rounded-2xl text-sm font-semibold text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                    className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-800 placeholder-slate-400 focus:outline-none focus:border-emerald-500 focus:bg-white transition-colors"
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="block text-sm font-black text-slate-200">Pincode</label>
+                  <label className="block text-xs font-extrabold text-slate-600 uppercase tracking-wider">Pincode</label>
                   <input
                     type="text"
                     required
                     placeholder="500097"
                     value={spotForm.pincode || '500097'}
                     onChange={e => setSpotForm(p => ({ ...p, pincode: e.target.value }))}
-                    className="w-full px-4 py-3.5 bg-[#1e293b] border border-slate-700/80 rounded-2xl text-sm font-semibold text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                    className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-800 placeholder-slate-400 focus:outline-none focus:border-emerald-500 focus:bg-white transition-colors"
                   />
                 </div>
               </div>
 
               {/* 4. Google Maps Link (Optional) */}
               <div className="space-y-2">
-                <label className="block text-sm font-black text-slate-200">
+                <label className="block text-xs font-extrabold text-slate-600 uppercase tracking-wider">
                   Google Maps Link (Optional)
                 </label>
                 <input
@@ -865,14 +865,14 @@ const OwnerDashboard = () => {
                   placeholder="Paste Google Maps URL or use GPS above"
                   value={spotForm.googleMapsLink}
                   onChange={e => setSpotForm(p => ({ ...p, googleMapsLink: e.target.value }))}
-                  className="w-full px-4 py-3.5 bg-[#1e293b] border border-slate-700/80 rounded-2xl text-sm font-semibold text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                  className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-semibold text-slate-800 placeholder-slate-400 focus:outline-none focus:border-emerald-500 focus:bg-white transition-colors"
                 />
               </div>
 
               {/* 5. Hourly Rate (₹) and Total Capacity (Slots) */}
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
-                  <label className="block text-sm font-black text-slate-200">Hourly Rate (₹)</label>
+                  <label className="block text-xs font-extrabold text-slate-600 uppercase tracking-wider">Hourly Rate (₹)</label>
                   <input
                     type="number"
                     required
@@ -880,11 +880,11 @@ const OwnerDashboard = () => {
                     placeholder="50"
                     value={spotForm.pricePerHour}
                     onChange={e => setSpotForm(p => ({ ...p, pricePerHour: e.target.value }))}
-                    className="w-full px-4 py-3.5 bg-[#1e293b] border border-slate-700/80 rounded-2xl text-sm font-black text-white focus:outline-none focus:border-indigo-500"
+                    className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-black text-slate-800 focus:outline-none focus:border-emerald-500 focus:bg-white transition-colors"
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="block text-sm font-black text-slate-200">Total Capacity (Slots)</label>
+                  <label className="block text-xs font-extrabold text-slate-600 uppercase tracking-wider">Total Capacity (Slots)</label>
                   <input
                     type="number"
                     required
@@ -893,7 +893,7 @@ const OwnerDashboard = () => {
                     placeholder="5"
                     value={spotForm.totalSlots}
                     onChange={e => setSpotForm(p => ({ ...p, totalSlots: e.target.value }))}
-                    className="w-full px-4 py-3.5 bg-[#1e293b] border border-slate-700/80 rounded-2xl text-sm font-black text-white focus:outline-none focus:border-indigo-500"
+                    className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-black text-slate-800 focus:outline-none focus:border-emerald-500 focus:bg-white transition-colors"
                   />
                 </div>
               </div>
@@ -903,8 +903,8 @@ const OwnerDashboard = () => {
                 <div className="flex items-center gap-2">
                   <span className="text-base">🛡️</span>
                   <div>
-                    <p className="text-sm font-black text-slate-200">Cancellation &amp; Refund Policy</p>
-                    <p className="text-xs text-slate-400">Select refund amount driver receives if they cancel:</p>
+                    <p className="text-xs font-extrabold text-slate-700 uppercase tracking-wider">Cancellation &amp; Refund Policy</p>
+                    <p className="text-xs text-slate-500">Select refund amount driver receives if they cancel:</p>
                   </div>
                 </div>
 
@@ -914,20 +914,20 @@ const OwnerDashboard = () => {
                     onClick={() => setSpotForm(p => ({ ...p, cancellationPolicy: 'full' }))}
                     className={`p-4 rounded-2xl border cursor-pointer transition-all flex items-start justify-between gap-3 ${
                       spotForm.cancellationPolicy === 'full'
-                        ? 'bg-[#1e1b4b]/60 border-indigo-500 ring-1 ring-indigo-500'
-                        : 'bg-[#1e293b]/60 border-slate-800 hover:border-slate-700'
+                        ? 'bg-emerald-50/80 border-emerald-500 ring-1 ring-emerald-500 text-slate-900'
+                        : 'bg-slate-50 border-slate-200 hover:border-slate-300 text-slate-700'
                     }`}
                   >
                     <div>
-                      <p className="text-sm font-black text-white flex items-center gap-2">
+                      <p className="text-sm font-black text-slate-900 flex items-center gap-2">
                         🟢 100% Full Refund
                       </p>
-                      <p className="text-xs text-slate-400 mt-0.5">
+                      <p className="text-xs text-slate-500 mt-0.5 font-medium">
                         Seeker receives full 100% paid amount credited to wallet
                       </p>
                     </div>
                     <div className={`h-5 w-5 rounded-full border-2 flex items-center justify-center shrink-0 mt-0.5 ${
-                      spotForm.cancellationPolicy === 'full' ? 'border-indigo-500 bg-indigo-500' : 'border-slate-600'
+                      spotForm.cancellationPolicy === 'full' ? 'border-emerald-500 bg-emerald-500' : 'border-slate-300 bg-white'
                     }`}>
                       {spotForm.cancellationPolicy === 'full' && <div className="h-2 w-2 rounded-full bg-white" />}
                     </div>
@@ -938,20 +938,20 @@ const OwnerDashboard = () => {
                     onClick={() => setSpotForm(p => ({ ...p, cancellationPolicy: 'half' }))}
                     className={`p-4 rounded-2xl border cursor-pointer transition-all flex items-start justify-between gap-3 ${
                       spotForm.cancellationPolicy === 'half'
-                        ? 'bg-[#1e1b4b]/60 border-indigo-500 ring-1 ring-indigo-500'
-                        : 'bg-[#1e293b]/60 border-slate-800 hover:border-slate-700'
+                        ? 'bg-amber-50/80 border-amber-500 ring-1 ring-amber-500 text-slate-900'
+                        : 'bg-slate-50 border-slate-200 hover:border-slate-300 text-slate-700'
                     }`}
                   >
                     <div>
-                      <p className="text-sm font-black text-white flex items-center gap-2">
+                      <p className="text-sm font-black text-slate-900 flex items-center gap-2">
                         🟡 50% Half Refund
                       </p>
-                      <p className="text-xs text-slate-400 mt-0.5">
+                      <p className="text-xs text-slate-500 mt-0.5 font-medium">
                         Seeker receives 50% refund; you keep 50% compensation
                       </p>
                     </div>
                     <div className={`h-5 w-5 rounded-full border-2 flex items-center justify-center shrink-0 mt-0.5 ${
-                      spotForm.cancellationPolicy === 'half' ? 'border-indigo-500 bg-indigo-500' : 'border-slate-600'
+                      spotForm.cancellationPolicy === 'half' ? 'border-amber-500 bg-amber-500' : 'border-slate-300 bg-white'
                     }`}>
                       {spotForm.cancellationPolicy === 'half' && <div className="h-2 w-2 rounded-full bg-white" />}
                     </div>
@@ -962,20 +962,20 @@ const OwnerDashboard = () => {
                     onClick={() => setSpotForm(p => ({ ...p, cancellationPolicy: 'none' }))}
                     className={`p-4 rounded-2xl border cursor-pointer transition-all flex items-start justify-between gap-3 ${
                       spotForm.cancellationPolicy === 'none'
-                        ? 'bg-[#1e1b4b]/60 border-indigo-500 ring-1 ring-indigo-500'
-                        : 'bg-[#1e293b]/60 border-slate-800 hover:border-slate-700'
+                        ? 'bg-rose-50/80 border-rose-500 ring-1 ring-rose-500 text-slate-900'
+                        : 'bg-slate-50 border-slate-200 hover:border-slate-300 text-slate-700'
                     }`}
                   >
                     <div>
-                      <p className="text-sm font-black text-white flex items-center gap-2">
+                      <p className="text-sm font-black text-slate-900 flex items-center gap-2">
                         🔴 0% No Refund
                       </p>
-                      <p className="text-xs text-slate-400 mt-0.5">
+                      <p className="text-xs text-slate-500 mt-0.5 font-medium">
                         Strict non-refundable booking
                       </p>
                     </div>
                     <div className={`h-5 w-5 rounded-full border-2 flex items-center justify-center shrink-0 mt-0.5 ${
-                      spotForm.cancellationPolicy === 'none' ? 'border-indigo-500 bg-indigo-500' : 'border-slate-600'
+                      spotForm.cancellationPolicy === 'none' ? 'border-rose-500 bg-rose-500' : 'border-slate-300 bg-white'
                     }`}>
                       {spotForm.cancellationPolicy === 'none' && <div className="h-2 w-2 rounded-full bg-white" />}
                     </div>
@@ -985,7 +985,7 @@ const OwnerDashboard = () => {
 
               {/* 7. Max Wallet Money Usable per Booking (₹) */}
               <div className="space-y-2 pt-2">
-                <label className="block text-sm font-black text-slate-200 flex items-center gap-1.5">
+                <label className="block text-xs font-extrabold text-slate-600 uppercase tracking-wider flex items-center gap-1.5">
                   ⚡ Max Wallet Money Usable per Booking (₹)
                 </label>
                 <input
@@ -994,7 +994,7 @@ const OwnerDashboard = () => {
                   max={50}
                   value={spotForm.maxWalletDiscount}
                   onChange={e => setSpotForm(p => ({ ...p, maxWalletDiscount: e.target.value }))}
-                  className="w-full px-4 py-3.5 bg-[#1e293b] border border-slate-700/80 rounded-2xl text-sm font-black text-white focus:outline-none focus:border-indigo-500"
+                  className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-black text-slate-800 focus:outline-none focus:border-emerald-500 focus:bg-white transition-colors"
                 />
                 <p className="text-xs text-slate-400">
                   Drivers can deduct up to ₹10 from their PlanToPark Wallet balance on each booking.
@@ -1002,12 +1002,12 @@ const OwnerDashboard = () => {
               </div>
 
               {/* 8. EV Charger Facility Switch Toggle */}
-              <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between">
+              <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-black text-slate-200 flex items-center gap-1.5">
+                  <p className="text-xs font-extrabold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
                     ⚡ EV Charger Facility
                   </p>
-                  <p className="text-xs text-slate-400 mt-0.5">
+                  <p className="text-xs text-slate-500 mt-0.5 font-medium">
                     Is electric vehicle charging available?
                   </p>
                 </div>
@@ -1017,7 +1017,7 @@ const OwnerDashboard = () => {
                     type="button"
                     onClick={() => setSpotForm(p => ({ ...p, hasEvCharger: !p.hasEvCharger }))}
                     className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                      spotForm.hasEvCharger ? 'bg-indigo-600' : 'bg-slate-700'
+                      spotForm.hasEvCharger ? 'bg-emerald-500' : 'bg-slate-300'
                     }`}
                   >
                     <span
@@ -1026,20 +1026,20 @@ const OwnerDashboard = () => {
                       }`}
                     />
                   </button>
-                  <span className={`text-xs font-black uppercase ${spotForm.hasEvCharger ? 'text-indigo-400' : 'text-slate-500'}`}>
+                  <span className={`text-xs font-extrabold uppercase ${spotForm.hasEvCharger ? 'text-emerald-700' : 'text-slate-400'}`}>
                     {spotForm.hasEvCharger ? 'ON' : 'OFF'}
                   </span>
                 </div>
               </div>
 
-              {/* Submit Button matching Mobile Screenshot */}
+              {/* Submit Button matching Website Colors */}
               <button
                 type="submit"
                 disabled={submittingSpot}
-                className="w-full bg-[#818cf8] hover:bg-[#6366f1] text-[#0f172a] hover:text-white font-black py-4 rounded-2xl text-base shadow-xl shadow-indigo-600/30 transition-all transform active:scale-98 flex items-center justify-center gap-2 cursor-pointer mt-4"
+                className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-black py-4 rounded-2xl text-base shadow-lg shadow-emerald-500/25 transition-all transform active:scale-98 flex items-center justify-center gap-2 cursor-pointer mt-4"
               >
                 {submittingSpot ? (
-                  <Loader2 className="h-5 w-5 animate-spin text-slate-900" />
+                  <Loader2 className="h-5 w-5 animate-spin text-white" />
                 ) : (
                   editingSpot ? 'Update Parking Spot' : 'Publish Parking Listing'
                 )}
