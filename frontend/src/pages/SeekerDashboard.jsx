@@ -1961,12 +1961,12 @@ const SeekerDashboard = () => {
                           {/* Header: Address & Status */}
                           <div className="flex items-start justify-between gap-3">
                             <div className="min-w-0">
-                              <h4 className="font-extrabold text-slate-900 text-base tracking-tight truncate group-hover:text-emerald-600 transition-colors" title={b.spaceId?.address}>
-                                {b.spaceId?.address || 'Parking Property'}
+                              <h4 className="font-extrabold text-slate-900 text-base tracking-tight truncate group-hover:text-emerald-600 transition-colors" title={b.spaceId?.title || b.spaceId?.address}>
+                                {b.spaceId?.title || b.spaceId?.address || 'Parking Property'}
                               </h4>
                               <p className="text-xs text-slate-400 font-medium flex items-center gap-1 mt-1 truncate">
                                 <MapPin className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-                                {b.spaceId?.location || 'Unknown Location'}
+                                {b.spaceId?.address || b.spaceId?.location || 'Location Address'}
                               </p>
                             </div>
                             <div className="shrink-0">
