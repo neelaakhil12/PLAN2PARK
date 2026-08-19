@@ -375,6 +375,102 @@ const SeekerDashboard = () => {
     getSlots();
   }, [selectedSpace, form.startTime, form.hours, token, API_URL]);
 
+  const triggerRazorpayPayment = async (booking) => {
+    if (!booking || !booking._id) return;
+    setPayLoading(true);
+
+    try {
+      await loadRazorpayScript();
+
+      const orderRes = await fetch(`${API_URL}/bookings/${booking._id}/razorpay-order`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        }
+      });
+
+      if (!orderRes.ok) {
+        const errData = await orderRes.json();
+        alert(errData.message || 'Failed to initialize payment order');
+        setPayLoading(false);
+        return;
+      }
+
+      const orderData = await orderRes.json();
+      const { orderId, amount, currency, keyId } = orderData;
+
+      if (!window.Razorpay) {
+        alert('Razorpay payment gateway SDK is loading. Please try again.');
+        setPayLoading(false);
+        return;
+      }
+
+      // Real Razorpay checkout flow
+      const options = {
+        key: keyId || 'rzp_test_TRbpfgVeLqTOdb',
+        amount: amount,
+        currency: currency || 'INR',
+        name: 'PlantoPark Safe P2P',
+        description: `Booking Reference: ${booking._id}`,
+        order_id: orderId,
+        handler: async function (response) {
+          try {
+            const verifyRes = await fetch(`${API_URL}/bookings/${booking._id}/verify-payment`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`
+              },
+              body: JSON.stringify({
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_signature: response.razorpay_signature,
+                isMock: false
+              })
+            });
+
+            if (verifyRes.ok) {
+              alert('🎉 Razorpay Payment successful! Your slot is confirmed.');
+              setPayingBooking(null);
+              setSelectedSpace(null);
+              setCurrentView('bookings');
+              fetchData();
+            } else {
+              const errData = await verifyRes.json();
+              alert(errData.message || 'Payment signature verification failed.');
+            }
+          } catch (verErr) {
+            console.error('Verification error:', verErr);
+          }
+        },
+        prefill: {
+          name: user?.name || booking?.seekerName || '',
+          email: user?.email || '',
+          contact: user?.contact || booking?.seekerContact || ''
+        },
+        theme: {
+          color: '#10b981'
+        },
+        modal: {
+          ondismiss: function () {
+            setPayLoading(false);
+            setCurrentView('bookings');
+            fetchData();
+          }
+        }
+      };
+
+      const paymentObject = new window.Razorpay(options);
+      paymentObject.open();
+
+    } catch (error) {
+      console.error('Razorpay Error:', error);
+      alert('An error occurred while launching Razorpay payment gateway.');
+    }
+    setPayLoading(false);
+  };
+
   const handleBookSubmit = async (e) => {
     e.preventDefault();
     if (!form.slotId) {
@@ -401,11 +497,13 @@ const SeekerDashboard = () => {
       });
       const data = await res.json();
       if (res.ok) {
-        alert('Booking created successfully! Please complete payment under Active Reservations to lock your spot.');
         setSelectedSpace(null);
-        setCurrentView('bookings');
         fetchData();
-      } else alert(data.message);
+        // Immediately trigger the official Razorpay payment gateway environment!
+        triggerRazorpayPayment(data);
+      } else {
+        alert(data.message || 'Booking creation failed');
+      }
     } catch (e) { console.error(e); }
     setLoading(false);
   };
@@ -452,111 +550,9 @@ const SeekerDashboard = () => {
 
   const handlePay = async (e) => {
     if (e) e.preventDefault();
-    setPayLoading(true);
-
-    try {
-      // 1. Load Razorpay Script
-      const scriptLoaded = await loadRazorpayScript();
-      
-      // 2. Fetch Razorpay Order from backend
-      const orderRes = await fetch(`${API_URL}/bookings/${payingBooking._id}/razorpay-order`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        }
-      });
-
-      if (!orderRes.ok) {
-        const errData = await orderRes.json();
-        alert(errData.message || 'Failed to initialize payment order');
-        setPayLoading(false);
-        return;
-      }
-
-      const orderData = await orderRes.json();
-      const { orderId, amount, currency, keyId, isMock } = orderData;
-
-      if (isMock || !scriptLoaded) {
-        // Run Sandbox/Mock simulation flow
-        const mockVerifyRes = await fetch(`${API_URL}/bookings/${payingBooking._id}/verify-payment`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`
-          },
-          body: JSON.stringify({
-            razorpay_order_id: orderId,
-            razorpay_payment_id: 'pay_mock_' + Math.random().toString(36).substring(2, 9),
-            isMock: true
-          })
-        });
-
-        if (mockVerifyRes.ok) {
-          alert('💳 [SANDBOX MOCK] Payment successful! Your parking slot is confirmed.');
-          setPayingBooking(null);
-          setCurrentView('bookings');
-          fetchData();
-        } else {
-          const errData = await mockVerifyRes.json();
-          alert(errData.message || 'Payment simulation verification failed');
-        }
-        setPayLoading(false);
-        return;
-      }
-
-      // Real Razorpay checkout flow
-      const options = {
-        key: keyId,
-        amount: amount,
-        currency: currency,
-        name: 'PlantoPark Safe P2P',
-        description: `Booking Reference: ${payingBooking._id}`,
-        order_id: orderId,
-        handler: async function (response) {
-          // Send signature and ids to verify-payment
-          const verifyRes = await fetch(`${API_URL}/bookings/${payingBooking._id}/verify-payment`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${token}`
-            },
-            body: JSON.stringify({
-              razorpay_payment_id: response.razorpay_payment_id,
-              razorpay_order_id: response.razorpay_order_id,
-              razorpay_signature: response.razorpay_signature,
-              isMock: false
-            })
-          });
-
-          if (verifyRes.ok) {
-            alert('🎉 Razorpay Payment successful! Booking confirmed.');
-            setPayingBooking(null);
-            setCurrentView('bookings');
-            fetchData();
-          } else {
-            const errData = await verifyRes.json();
-            alert(errData.message || 'Payment signature verification failed.');
-          }
-        },
-        prefill: {
-          name: user?.name || '',
-          email: user?.email || '',
-          contact: user?.contact || ''
-        },
-        theme: {
-          color: '#10b981'
-        }
-      };
-
-      const paymentObject = new window.Razorpay(options);
-      paymentObject.open();
-
-    } catch (error) {
-      console.error('Razorpay Error:', error);
-      alert('An error occurred while launching Razorpay payment gateway.');
+    if (payingBooking) {
+      triggerRazorpayPayment(payingBooking);
     }
-    setPayLoading(false);
   };
 
   const handleReviewSubmit = async (e) => {
