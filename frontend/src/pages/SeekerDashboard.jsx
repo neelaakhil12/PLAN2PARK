@@ -468,9 +468,15 @@ const SeekerDashboard = () => {
           color: '#10b981'
         },
         modal: {
-          ondismiss: function () {
+          ondismiss: async function () {
             setPayLoading(false);
-            setCurrentView('bookings');
+            // Cancel unpaid draft if dismissed so it never appears in bookings
+            try {
+              await fetch(`${API_URL}/bookings/${booking._id}/cancel`, {
+                method: 'PUT',
+                headers: { Authorization: `Bearer ${token}` }
+              });
+            } catch (e) {}
             fetchData();
           }
         }
@@ -747,7 +753,7 @@ const SeekerDashboard = () => {
     return 'Good evening';
   };
 
-  const activeBookings = bookings.filter(b => ['paid', 'allotted', 'pending_approval'].includes(b.status));
+  const activeBookings = bookings.filter(b => b.status === 'paid');
   const totalSpent = analytics?.totalSpent || 0;
 
   // Geocoding distance calculation helper (Haversine Formula)
