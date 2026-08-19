@@ -747,7 +747,7 @@ const SeekerDashboard = () => {
     return 'Good evening';
   };
 
-  const activeBookings = bookings.filter(b => b.status === 'paid');
+  const activeBookings = bookings.filter(b => ['paid', 'allotted', 'pending_approval'].includes(b.status));
   const totalSpent = analytics?.totalSpent || 0;
 
   // Geocoding distance calculation helper (Haversine Formula)
@@ -2012,10 +2012,10 @@ const SeekerDashboard = () => {
                           <div className="flex flex-wrap items-center gap-1.5">
                             {b.status === 'allotted' && (
                               <button 
-                                onClick={() => setPayingBooking(b)} 
-                                className="bg-emerald-500 hover:bg-emerald-600 text-white font-extrabold px-3 py-2 rounded-xl text-xs flex items-center gap-1 shadow-md shadow-emerald-500/10 transition-all hover:-translate-y-0.5"
+                                onClick={() => triggerRazorpayPayment(b)} 
+                                className="bg-emerald-500 hover:bg-emerald-600 text-white font-extrabold px-4 py-2.5 rounded-xl text-xs flex items-center gap-1.5 shadow-md shadow-emerald-500/20 transition-all hover:-translate-y-0.5 cursor-pointer"
                               >
-                                <CreditCard className="h-3.5 w-3.5" /> Pay Now
+                                <CreditCard className="h-3.5 w-3.5" /> Complete Payment (₹{b.totalAmount})
                               </button>
                             )}
 
