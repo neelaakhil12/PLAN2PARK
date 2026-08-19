@@ -84,6 +84,8 @@ const SeekerDashboard = () => {
   const [favorites, setFavorites] = useState([]);
   const [loading, setLoading] = useState(true);
   const [payLoading, setPayLoading] = useState(false);
+  const [walletBalance, setWalletBalance] = useState(150);
+  const [useWallet, setUseWallet] = useState(true);
 
   // Transient UI states (overlays)
   const [selectedSpace, setSelectedSpace] = useState(null);
@@ -152,6 +154,9 @@ const SeekerDashboard = () => {
       if (rP.ok) {
         const uData = await rP.json();
         setFavorites(uData.favorites || []);
+        if (uData.walletBalance !== undefined) {
+          setWalletBalance(uData.walletBalance);
+        }
       }
     } catch (e) { console.error(e); }
     setLoading(false);
