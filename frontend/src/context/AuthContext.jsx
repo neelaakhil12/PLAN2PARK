@@ -7,7 +7,7 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [token, setToken] = useState(localStorage.getItem('token') || '');
 
-  const API_URL = import.meta.env.VITE_API_URL || 'http://43.204.235.124:5000/api';
+  const API_URL = import.meta.env.VITE_API_URL || 'https://api.plantopark.com/api';
 
   // Helper to format image URLs (converts /uploads/... to full AWS EC2 server URL)
   const getImageUrl = (url) => {
