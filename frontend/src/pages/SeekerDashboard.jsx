@@ -892,40 +892,41 @@ const SeekerDashboard = () => {
                     </button>
                   </div>
 
-                  {/* Mini space cards */}
-                  <div className="divide-y divide-slate-50">
-                    {spaces.slice(0, 4).map(space => {
-                      const freeSlots = space.slots?.filter(s => s.isAvailable).length || 0;
-                      return (
-                        <div key={space._id} className="flex items-center gap-4 px-5 py-4 hover:bg-slate-50 transition-colors">
-                          <img src={space.image} alt="" className="h-14 w-14 rounded-xl object-cover border shrink-0" />
-                          <div className="flex-1 min-w-0">
-                            <p className="font-semibold text-slate-800 text-sm truncate">{space.address}</p>
-                            <p className="text-xs text-slate-400 flex items-center gap-1 mt-0.5">
-                              <MapPin className="h-3 w-3" />{space.location}
-                            </p>
+                    {/* Mini space cards */}
+                    <div className="divide-y divide-slate-50">
+                      {spaces.slice(0, 6).map(space => {
+                        const freeSlots = space.slots?.filter(s => s.isAvailable).length || 0;
+                        const spotImg = getImageUrl ? getImageUrl(space.images?.[0] || space.image || space.photoUrl) : (space.image || space.photoUrl);
+                        return (
+                          <div key={space._id} className="flex items-center gap-4 px-5 py-4 hover:bg-slate-50 transition-colors">
+                            <img src={spotImg} alt={space.title || 'Parking Spot'} className="h-14 w-14 rounded-xl object-cover border border-slate-200 shrink-0" />
+                            <div className="flex-1 min-w-0">
+                              <p className="font-extrabold text-slate-900 text-sm truncate">{space.title || space.address}</p>
+                              <p className="text-xs text-slate-400 flex items-center gap-1 mt-0.5 truncate">
+                                <MapPin className="h-3 w-3 shrink-0 text-slate-400" />{space.address || space.location}
+                              </p>
+                            </div>
+                            <div className="text-right shrink-0">
+                              <p className="font-black text-emerald-600 text-sm">₹{space.pricePerHour}/hr</p>
+                              <p className={`text-[10px] font-bold mt-0.5 ${freeSlots > 0 ? 'text-emerald-600' : 'text-rose-500'}`}>
+                                {freeSlots} free slot{freeSlots !== 1 ? 's' : ''}
+                              </p>
+                            </div>
+                            <button
+                              onClick={() => {
+                                setSelectedSpace(space);
+                                const now = new Date().toISOString().slice(0, 16);
+                                setForm(p => ({ ...p, seekerName: user?.name || '', seekerContact: user?.contact || '', startTime: now, bookingType: 'hourly', hours: '1' }));
+                                setCurrentView('find_parking');
+                              }}
+                              disabled={freeSlots === 0}
+                              className={`shrink-0 px-3.5 py-2 rounded-xl text-xs font-black transition-colors ${freeSlots > 0 ? 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-xs cursor-pointer' : 'bg-slate-100 text-slate-400 cursor-not-allowed'}`}
+                            >
+                              Book
+                            </button>
                           </div>
-                          <div className="text-right shrink-0">
-                            <p className="font-bold text-emerald-600 text-sm">₹{space.pricePerHour}/hr</p>
-                            <p className={`text-[10px] font-semibold mt-0.5 ${freeSlots > 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
-                              {freeSlots} slots free
-                            </p>
-                          </div>
-                          <button
-                            onClick={() => {
-                              setSelectedSpace(space);
-                              const now = new Date().toISOString().slice(0, 16);
-                              setForm(p => ({ ...p, seekerName: user?.name || '', seekerContact: user?.contact || '', startTime: now, bookingType: 'hourly', hours: '1' }));
-                              setCurrentView('find_parking');
-                            }}
-                            disabled={freeSlots === 0}
-                            className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${freeSlots > 0 ? 'bg-emerald-500 hover:bg-emerald-600 text-white' : 'bg-slate-100 text-slate-400 cursor-not-allowed'}`}
-                          >
-                            Book
-                          </button>
-                        </div>
-                      );
-                    })}
+                        );
+                      })}
                     {spaces.length === 0 && (
                       <div className="px-5 py-10 text-center text-slate-400 text-sm">
                         No parking spaces available in your area right now.
@@ -1423,6 +1424,7 @@ const SeekerDashboard = () => {
                       const freeSlots = space.slots?.filter(s => s.isAvailable).length || 0;
                       const isFav     = favorites.includes(space._id);
                       const isActive  = activeSpaceId === space._id;
+                      const spotImg   = getImageUrl ? getImageUrl(space.images?.[0] || space.image || space.photoUrl) : (space.image || space.photoUrl);
                       return (
                         <div
                           key={space._id}
@@ -1438,7 +1440,7 @@ const SeekerDashboard = () => {
                           <div className="flex gap-0">
                             {/* Image */}
                             <div className="relative shrink-0 w-32 sm:w-36">
-                              <img src={space.image} alt="" className="h-full w-full object-cover min-h-[110px]" />
+                              <img src={spotImg} alt={space.title || 'Parking Spot'} className="h-full w-full object-cover min-h-[110px]" />
                               {freeSlots > 0 && (
                                 <span className="absolute top-2 left-2 bg-emerald-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded-md">
                                   AVAILABLE
@@ -1455,10 +1457,10 @@ const SeekerDashboard = () => {
                             {/* Details */}
                             <div className="flex-1 p-4 flex flex-col justify-between min-w-0">
                               <div className="space-y-1">
-                                <h4 className="font-bold text-slate-900 text-sm leading-tight truncate">{space.address}</h4>
+                                <h4 className="font-extrabold text-slate-900 text-sm leading-tight truncate">{space.title || space.address}</h4>
                                 <p className="text-xs text-slate-400 flex items-center gap-1">
-                                  <MapPin className="h-3 w-3 shrink-0" />
-                                  <span className="truncate">{space.location}</span>
+                                  <MapPin className="h-3 w-3 shrink-0 text-slate-400" />
+                                  <span className="truncate">{space.address || space.location}</span>
                                 </p>
                                 <div className="flex items-center gap-2 flex-wrap mt-1">
                                   <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${freeSlots > 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-600'}`}>
