@@ -89,6 +89,10 @@ const SeekerDashboard = () => {
   const [showEditProfileModal, setShowEditProfileModal] = useState(false);
   const [showAddVehicleForm, setShowAddVehicleForm] = useState(false);
   const [profileImgError, setProfileImgError] = useState(false);
+  const [showPinModal, setShowPinModal] = useState(true);
+  const [pinnedLocationName, setPinnedLocationName] = useState('Almasguda, Hyderabad');
+  const [locatingGps, setLocatingGps] = useState(false);
+  const [customAreaInput, setCustomAreaInput] = useState('');
 
   // Transient UI states (overlays)
   const [selectedSpace, setSelectedSpace] = useState(null);
@@ -489,13 +493,14 @@ const SeekerDashboard = () => {
     try {
       const fd = new FormData();
       fd.append('spaceId', selectedSpace._id);
-      fd.append('vehicleNumber', form.vehicleNumber);
-      fd.append('seekerName', form.seekerName);
-      fd.append('seekerContact', form.seekerContact);
-      fd.append('hours', Number(form.hours));
-      fd.append('startTime', form.startTime);
+      fd.append('vehicleNumber', form.vehicleNumber || 'TS07WJ2099');
+      fd.append('seekerName', form.seekerName || user?.name || 'Seeker');
+      fd.append('seekerContact', form.seekerContact || user?.contact || '9989551305');
+      fd.append('hours', Number(form.hours || 1));
+      fd.append('startTime', form.startTime || new Date().toISOString());
       fd.append('slotId', form.slotId);
-      fd.append('bookingType', form.bookingType);
+      fd.append('bookingType', form.bookingType || 'hourly');
+      fd.append('useWalletBalance', useWallet);
       if (form.driverImageFile) fd.append('driverImageFile', form.driverImageFile);
 
       const res = await fetch(`${API_URL}/bookings`, {
@@ -505,14 +510,23 @@ const SeekerDashboard = () => {
       });
       const data = await res.json();
       if (res.ok) {
-        setSelectedSpace(null);
+        const createdBooking = data.booking || data;
         fetchData();
-        // Immediately trigger the official Razorpay payment gateway environment!
-        triggerRazorpayPayment(data);
+        if (createdBooking.status === 'paid' || data.finalPayableAmount === 0) {
+          alert('🎉 Booking confirmed and paid with PlanToPark Wallet!');
+          setSelectedSpace(null);
+          setCurrentView('bookings');
+        } else {
+          // Immediately trigger the official Razorpay payment gateway environment!
+          triggerRazorpayPayment(createdBooking);
+        }
       } else {
         alert(data.message || 'Booking creation failed');
       }
-    } catch (e) { console.error(e); }
+    } catch (e) {
+      console.error(e);
+      alert('Failed to connect. Please try again.');
+    }
     setLoading(false);
   };
 
@@ -655,6 +669,71 @@ const SeekerDashboard = () => {
     if (res.ok) fetchData();
   };
 
+  const POPULAR_LOCATIONS = [
+    { name: 'Almasguda, Hyderabad', lat: 17.313, lng: 78.545 },
+    { name: 'Hitech City, Hyderabad', lat: 17.443, lng: 78.377 },
+    { name: 'Banjara Hills, Hyderabad', lat: 17.415, lng: 78.435 },
+    { name: 'Madhapur, Hyderabad', lat: 17.448, lng: 78.390 },
+    { name: 'Gachibowli, Hyderabad', lat: 17.440, lng: 78.348 },
+    { name: 'Jubilee Hills, Hyderabad', lat: 17.431, lng: 78.407 },
+    { name: 'Kondapur, Hyderabad', lat: 17.468, lng: 78.361 },
+    { name: 'Secunderabad Station', lat: 17.434, lng: 78.501 },
+  ];
+
+  const handleUseGps = () => {
+    setLocatingGps(true);
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          const lat = position.coords.latitude;
+          const lng = position.coords.longitude;
+          setUserLat(lat);
+          setUserLng(lng);
+          try {
+            const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`);
+            const data = await res.json();
+            const areaName = data.address
+              ? (data.address.suburb || data.address.neighbourhood || data.address.residential || data.address.city_district || data.address.city || 'Current Area')
+              : 'Current GPS Location';
+            setPinnedLocationName(`🎯 ${areaName}`);
+          } catch (e) {
+            setPinnedLocationName(`🎯 GPS Location (${lat.toFixed(3)}, ${lng.toFixed(3)})`);
+          } finally {
+            setLocatingGps(false);
+            setShowPinModal(false);
+          }
+        },
+        (error) => {
+          console.warn('Geolocation error:', error);
+          setUserLat(17.313);
+          setUserLng(78.545);
+          setPinnedLocationName('🎯 Almasguda, Hyderabad');
+          setLocatingGps(false);
+          setShowPinModal(false);
+        },
+        { enableHighAccuracy: true, timeout: 8000 }
+      );
+    } else {
+      setLocatingGps(false);
+      setShowPinModal(false);
+    }
+  };
+
+  const handleSelectPresetLocation = (loc) => {
+    setUserLat(loc.lat);
+    setUserLng(loc.lng);
+    setPinnedLocationName(`📍 ${loc.name}`);
+    setShowPinModal(false);
+  };
+
+  const handleCustomAreaSearch = (e) => {
+    if (e) e.preventDefault();
+    if (!customAreaInput.trim()) return;
+    setPinnedLocationName(`📍 ${customAreaInput.trim()}`);
+    setSearchQuery(customAreaInput.trim());
+    setShowPinModal(false);
+  };
+
   const mapSrc = (address) =>
     `https://maps.google.com/maps?q=${encodeURIComponent(address)}&t=&z=14&ie=UTF8&iwloc=&output=embed`;
 
@@ -723,6 +802,26 @@ const SeekerDashboard = () => {
         {/* ── VIEW: DASHBOARD ─────────────────────────────────────────── */}
         {currentView === 'dashboard' && (
           <div className="space-y-6">
+            {/* Pinned Location Banner */}
+            <div className="bg-emerald-50 border border-emerald-200/90 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="h-10 w-10 rounded-xl bg-emerald-500 text-white flex items-center justify-center text-lg shrink-0 shadow-md shadow-emerald-500/20">
+                  📍
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[10px] font-black text-emerald-800 uppercase tracking-widest">Pinned Search Location</p>
+                  <p className="text-sm font-extrabold text-slate-900 truncate">{pinnedLocationName}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowPinModal(true)}
+                className="shrink-0 bg-white hover:bg-slate-50 border border-emerald-300 text-emerald-700 font-extrabold text-xs px-4 py-2.5 rounded-xl shadow-xs transition-all cursor-pointer flex items-center justify-center gap-1.5"
+              >
+                Change Location Pin 📍
+              </button>
+            </div>
+
             {/* Greeting */}
             <div>
               <h1 className="text-2xl font-extrabold text-slate-900">
@@ -2238,7 +2337,7 @@ const SeekerDashboard = () => {
               <Clock className="h-6 w-6 text-indigo-600" />
             </div>
             <h3 className="text-xl font-extrabold text-slate-900 text-center mb-1">Extend Parking Duration</h3>
-            <p className="text-slate-400 text-sm text-center mb-5">Current Slot: <strong className="text-indigo-650">{extendingBooking.slotId}</strong></p>
+            <p className="text-slate-400 text-sm text-center mb-5">Current Slot: <strong className="text-indigo-600">{extendingBooking.slotId}</strong></p>
 
             {extendError && (
               <div className="flex items-start gap-2 bg-rose-50 border border-rose-200 text-rose-600 p-3.5 rounded-xl mb-5 text-xs font-semibold leading-relaxed">
@@ -2471,6 +2570,100 @@ const SeekerDashboard = () => {
                   >
                     Close Navigation
                   </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* ── PIN LOCATION MODAL (MATCHING SEEKER APP 1:1) ───────────────── */}
+      {showPinModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-fadeIn">
+          <div className="w-full max-w-lg bg-white rounded-3xl shadow-2xl p-7 relative max-h-[90vh] overflow-y-auto">
+            <button
+              onClick={() => setShowPinModal(false)}
+              className="absolute top-5 right-5 text-slate-400 hover:text-slate-700"
+            >
+              <XCircle className="h-6 w-6" />
+            </button>
+
+            {/* Header */}
+            <div className="mb-5">
+              <h3 className="text-xl font-black text-slate-900 flex items-center gap-2">
+                <span>📍</span> Pin Your Location
+              </h3>
+              <p className="text-slate-400 text-xs mt-1">
+                Pin where you need parking so we can show you the nearest spots!
+              </p>
+            </div>
+
+            <div className="space-y-5">
+              {/* GPS Locate Button */}
+              <button
+                type="button"
+                onClick={handleUseGps}
+                disabled={locatingGps}
+                className="w-full p-4 bg-emerald-50 hover:bg-emerald-100/80 border border-emerald-300 rounded-2xl flex items-center gap-4 transition-all text-left group cursor-pointer shadow-xs"
+              >
+                <div className="h-11 w-11 rounded-xl bg-emerald-500 text-white flex items-center justify-center text-xl shrink-0 shadow-md shadow-emerald-500/20">
+                  🎯
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-extrabold text-slate-900 group-hover:text-emerald-700 transition-colors">
+                    {locatingGps ? 'Detecting your real-time GPS location...' : 'Use Current GPS Location'}
+                  </p>
+                  <p className="text-[11px] text-emerald-700/80 font-medium mt-0.5">
+                    Auto-detect &amp; pin your exact neighborhood
+                  </p>
+                </div>
+                <span className="text-emerald-600 font-extrabold text-sm">→</span>
+              </button>
+
+              {/* Custom Area Search */}
+              <div>
+                <p className="text-xs font-extrabold text-slate-600 uppercase tracking-wider mb-2">
+                  Or Search Specific Area / Landmark
+                </p>
+                <form onSubmit={handleCustomAreaSearch} className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="Enter city, area, or landmark (e.g. Almasguda)..."
+                    value={customAreaInput}
+                    onChange={e => setCustomAreaInput(e.target.value)}
+                    className="flex-1 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:border-emerald-500"
+                  />
+                  <button
+                    type="submit"
+                    className="bg-emerald-500 hover:bg-emerald-600 text-white font-black px-4 py-3 rounded-xl text-xs shadow-md transition-colors cursor-pointer"
+                  >
+                    Pin
+                  </button>
+                </form>
+              </div>
+
+              {/* Popular Parking Hotspots */}
+              <div>
+                <p className="text-xs font-extrabold text-slate-600 uppercase tracking-wider mb-2.5">
+                  Popular Parking Hotspots
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {POPULAR_LOCATIONS.map((loc) => {
+                    const isSelected = pinnedLocationName.includes(loc.name.split(',')[0]);
+                    return (
+                      <button
+                        key={loc.name}
+                        type="button"
+                        onClick={() => handleSelectPresetLocation(loc)}
+                        className={`px-3 py-2 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
+                          isSelected
+                            ? 'bg-emerald-500 text-white border-emerald-500 shadow-md shadow-emerald-500/20'
+                            : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                        }`}
+                      >
+                        📍 {loc.name}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             </div>
