@@ -520,6 +520,14 @@ router.post('/:id/verify-payment', protect, seekerOnly, async (req, res) => {
       return res.status(400).json({ message: 'Payment verification failed. Invalid signature.' });
     }
 
+    // Update booking status to paid and save to MongoDB
+    booking.paymentStatus = 'paid';
+    booking.status = 'paid';
+    booking.transactionReference = razorpay_payment_id;
+    booking.adminCommission = 0;
+    booking.ownerEarnings = Number(booking.totalAmount.toFixed(2));
+    await booking.save();
+
     // Deduct wallet amount upon verified payment success
     if (booking.walletAmountUsed > 0) {
       const seeker = await User.findById(booking.seekerId);
