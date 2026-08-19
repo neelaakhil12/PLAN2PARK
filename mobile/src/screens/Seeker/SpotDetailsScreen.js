@@ -173,10 +173,27 @@ export default function SpotDetailsScreen({ route, navigation }) {
         });
       } catch (orderErr) {
         // Fallback open Razorpay Sheet
+        let orderData = { orderId: 'order_' + Math.random().toString(36).substring(2, 9), amount: finalPayablePrice * 100, keyId: 'rzp_test_TRbpfgVeLqTOdb' };
+        try {
+          const res = await fetch(`${baseUrl}/bookings/${newBooking._id}/razorpay-order`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }
+          });
+          const data = await res.json();
+          if (res.ok && data.orderId) {
+            orderData = data;
+          }
+        } catch (e) {
+          console.log('Order fetch error:', e);
+        }
+
         setRazorpayModal({
-          booking: newBooking,
-          orderData: { orderId: 'order_' + Math.random().toString(36).substring(2, 9), amount: finalPayablePrice * 100, keyId: 'rzp_test_TMLHMiwE70n6U3' },
+          visible: true,
+          bookingId: newBooking._id,
+          orderData: { orderId: 'order_' + Math.random().toString(36).substring(2, 9), amount: finalPayablePrice * 100, keyId: 'rzp_test_TRbpfgVeLqTOdb', ...orderData },
+          finalPayablePrice: finalPayablePrice,
           actualHours,
+          booking: newBooking
         });
       }
     } catch (err) {
@@ -508,7 +525,7 @@ export default function SpotDetailsScreen({ route, navigation }) {
     setTimeout(function() {
       try {
         var options = {
-          key: "${razorpayModal.orderData?.keyId || 'rzp_test_TMLHMiwE70n6U3'}",
+          key: "${razorpayModal.orderData?.keyId || 'rzp_test_TRbpfgVeLqTOdb'}",
           ${razorpayModal.orderData?.orderId && !razorpayModal.orderData?.isMock ? `order_id: "${razorpayModal.orderData.orderId}",` : ''}
           amount: ${Math.round(finalPayablePrice * 100)},
           currency: "INR",

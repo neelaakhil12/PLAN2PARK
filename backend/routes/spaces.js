@@ -311,6 +311,51 @@ const enrichSpaceWithSlotAvailability = async (spaces) => {
   });
 };
 
+// ─── GET /api/spaces/:id/available-slots-by-time ─────────────────────────────
+router.get('/:id/available-slots-by-time', async (req, res) => {
+  try {
+    const space = await ParkingSpace.findById(req.params.id);
+    if (!space) return res.status(404).json({ message: 'Space not found' });
+
+    const { startTime, hours } = req.query;
+    let slots = space.slots && space.slots.length > 0
+      ? space.slots.map(s => ({ slotId: s.slotId, isAvailable: s.isAvailable }))
+      : [
+          { slotId: 'Slot-1', isAvailable: true },
+          { slotId: 'Slot-2', isAvailable: true },
+          { slotId: 'Slot-3', isAvailable: true },
+          { slotId: 'Slot-4', isAvailable: true },
+          { slotId: 'Slot-5', isAvailable: true }
+        ];
+
+    if (startTime && hours) {
+      const start = new Date(startTime);
+      const end = new Date(start.getTime() + Number(hours) * 60 * 60 * 1000);
+
+      const activeBookings = await Booking.find({
+        spaceId: req.params.id,
+        status: { $in: ['pending_approval', 'allotted', 'paid'] },
+        $or: [
+          { startTime: { $lt: end, $gte: start } },
+          { endTime: { $gt: start, $lte: end } },
+          { startTime: { $lte: start }, endTime: { $gte: end } }
+        ]
+      });
+
+      const bookedSlots = new Set(activeBookings.map(b => b.slotId).filter(Boolean));
+      slots = slots.map(s => ({
+        ...s,
+        isAvailable: !bookedSlots.has(s.slotId)
+      }));
+    }
+
+    res.json(slots);
+  } catch (error) {
+    console.error('Error fetching available slots:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 // ─── GET /api/spaces  (Public / Seeker) ──────────────────────────────────────
 router.get('/', async (req, res) => {
   try {

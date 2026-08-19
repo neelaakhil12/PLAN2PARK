@@ -320,10 +320,29 @@ const SeekerDashboard = () => {
   // Dynamically query available slots for the selected space and time window
   useEffect(() => {
     const getSlots = async () => {
-      if (!selectedSpace || !form.startTime || !form.hours) {
+      if (!selectedSpace) {
         setBookingAvailableSlots([]);
         return;
       }
+
+      // Default fallback slots from selected space or 5 generic slots
+      const defaultSlots = (selectedSpace.slots && selectedSpace.slots.length > 0)
+        ? selectedSpace.slots.map(s => ({ slotId: s.slotId, isAvailable: s.isAvailable }))
+        : [
+            { slotId: 'Slot-1', isAvailable: true },
+            { slotId: 'Slot-2', isAvailable: true },
+            { slotId: 'Slot-3', isAvailable: true },
+            { slotId: 'Slot-4', isAvailable: true },
+            { slotId: 'Slot-5', isAvailable: true },
+          ];
+
+      if (!form.startTime || !form.hours) {
+        setBookingAvailableSlots(defaultSlots);
+        const free = defaultSlots.filter(s => s.isAvailable);
+        if (free.length > 0) setForm(prev => ({ ...prev, slotId: free[0].slotId }));
+        return;
+      }
+
       setFetchingSlots(true);
       try {
         const res = await fetch(
@@ -332,16 +351,24 @@ const SeekerDashboard = () => {
         );
         if (res.ok) {
           const data = await res.json();
-          setBookingAvailableSlots(data);
-          const free = data.filter(s => s.isAvailable);
+          const slotsList = Array.isArray(data) ? data : (data.slots && Array.isArray(data.slots)) ? data.slots : defaultSlots;
+          setBookingAvailableSlots(slotsList);
+          const free = slotsList.filter(s => s.isAvailable);
           if (free.length > 0) {
             setForm(prev => ({ ...prev, slotId: free[0].slotId }));
           } else {
             setForm(prev => ({ ...prev, slotId: '' }));
           }
+        } else {
+          setBookingAvailableSlots(defaultSlots);
+          const free = defaultSlots.filter(s => s.isAvailable);
+          if (free.length > 0) setForm(prev => ({ ...prev, slotId: free[0].slotId }));
         }
       } catch (e) {
         console.error('Error getting slots:', e);
+        setBookingAvailableSlots(defaultSlots);
+        const free = defaultSlots.filter(s => s.isAvailable);
+        if (free.length > 0) setForm(prev => ({ ...prev, slotId: free[0].slotId }));
       }
       setFetchingSlots(false);
     };

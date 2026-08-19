@@ -2,7 +2,7 @@
  * SpacesMap.jsx ─ Interactive Leaflet / OpenStreetMap for PlanToPark
  */
 import React, { useEffect, useRef, useState } from 'react';
-import { Loader2, Navigation, MapPin } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 
 const LEAFLET_CSS = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
 let L = null;
@@ -72,32 +72,49 @@ const SpacesMap = ({
     let isMounted = true;
 
     loadLeaflet().then((Leaflet) => {
-      if (!isMounted || !mapContainerRef.current || mapInstanceRef.current) return;
+      if (!isMounted || !mapContainerRef.current) return;
 
-      const initialCenter = userLat && userLng ? [userLat, userLng] : [17.3850, 78.4867]; // Default Hyderabad
+      // Clean up previous instance if container has leftover leaflet ID
+      if (mapContainerRef.current._leaflet_id) {
+        delete mapContainerRef.current._leaflet_id;
+      }
 
-      const map = Leaflet.map(mapContainerRef.current, {
-        center: initialCenter,
-        zoom: 12,
-        zoomControl: false,
-      });
+      if (mapInstanceRef.current) {
+        try {
+          mapInstanceRef.current.remove();
+        } catch (e) {}
+        mapInstanceRef.current = null;
+      }
 
-      Leaflet.control.zoom({ position: 'topright' }).addTo(map);
+      const initialCenter = userLat && userLng ? [userLat, userLng] : [17.3850, 78.4867];
 
-      // Add CartoDB Voyager / OpenStreetMap Clean Tiles
-      Leaflet.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-        attribution: '&copy; OpenStreetMap &copy; CARTO',
-        maxZoom: 19,
-      }).addTo(map);
+      try {
+        const map = Leaflet.map(mapContainerRef.current, {
+          center: initialCenter,
+          zoom: 12,
+          zoomControl: false,
+        });
 
-      mapInstanceRef.current = map;
-      setLoading(false);
+        Leaflet.control.zoom({ position: 'topright' }).addTo(map);
+
+        Leaflet.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+          attribution: '&copy; OpenStreetMap &copy; CARTO',
+          maxZoom: 19,
+        }).addTo(map);
+
+        mapInstanceRef.current = map;
+        if (isMounted) setLoading(false);
+      } catch (err) {
+        console.warn('Leaflet map init warning:', err);
+      }
     });
 
     return () => {
       isMounted = false;
       if (mapInstanceRef.current) {
-        mapInstanceRef.current.remove();
+        try {
+          mapInstanceRef.current.remove();
+        } catch (e) {}
         mapInstanceRef.current = null;
       }
     };
@@ -109,12 +126,15 @@ const SpacesMap = ({
     const map = mapInstanceRef.current;
 
     // Clear existing markers
-    Object.values(markersRef.current).forEach((m) => m.remove());
+    Object.values(markersRef.current).forEach((m) => {
+      try { m.remove(); } catch (e) {}
+    });
     markersRef.current = {};
 
     const bounds = [];
 
-    spaces.forEach((space) => {
+    (Array.isArray(spaces) ? spaces : []).forEach((space) => {
+      if (!space) return;
       const lat = space.coordinates?.lat || space.lat || space.location?.coordinates?.[1];
       const lng = space.coordinates?.lng || space.lng || space.location?.coordinates?.[0];
       if (!lat || !lng) return;
@@ -126,16 +146,17 @@ const SpacesMap = ({
       const isActive = activeSpaceId === space._id;
 
       const icon = createPriceIcon(space.pricePerHour || 50, isAvailable, isActive);
+      if (!icon) return;
 
       const marker = L.marker([lat, lng], { icon }).addTo(map);
 
       const popupContent = `
         <div style="font-family: system-ui, sans-serif; min-width: 200px; padding: 4px;">
           <img src="${space.image || 'https://images.unsplash.com/photo-1506015391300-4802dc74de2e?w=600'}" style="width: 100%; height: 95px; object-fit: cover; border-radius: 8px; margin-bottom: 8px;" />
-          <div style="font-weight: 800; font-size: 13px; color: #0f172a; margin-bottom: 2px;">${space.title || space.address}</div>
-          <div style="font-size: 11px; color: #64748b; margin-bottom: 8px;">📍 ${space.address || 'Parking Location'}</div>
+          <div style="font-weight: 800; font-size: 13px; color: #0f172a; margin-bottom: 2px;">${space.title || space.address || 'Parking'}</div>
+          <div style="font-size: 11px; color: #64748b; margin-bottom: 8px;">📍 ${space.address || 'Location'}</div>
           <div style="display: flex; align-items: center; justify-content: space-between;">
-            <span style="font-size: 14px; font-weight: 900; color: #10b981;">₹${space.pricePerHour}/hr</span>
+            <span style="font-size: 14px; font-weight: 900; color: #10b981;">₹${space.pricePerHour || 50}/hr</span>
             <button id="book-btn-${space._id}" style="background: #10b981; color: #ffffff; border: none; padding: 6px 12px; border-radius: 6px; font-weight: 800; font-size: 11px; cursor: pointer;">
               Book Slot
             </button>
@@ -175,7 +196,7 @@ const SpacesMap = ({
   }, [spaces, activeSpaceId, userLat, userLng]);
 
   return (
-    <div style={{ width: '100%', height, position: 'relative', minHeight: '300px' }}>
+    <div style={{ width: '100%', height, position: 'relative', minHeight: '220px' }}>
       {loading && (
         <div style={{ position: 'absolute', inset: 0, background: '#0f172a15', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10 }}>
           <Loader2 style={{ width: 28, height: 28, animation: 'spin 1s linear infinite', color: '#10b981' }} />
