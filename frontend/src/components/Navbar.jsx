@@ -49,8 +49,9 @@ const Navbar = () => {
   };
 
   const isSeeker = user?.role === 'seeker';
+  const isOwner = user?.role === 'owner';
 
-  // Seeker-specific navigation links that appear in the top bar (Matches Seeker App)
+  // Seeker-specific navigation links that appear in the top bar (Matches Seeker App 1:1)
   const seekerLinks = [
     { label: 'Discover', view: null, icon: <Search className="h-4 w-4" /> },
     { label: 'Bookings', view: 'bookings', icon: <BookOpen className="h-4 w-4" /> },
@@ -58,15 +59,33 @@ const Navbar = () => {
     { label: 'Profile', view: 'profile', icon: <User className="h-4 w-4" /> },
   ];
 
+  // Owner-specific navigation links that appear in the top bar (Matches Owner App 1:1)
+  const ownerLinks = [
+    { label: 'Dashboard', view: 'dashboard', icon: <LayoutDashboard className="h-4 w-4" /> },
+    { label: 'Orders', view: 'orders', icon: <BookOpen className="h-4 w-4" /> },
+    { label: 'Add Spot', view: 'add_spot', icon: <Plus className="h-4 w-4" /> },
+    { label: 'Profile', view: 'profile', icon: <User className="h-4 w-4" /> },
+  ];
+
   // Build URL for seeker tab link
   const seekerLinkHref = (view) =>
     view ? `/seeker/dashboard?view=${view}` : '/seeker/dashboard';
+
+  const ownerLinkHref = (view) =>
+    view ? `/owner/dashboard?view=${view}` : '/owner/dashboard';
 
   // Check if seeker tab is currently active
   const isSeekerLinkActive = (view) => {
     if (!location.pathname.startsWith('/seeker/dashboard')) return false;
     const currentView = searchParams.get('view');
     if (view === null) return !currentView || currentView === 'discover' || currentView === 'find_parking' || currentView === 'dashboard';
+    return currentView === view;
+  };
+
+  // Check if owner tab is currently active
+  const isOwnerLinkActive = (view) => {
+    if (!location.pathname.startsWith('/owner/dashboard')) return false;
+    const currentView = searchParams.get('view') || 'dashboard';
     return currentView === view;
   };
 
@@ -113,6 +132,31 @@ const Navbar = () => {
                   className={`relative flex items-center px-4 text-sm font-medium transition-colors ${
                     active
                       ? 'text-slate-900 font-semibold'
+                      : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'
+                  }`}
+                >
+                  {link.label}
+                  {active && (
+                    <span className="absolute bottom-0 inset-x-0 h-0.5 bg-emerald-500 rounded-t-full" />
+                  )}
+                </Link>
+              );
+            })}
+          </div>
+        )}
+
+        {/* ── OWNER NAV LINKS (desktop) ──────────────────────────────── */}
+        {isOwner && (
+          <div className="hidden md:flex items-stretch gap-0">
+            {ownerLinks.map((link) => {
+              const active = isOwnerLinkActive(link.view);
+              return (
+                <Link
+                  key={link.label}
+                  to={ownerLinkHref(link.view)}
+                  className={`relative flex items-center px-4 text-sm font-bold transition-colors ${
+                    active
+                      ? 'text-emerald-600 font-black'
                       : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'
                   }`}
                 >
@@ -275,8 +319,8 @@ const Navbar = () => {
                 )}
               </div>
 
-              {/* Mobile hamburger (seeker only — admin/owner don't show Navbar) */}
-              {isSeeker && (
+              {/* Mobile hamburger */}
+              {(isSeeker || isOwner) && (
                 <button
                   onClick={() => setMobileOpen(v => !v)}
                   className="md:hidden p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors ml-1"
@@ -313,7 +357,7 @@ const Navbar = () => {
         </div>
       </div>
 
-      {/* ── MOBILE SEEKER NAV DRAWER ─────────────────────────────────────── */}
+      {/* ── MOBILE NAV DRAWER (SEEKER) ─────────────────────────────────────── */}
       {mobileOpen && isSeeker && (
         <div className="md:hidden border-t border-slate-100 bg-white px-4 py-3 space-y-1 shadow-lg">
           {seekerLinks.map((link) => {
@@ -342,6 +386,37 @@ const Navbar = () => {
             <User className="h-4 w-4 text-slate-400" />
             Profile
           </Link>
+          <button
+            onClick={handleLogout}
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-rose-500 hover:bg-rose-50 transition-colors border-t border-slate-100 mt-2 pt-3"
+          >
+            <LogOut className="h-4 w-4" />
+            Sign Out
+          </button>
+        </div>
+      )}
+
+      {/* ── MOBILE NAV DRAWER (OWNER) ──────────────────────────────────────── */}
+      {mobileOpen && isOwner && (
+        <div className="md:hidden border-t border-slate-100 bg-white px-4 py-3 space-y-1 shadow-lg">
+          {ownerLinks.map((link) => {
+            const active = isOwnerLinkActive(link.view);
+            return (
+              <Link
+                key={link.label}
+                to={ownerLinkHref(link.view)}
+                onClick={() => setMobileOpen(false)}
+                className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-colors ${
+                  active
+                    ? 'bg-emerald-50 text-emerald-700 font-extrabold'
+                    : 'text-slate-700 hover:bg-slate-50'
+                }`}
+              >
+                <span className={active ? 'text-emerald-600' : 'text-slate-400'}>{link.icon}</span>
+                {link.label}
+              </Link>
+            );
+          })}
           <button
             onClick={handleLogout}
             className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-rose-500 hover:bg-rose-50 transition-colors border-t border-slate-100 mt-2 pt-3"
