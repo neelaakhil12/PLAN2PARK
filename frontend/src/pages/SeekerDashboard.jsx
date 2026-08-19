@@ -926,170 +926,294 @@ const SeekerDashboard = () => {
             </div>
 
             {selectedSpace ? (
-              /* ── BOOKING FORM ─────────────────────────────────────────── */
-              <div className="max-w-2xl mx-auto space-y-5">
-                {/* Space summary */}
-                <div className="bg-white border border-slate-200 rounded-2xl p-4 flex items-center gap-4 shadow-sm">
-                  <img src={selectedSpace.image} alt="" className="w-20 h-16 object-cover rounded-xl shrink-0 border" />
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-bold text-slate-900 text-base truncate">{selectedSpace.address}</h3>
-                    <p className="text-xs text-slate-400 flex items-center gap-1 mt-0.5"><MapPin className="h-3 w-3" />{selectedSpace.location}</p>
-                    <p className="text-emerald-600 font-bold text-sm mt-1">₹{selectedSpace.pricePerHour}/hour</p>
-                  </div>
-                  <button onClick={() => setSelectedSpace(null)} className="shrink-0 text-slate-400 hover:text-slate-600">
-                    <XCircle className="h-5 w-5" />
-                  </button>
-                </div>
+              /* ── EXACT SEEKER APP MATCHING SPOT DETAILS & RESERVATION VIEW ── */
+              <div className="max-w-2xl mx-auto space-y-6 animate-fadeIn pb-12">
+                {/* Back button */}
+                <button
+                  onClick={() => setSelectedSpace(null)}
+                  className="flex items-center gap-2 text-sm font-extrabold text-slate-600 hover:text-emerald-600 transition-colors"
+                >
+                  ← Back to Parking Spots
+                </button>
 
-                {/* Mini map of selected space */}
-                {selectedSpace?.coordinates?.lat && selectedSpace?.coordinates?.lng ? (
-                  <div className="rounded-2xl overflow-hidden border border-slate-200 shadow-sm" style={{height:'220px'}}>
-                    <SpacesMap
-                      spaces={[selectedSpace]}
-                      userLat={userLat}
-                      userLng={userLng}
-                      activeSpaceId={selectedSpace._id}
-                      height="220px"
+                {/* 1. SPOT BANNER CARD */}
+                <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-5">
+                  <div className="relative h-48 sm:h-56 w-full rounded-2xl overflow-hidden border border-slate-100">
+                    <img
+                      src={selectedSpace.image || 'https://images.unsplash.com/photo-1506015391300-4802dc74de2e?w=1200'}
+                      alt={selectedSpace.address}
+                      className="w-full h-full object-cover"
                     />
-                  </div>
-                ) : selectedSpace?.address ? (
-                  <div className="rounded-2xl overflow-hidden border border-slate-200 shadow-sm h-48">
-                    <iframe
-                      title="Map"
-                      src={`https://maps.google.com/maps?q=${encodeURIComponent(selectedSpace.address + ' ' + selectedSpace.location)}&output=embed`}
-                      width="100%" height="100%"
-                      style={{ border: 0 }}
-                      allowFullScreen loading="lazy"
-                    />
-                  </div>
-                ) : null}
-
-                {/* Booking form */}
-                <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
-                  <h4 className="font-bold text-slate-800 text-base mb-5">Confirm Booking</h4>
-                  <form onSubmit={handleBookSubmit} className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Driver Name</label>
-                        <input type="text" required value={form.seekerName} onChange={e => setForm(p => ({ ...p, seekerName: e.target.value }))}
-                          className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-emerald-400 focus:ring-1 focus:ring-emerald-100" />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Contact</label>
-                        <input type="text" required value={form.seekerContact} onChange={e => setForm(p => ({ ...p, seekerContact: e.target.value }))}
-                          className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-emerald-400 focus:ring-1 focus:ring-emerald-100" />
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Driver Image (Optional)</label>
-                      <input type="file" accept="image/*" onChange={e => {
-                        const file = e.target.files[0];
-                        if (file) setForm(p => ({ ...p, driverImageFile: file }));
-                      }}
-                        className="w-full px-4 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-emerald-400 bg-white" />
-                      {form.driverImageFile && (
-                        <p className="text-xs text-emerald-600 font-semibold mt-1">Image selected: {form.driverImageFile.name}</p>
+                    <div className="absolute top-3 left-3 flex items-center gap-2">
+                      <span className="bg-emerald-500/90 backdrop-blur text-white text-[11px] font-black px-3 py-1 rounded-full tracking-wider uppercase shadow-md">
+                        VERIFIED PARKING
+                      </span>
+                      {selectedSpace.hasEvCharger && (
+                        <span className="bg-amber-500/90 backdrop-blur text-white text-[11px] font-black px-3 py-1 rounded-full tracking-wider uppercase shadow-md">
+                          ⚡ EV CHARGING
+                        </span>
                       )}
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Vehicle Plate</label>
-                        <select value={form.vehicleNumber} onChange={e => setForm(p => ({ ...p, vehicleNumber: e.target.value }))}
-                          className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-emerald-400 bg-white cursor-pointer">
-                          <option value="" disabled>Select vehicle</option>
+                  </div>
+
+                  <div>
+                    <h2 className="text-2xl font-black text-slate-900 tracking-tight">
+                      {selectedSpace.title || selectedSpace.address}
+                    </h2>
+                    <p className="text-slate-500 text-sm font-medium flex items-center gap-1.5 mt-1.5">
+                      <MapPin className="h-4 w-4 text-slate-400 shrink-0" />
+                      {selectedSpace.address}, {selectedSpace.location || selectedSpace.city || 'Hyderabad'}
+                    </p>
+                    <p className="text-sm font-bold text-slate-700 mt-2">
+                      Rate: <span className="text-emerald-600 font-black text-base">₹{selectedSpace.pricePerHour || 40}/hour</span>
+                    </p>
+                  </div>
+
+                  {/* Real-Time Slot Capacity Box */}
+                  {(() => {
+                    const freeCount = bookingAvailableSlots.filter(s => s.isAvailable).length;
+                    const totalCount = bookingAvailableSlots.length || selectedSpace.totalSlots || 5;
+                    return (
+                      <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 flex items-center justify-between">
+                        <span className="text-xs font-bold text-slate-600">🅿️ Real-Time Capacity:</span>
+                        <span className={`text-xs font-extrabold ${freeCount > 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                          {freeCount > 0 ? `🟢 ${freeCount} of ${totalCount} Slots Free` : '🔴 All Slots Currently Booked'}
+                        </span>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Live Turn-by-Turn GPS Navigation Button */}
+                  <a
+                    href={`https://www.google.com/maps/dir/?api=1&destination=${selectedSpace.coordinates?.lat || 17.3850},${selectedSpace.coordinates?.lng || 78.4867}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="w-full bg-slate-900 hover:bg-slate-800 text-white p-4 rounded-2xl flex items-center gap-4 transition-all shadow-md group"
+                  >
+                    <span className="text-2xl">🧭</span>
+                    <div className="flex-1 text-left">
+                      <p className="text-sm font-extrabold text-white group-hover:text-emerald-400 transition-colors">
+                        Open Live Turn-by-Turn GPS Navigation
+                      </p>
+                      <p className="text-[11px] text-slate-400 mt-0.5">Get instant driving directions on Google Maps</p>
+                    </div>
+                    <span className="text-lg text-slate-400 group-hover:text-white transition-colors">→</span>
+                  </a>
+
+                  {/* Amenities & Features */}
+                  <div className="pt-2 border-t border-slate-100">
+                    <p className="text-xs font-extrabold text-slate-400 uppercase tracking-wider mb-3">Amenities &amp; Features</p>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                      <div className="bg-slate-50 border border-slate-200/70 text-slate-700 text-xs font-bold px-3 py-2 rounded-xl text-center">
+                        🛡️ 24/7 CCTV
+                      </div>
+                      <div className="bg-slate-50 border border-slate-200/70 text-slate-700 text-xs font-bold px-3 py-2 rounded-xl text-center">
+                        🔒 Gated Guarded
+                      </div>
+                      {selectedSpace.hasEvCharger ? (
+                        <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-bold px-3 py-2 rounded-xl text-center">
+                          ⚡ Fast Charger
+                        </div>
+                      ) : (
+                        <div className="bg-slate-50 border border-slate-200/70 text-slate-700 text-xs font-bold px-3 py-2 rounded-xl text-center">
+                          ⚡ Fast Charger
+                        </div>
+                      )}
+                      <div className="bg-slate-50 border border-slate-200/70 text-slate-700 text-xs font-bold px-3 py-2 rounded-xl text-center">
+                        ☂️ Covered Parking
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2. RESERVATION DETAILS CARD */}
+                <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-sm space-y-6">
+                  <h3 className="text-lg font-black text-slate-900">Reservation Details</h3>
+
+                  <form onSubmit={handleBookSubmit} className="space-y-6">
+                    {/* Vehicle Plate Number */}
+                    <div>
+                      <label className="block text-xs font-extrabold text-slate-600 uppercase tracking-wider mb-2">
+                        Vehicle Plate Number
+                      </label>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <select
+                          value={form.vehicleNumber}
+                          onChange={e => setForm(p => ({ ...p, vehicleNumber: e.target.value }))}
+                          className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-800 focus:outline-none focus:border-emerald-500"
+                        >
+                          <option value="" disabled>Select from Saved Vehicles</option>
                           {user?.vehicles?.map(v => (
                             <option key={v._id} value={v.plateNumber}>{v.plateNumber} ({v.model || v.vehicleType})</option>
                           ))}
-                          <option value="TEMPORARY">Other / Rental</option>
+                          <option value="TS07AB1234">TS07AB1234 (Demo Car)</option>
                         </select>
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Manual Plate</label>
-                        <input type="text" value={form.vehicleNumber} onChange={e => setForm(p => ({ ...p, vehicleNumber: e.target.value }))} placeholder="TS 09 AB 1234"
-                          className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-emerald-400 uppercase" />
+                        <input
+                          type="text"
+                          required
+                          placeholder="e.g. TS 08 EA 5678"
+                          value={form.vehicleNumber}
+                          onChange={e => setForm(p => ({ ...p, vehicleNumber: e.target.value.toUpperCase() }))}
+                          className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-800 uppercase focus:outline-none focus:border-emerald-500"
+                        />
                       </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Booking Type</label>
-                        <select value={form.bookingType} onChange={e => {
-                          const bt = e.target.value;
-                          setForm(p => ({ ...p, bookingType: bt, hours: bt === 'hourly' ? '1' : bt === 'daily' ? '24' : bt === 'weekly' ? '168' : '720' }))
-                        }}
-                          className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-emerald-400 bg-white cursor-pointer">
-                          <option value="hourly">Hourly</option>
-                          <option value="daily">Daily</option>
-                          {selectedSpace?.pricePerWeek && <option value="weekly">Weekly Pack</option>}
-                          {selectedSpace?.pricePerMonth && <option value="monthly">Monthly Pack</option>}
-                        </select>
-                      </div>
-                      {form.bookingType === 'hourly' && (
-                        <div>
-                          <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Duration (Hours)</label>
-                          <input type="number" required min="1" value={form.hours} onChange={e => setForm(p => ({ ...p, hours: e.target.value }))}
-                            className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-emerald-400" />
-                        </div>
-                      )}
-                      <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Start Time</label>
-                        <input type="datetime-local" required value={form.startTime} onChange={e => setForm(p => ({ ...p, startTime: e.target.value }))}
-                          className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-emerald-400" />
-                      </div>
-                    </div>
+
+                    {/* Vehicle Type Switcher */}
                     <div>
-                      <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Select Available Slot</label>
-                      {fetchingSlots ? (
-                        <div className="text-xs text-slate-400 italic flex items-center gap-1">
-                          <Loader2 className="h-3.5 w-3.5 animate-spin text-emerald-500" />
-                          Checking slot timings...
-                        </div>
-                      ) : bookingAvailableSlots.length === 0 ? (
-                        <div className="text-xs text-rose-500 font-semibold bg-rose-50 border border-rose-100 p-3 rounded-xl">
-                          Please select Start Time and Duration to check slot availability.
-                        </div>
-                      ) : (
-                        <div className="grid grid-cols-4 gap-2">
-                          {bookingAvailableSlots.map(s => {
-                            const isSelected = form.slotId === s.slotId;
-                            return (
-                              <button
-                                key={s.slotId}
-                                type="button"
-                                disabled={!s.isAvailable}
-                                onClick={() => setForm(p => ({ ...p, slotId: s.slotId }))}
-                                className={`py-2 px-1 rounded-xl text-xs font-bold transition-all border text-center ${
-                                  !s.isAvailable
-                                    ? 'bg-slate-50 text-slate-300 border-slate-100 cursor-not-allowed line-through'
-                                    : isSelected
-                                    ? 'bg-emerald-500 text-white border-emerald-500 shadow-md shadow-emerald-500/20 scale-105'
-                                    : 'bg-white text-slate-700 border-slate-200 hover:border-emerald-450 hover:text-emerald-600'
-                                }`}
-                              >
-                                {s.slotId}
-                                {!s.isAvailable && <span className="block text-[8px] font-bold text-rose-500 mt-0.5 uppercase">Booked</span>}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      )}
+                      <label className="block text-xs font-extrabold text-slate-600 uppercase tracking-wider mb-2">
+                        Vehicle Type
+                      </label>
+                      <div className="grid grid-cols-2 gap-3">
+                        <button
+                          type="button"
+                          onClick={() => setForm(p => ({ ...p, bookingType: 'hourly' }))}
+                          className="py-3 px-4 rounded-2xl text-xs font-extrabold border transition-all bg-emerald-50 text-emerald-700 border-emerald-300 shadow-sm"
+                        >
+                          🚗 4-Wheeler (Car)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setForm(p => ({ ...p, bookingType: 'hourly' }))}
+                          className="py-3 px-4 rounded-2xl text-xs font-bold border border-slate-200 text-slate-600 hover:bg-slate-50 transition-all"
+                        >
+                          🏍️ 2-Wheeler (Bike)
+                        </button>
+                      </div>
                     </div>
-                    <div className="flex items-center justify-between p-4 bg-emerald-50 border border-emerald-100 rounded-xl">
-                      <span className="font-bold text-emerald-800 text-sm">Estimated Total</span>
-                      <span className="text-2xl font-black text-emerald-600">₹{
-                        form.bookingType === 'daily' ? selectedSpace.pricePerDay :
-                        form.bookingType === 'weekly' ? selectedSpace.pricePerWeek :
-                        form.bookingType === 'monthly' ? selectedSpace.pricePerMonth :
-                        (Number(form.hours || 1) * selectedSpace.pricePerHour).toFixed(0)
-                      }</span>
+
+                    {/* Parking Duration (Hours) Pills */}
+                    <div>
+                      <label className="block text-xs font-extrabold text-slate-600 uppercase tracking-wider mb-2">
+                        Parking Duration (Hours)
+                      </label>
+                      <div className="grid grid-cols-4 gap-2.5">
+                        {['1', '2', '4', '8'].map(hr => (
+                          <button
+                            key={hr}
+                            type="button"
+                            onClick={() => setForm(p => ({ ...p, hours: hr }))}
+                            className={`py-3 rounded-2xl text-xs font-black transition-all border ${
+                              form.hours === hr
+                                ? 'bg-emerald-500 text-white border-emerald-500 shadow-md shadow-emerald-500/20'
+                                : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                            }`}
+                          >
+                            {hr} hr{hr !== '1' ? 's' : ''}
+                          </button>
+                        ))}
+                      </div>
                     </div>
-                    <div className="flex gap-3">
-                      <button type="submit" className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3.5 rounded-xl text-sm shadow-sm transition-colors">
-                        Confirm Slot &amp; Book
-                      </button>
-                      <button type="button" onClick={() => setSelectedSpace(null)} className="px-5 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-600 font-semibold rounded-xl text-sm transition-colors">
-                        Back
-                      </button>
+
+                    {/* Select Parking Slot */}
+                    <div>
+                      <label className="block text-xs font-extrabold text-slate-600 uppercase tracking-wider mb-2">
+                        Select Parking Slot
+                      </label>
+                      <div className="grid grid-cols-3 sm:grid-cols-5 gap-2.5">
+                        {bookingAvailableSlots.map(s => {
+                          const isSelected = form.slotId === s.slotId;
+                          return (
+                            <button
+                              key={s.slotId}
+                              type="button"
+                              disabled={!s.isAvailable}
+                              onClick={() => setForm(p => ({ ...p, slotId: s.slotId }))}
+                              className={`py-3 px-2 rounded-2xl text-xs font-black transition-all border text-center ${
+                                !s.isAvailable
+                                  ? 'bg-slate-100 text-slate-300 border-slate-200 cursor-not-allowed line-through'
+                                  : isSelected
+                                  ? 'bg-emerald-500 text-white border-emerald-500 shadow-md shadow-emerald-500/25 scale-105'
+                                  : 'bg-white text-slate-700 border-slate-200 hover:border-emerald-400 hover:text-emerald-600'
+                              }`}
+                            >
+                              {s.slotId}
+                              {!s.isAvailable && <span className="block text-[8.5px] font-black text-rose-500 mt-0.5 uppercase">Booked</span>}
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
+
+                    {/* PlanToPark Wallet Money Deduction Card */}
+                    {(() => {
+                      const hourlyRate = selectedSpace.pricePerHour || 40;
+                      const rawTotal = Number(form.hours || 1) * hourlyRate;
+                      const maxWallet = selectedSpace.maxWalletDiscount !== undefined ? Number(selectedSpace.maxWalletDiscount) : 10;
+                      const discount = (useWallet && walletBalance > 0 && maxWallet > 0) ? Math.min(walletBalance, maxWallet, rawTotal) : 0;
+                      const finalTotal = Math.max(0, rawTotal - discount);
+
+                      return (
+                        <>
+                          {walletBalance > 0 && maxWallet > 0 && (
+                            <div
+                              onClick={() => setUseWallet(p => !p)}
+                              className={`p-4 rounded-2xl border transition-all cursor-pointer flex items-center justify-between ${
+                                useWallet
+                                  ? 'bg-emerald-50/70 border-emerald-300'
+                                  : 'bg-slate-50 border-slate-200'
+                              }`}
+                            >
+                              <div className="flex items-center gap-3.5">
+                                <div className={`h-9 w-9 rounded-xl flex items-center justify-center text-base ${
+                                  useWallet ? 'bg-emerald-500 text-white' : 'bg-slate-200 text-slate-600'
+                                }`}>
+                                  ⚡
+                                </div>
+                                <div>
+                                  <p className="text-xs font-black text-slate-900">
+                                    Use PlanToPark Wallet (-₹{discount})
+                                  </p>
+                                  <p className="text-[11px] text-slate-400 font-medium mt-0.5">
+                                    Available Balance: ₹{walletBalance}.00 • Max ₹{maxWallet} usable
+                                  </p>
+                                </div>
+                              </div>
+                              <div className={`h-5 w-5 rounded-md flex items-center justify-center text-xs font-black ${
+                                useWallet ? 'bg-emerald-500 text-white' : 'border border-slate-300 bg-white'
+                              }`}>
+                                {useWallet && '✓'}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Price Breakdown Box */}
+                          <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-5 space-y-2.5 text-xs">
+                            <div className="flex items-center justify-between text-slate-600">
+                              <span>Base Rate</span>
+                              <span className="font-bold text-slate-800">₹{hourlyRate} × {form.hours} hrs = ₹{rawTotal}</span>
+                            </div>
+                            {discount > 0 && (
+                              <div className="flex items-center justify-between text-emerald-600 font-bold">
+                                <span>⚡ Wallet Money Applied</span>
+                                <span className="font-black">- ₹{discount}.00</span>
+                              </div>
+                            )}
+                            <div className="flex items-center justify-between text-slate-600">
+                              <span>Platform Convenience Fee</span>
+                              <span className="font-bold text-slate-800">₹0 (Free)</span>
+                            </div>
+                            <div className="pt-3 border-t border-slate-200 flex items-center justify-between text-base font-black text-slate-900">
+                              <span>Total Payable</span>
+                              <span className="text-2xl font-black text-emerald-600">₹{finalTotal}</span>
+                            </div>
+                          </div>
+
+                          {/* Action Button */}
+                          <button
+                            type="submit"
+                            disabled={loading || payLoading}
+                            className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-black py-4 rounded-2xl text-base shadow-lg shadow-emerald-500/25 transition-all transform active:scale-98 flex items-center justify-center gap-2 cursor-pointer"
+                          >
+                            {loading || payLoading ? (
+                              <Loader2 className="h-5 w-5 animate-spin text-white" />
+                            ) : (
+                              finalTotal === 0 ? 'Confirm with Wallet • Free' : `Confirm & Pay • ₹${finalTotal}`
+                            )}
+                          </button>
+                        </>
+                      );
+                    })()}
                   </form>
                 </div>
               </div>
