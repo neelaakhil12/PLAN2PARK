@@ -3,7 +3,7 @@
 
 import { Platform } from 'react-native';
 
-export const PUBLIC_ONLINE_URL = 'http://43.204.235.124:5000/api';
+export const PUBLIC_ONLINE_URL = 'https://api.plantopark.com/api';
 
 export const COMMON_HEADERS = {
   'Content-Type': 'application/json',
