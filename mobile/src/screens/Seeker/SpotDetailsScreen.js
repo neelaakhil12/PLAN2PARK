@@ -439,15 +439,29 @@ export default function SpotDetailsScreen({ route, navigation }) {
         <View style={styles.rzpModalOverlay}>
           <View style={styles.rzpModalCard}>
             <View style={styles.rzpHeader}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
                 <View style={styles.rzpLogoBadge}>
                   <Text style={styles.rzpLogoTxt}>₹</Text>
                 </View>
-                <View>
-                  <Text style={styles.rzpBrandTitle}>Razorpay Payment Gateway</Text>
-                  <Text style={styles.rzpBrandSub}>Official Test Environment • Key: rzp_test_...</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.rzpBrandTitle}>Razorpay Checkout</Text>
+                  <Text style={styles.rzpBrandSub}>₹{finalPayablePrice}.00 • Test Sandbox</Text>
                 </View>
               </View>
+
+              <TouchableOpacity
+                onPress={handleRazorpayPaymentComplete}
+                style={{
+                  backgroundColor: '#10b981',
+                  paddingHorizontal: 12,
+                  paddingVertical: 7,
+                  borderRadius: 8,
+                  marginRight: 8,
+                }}
+              >
+                <Text style={{ color: '#ffffff', fontSize: 12, fontWeight: '900' }}>⚡ Instant Success</Text>
+              </TouchableOpacity>
+
               <TouchableOpacity onPress={() => setRazorpayModal(null)} style={styles.rzpCloseBtn}>
                 <Text style={{ color: '#94a3b8', fontSize: 16, fontWeight: '700' }}>✕</Text>
               </TouchableOpacity>
@@ -455,7 +469,10 @@ export default function SpotDetailsScreen({ route, navigation }) {
 
             <WebView
               originWhitelist={['*']}
+              thirdPartyCookiesEnabled={true}
+              sharedCookiesEnabled={true}
               source={{
+                baseUrl: 'https://checkout.razorpay.com',
                 html: `
 <!DOCTYPE html>
 <html>
