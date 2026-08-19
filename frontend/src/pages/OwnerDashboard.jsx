@@ -193,6 +193,28 @@ const OwnerDashboard = () => {
     }
   };
 
+  // Delete Booking Order
+  const handleDeleteBooking = async (bookingId) => {
+    if (!window.confirm('Are you sure you want to delete this booking order?')) return;
+    try {
+      const res = await fetch(`${API_URL}/bookings/${bookingId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        setBookings(prev => prev.filter(b => b._id !== bookingId));
+        alert('Booking order deleted successfully.');
+        fetchOwnerData();
+      } else {
+        const data = await res.json();
+        alert(data.message || 'Failed to delete booking.');
+      }
+    } catch (e) {
+      console.error(e);
+      alert('Network error while deleting booking.');
+    }
+  };
+
   // Edit Spot button action (populate form and switch view)
   const handleStartEdit = (spot) => {
     setEditingSpot(spot);
@@ -758,6 +780,14 @@ const OwnerDashboard = () => {
                             <Navigation className="h-3.5 w-3.5" /> Navigation
                           </button>
                         )}
+
+                        <button
+                          onClick={() => handleDeleteBooking(item._id)}
+                          className="bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold text-xs px-3.5 py-2 rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer ml-auto"
+                          title="Delete booking order"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" /> Delete
+                        </button>
                       </div>
                     </div>
                   );
