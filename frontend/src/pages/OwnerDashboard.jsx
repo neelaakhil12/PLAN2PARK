@@ -782,7 +782,7 @@ const OwnerDashboard = () => {
         {/* ── VIEW 3: ADD / EDIT SPOT (MATCHING OWNER APP 1:1 WITH WEBSITE COLORS) ─ */}
         {/* ═════════════════════════════════════════════════════════════════════ */}
         {currentView === 'add_spot' && (
-          <div className="max-w-xl mx-auto space-y-5 animate-fadeIn pb-16">
+          <div className="max-w-5xl mx-auto space-y-5 animate-fadeIn pb-16">
             {/* Header with Back Button */}
             <div className="flex items-center gap-3">
               <button
@@ -798,10 +798,11 @@ const OwnerDashboard = () => {
             </div>
 
             {/* Clean White Card Container Matching Website Theme */}
-            <form onSubmit={handleSpotSubmit} className="bg-white border border-slate-200 text-slate-800 rounded-3xl p-6 sm:p-8 shadow-sm space-y-5">
+            <form onSubmit={handleSpotSubmit} className="bg-white border border-slate-200 text-slate-800 rounded-3xl p-8 shadow-sm">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-5">
 
-              {/* 1. Spot Name / Title */}
-              <div className="space-y-2">
+              {/* 1. Spot Name / Title - full width */}
+              <div className="space-y-2 md:col-span-2">
                 <label className="block text-xs font-extrabold text-slate-600 uppercase tracking-wider">
                   Spot Name / Title
                 </label>
@@ -840,29 +841,31 @@ const OwnerDashboard = () => {
                 />
               </div>
 
-              {/* 3. City and Pincode */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2">
-                  <label className="block text-xs font-extrabold text-slate-600 uppercase tracking-wider">City</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="Hyderabad"
-                    value={spotForm.city}
-                    onChange={e => setSpotForm(p => ({ ...p, city: e.target.value, location: e.target.value }))}
-                    className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-800 placeholder-slate-400 focus:outline-none focus:border-emerald-500 focus:bg-white transition-colors"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="block text-xs font-extrabold text-slate-600 uppercase tracking-wider">Pincode</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="500097"
-                    value={spotForm.pincode || '500097'}
-                    onChange={e => setSpotForm(p => ({ ...p, pincode: e.target.value }))}
-                    className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-800 placeholder-slate-400 focus:outline-none focus:border-emerald-500 focus:bg-white transition-colors"
-                  />
+              {/* 3. City and Pincode - share one column by putting them side by side inside the column */}
+              <div className="space-y-2">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <label className="block text-xs font-extrabold text-slate-600 uppercase tracking-wider">City</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Hyderabad"
+                      value={spotForm.city}
+                      onChange={e => setSpotForm(p => ({ ...p, city: e.target.value, location: e.target.value }))}
+                      className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-800 placeholder-slate-400 focus:outline-none focus:border-emerald-500 focus:bg-white transition-colors"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="block text-xs font-extrabold text-slate-600 uppercase tracking-wider">Pincode</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="500097"
+                      value={spotForm.pincode || '500097'}
+                      onChange={e => setSpotForm(p => ({ ...p, pincode: e.target.value }))}
+                      className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-800 placeholder-slate-400 focus:outline-none focus:border-emerald-500 focus:bg-white transition-colors"
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -909,8 +912,8 @@ const OwnerDashboard = () => {
                 </div>
               </div>
 
-              {/* 6. Cancellation & Refund Policy */}
-              <div className="space-y-3 pt-2">
+              {/* 6. Cancellation & Refund Policy - full width */}
+              <div className="space-y-3 pt-2 md:col-span-2">
                 <div className="flex items-center gap-2">
                   <span className="text-base">🛡️</span>
                   <div>
@@ -1044,17 +1047,20 @@ const OwnerDashboard = () => {
               </div>
 
               {/* Submit Button matching Website Colors */}
-              <button
-                type="submit"
-                disabled={submittingSpot}
-                className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-black py-4 rounded-2xl text-base shadow-lg shadow-emerald-500/25 transition-all transform active:scale-98 flex items-center justify-center gap-2 cursor-pointer mt-4"
-              >
-                {submittingSpot ? (
-                  <Loader2 className="h-5 w-5 animate-spin text-white" />
-                ) : (
-                  editingSpot ? 'Update Parking Spot' : 'Publish Parking Listing'
-                )}
-              </button>
+              <div className="md:col-span-2">
+                <button
+                  type="submit"
+                  disabled={submittingSpot}
+                  className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-black py-4 rounded-2xl text-base shadow-lg shadow-emerald-500/25 transition-all transform active:scale-98 flex items-center justify-center gap-2 cursor-pointer mt-2"
+                >
+                  {submittingSpot ? (
+                    <Loader2 className="h-5 w-5 animate-spin text-white" />
+                  ) : (
+                    editingSpot ? 'Update Parking Spot' : 'Publish Parking Listing'
+                  )}
+                </button>
+              </div>
+              </div>{/* end grid */}
             </form>
           </div>
         )}
