@@ -336,7 +336,7 @@ router.get('/:id/available-slots-by-time', async (req, res) => {
 
     const activeBookings = await Booking.find({
       spaceId: req.params.id,
-      status: { $in: ['pending_approval', 'allotted', 'paid'] },
+      status: 'paid',
       startTime: { $lt: end },
       endTime: { $gt: start },
     });

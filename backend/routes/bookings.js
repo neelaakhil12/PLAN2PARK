@@ -71,10 +71,17 @@ router.post('/', protect, seekerOnly, upload.single('driverImageFile'), async (r
       totalAmount = space.pricePerMonth;
     }
 
-    // Find all active bookings in this time window to see which slots are taken
+    // Automatically delete any older unpaid/allotted draft bookings by the same seeker for this space
+    await Booking.deleteMany({
+      spaceId,
+      seekerId: req.user._id,
+      status: { $in: ['allotted', 'pending_approval'] },
+    });
+
+    // Only confirmed and PAID bookings permanently lock the slot
     const activeBookings = await Booking.find({
       spaceId,
-      status: { $in: ['allotted', 'paid'] },
+      status: 'paid',
       startTime: { $lt: endTime },
       endTime: { $gt: start },
     });

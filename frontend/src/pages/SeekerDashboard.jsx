@@ -747,7 +747,7 @@ const SeekerDashboard = () => {
     return 'Good evening';
   };
 
-  const activeBookings = bookings.filter(b => ['pending_approval', 'allotted', 'paid'].includes(b.status));
+  const activeBookings = bookings.filter(b => b.status === 'paid');
   const completedBookings = bookings.filter(b => b.status === 'completed');
   const totalSpent = analytics?.totalSpent || 0;
 
