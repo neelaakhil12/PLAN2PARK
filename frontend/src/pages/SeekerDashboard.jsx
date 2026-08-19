@@ -782,8 +782,7 @@ const SeekerDashboard = () => {
     .sort((a, b) => (a.calculatedDist || 999) - (b.calculatedDist || 999))
     .filter(item => {
       if (item.isActive === false) return false;
-      const activeRadius = selectedRadius !== null ? selectedRadius : nearMeRadius;
-      if (activeRadius && item.calculatedDist !== null && item.calculatedDist > activeRadius) {
+      if (selectedRadius !== null && item.calculatedDist !== null && item.calculatedDist > selectedRadius) {
         return false;
       }
       const q = searchQuery.toLowerCase().trim();
