@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useContext, useRef } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
-import { StatusBadge } from './AdminDashboard';
 import SpacesMap from '../components/SpacesMap';
 import {
   Car, Clock, DollarSign, CreditCard, CheckCircle,
