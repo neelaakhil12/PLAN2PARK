@@ -2093,6 +2093,60 @@ const SeekerDashboard = () => {
                 )}
               </div>
             </div>
+
+            {/* Past & Completed Bookings History Log */}
+            <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+              <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+                <div>
+                  <h3 className="font-bold text-slate-800">Completed & Past Bookings</h3>
+                  <p className="text-xs text-slate-400">Past completed and cancelled parking sessions with invoices.</p>
+                </div>
+                <span className="bg-slate-100 text-slate-600 text-xs font-bold px-2.5 py-0.5 rounded-full">
+                  {bookings.filter(b => ['completed', 'cancelled'].includes(b.status)).length} history
+                </span>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm text-left">
+                  <thead className="bg-slate-50 text-slate-400 text-xs font-bold uppercase">
+                    <tr>
+                      <th className="px-6 py-3">Property</th>
+                      <th className="px-6 py-3">Vehicle</th>
+                      <th className="px-6 py-3">Slot</th>
+                      <th className="px-6 py-3">Duration</th>
+                      <th className="px-6 py-3">Fee Paid</th>
+                      <th className="px-6 py-3">Status</th>
+                      <th className="px-6 py-3">Date</th>
+                      <th className="px-6 py-3 text-right">Invoice & Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 text-slate-600">
+                    {bookings.filter(b => ['completed', 'cancelled'].includes(b.status)).length === 0 ? (
+                      <tr><td colSpan="8" className="text-center py-12 text-slate-400 font-medium">No past parking history yet.</td></tr>
+                    ) : bookings.filter(b => ['completed', 'cancelled'].includes(b.status)).map(b => (
+                      <tr key={b._id} className="hover:bg-slate-50">
+                        <td className="px-6 py-4 font-semibold text-slate-800 truncate max-w-[200px]">{b.spaceId?.title || b.spaceId?.address || 'Parking Property'}</td>
+                        <td className="px-6 py-4 font-mono text-xs uppercase font-bold">{b.vehicleNumber}</td>
+                        <td className="px-6 py-4 font-mono text-xs">
+                          <span className="bg-slate-100 px-2 py-0.5 rounded-lg border border-slate-200">{b.slotId || '—'}</span>
+                        </td>
+                        <td className="px-6 py-4">{b.hours} hrs</td>
+                        <td className="px-6 py-4 font-bold text-slate-900">₹{b.totalAmount}</td>
+                        <td className="px-6 py-4"><StatusBadge status={b.status} /></td>
+                        <td className="px-6 py-4 text-slate-400 text-xs">{new Date(b.createdAt || b.startTime).toLocaleDateString()}</td>
+                        <td className="px-6 py-4 text-right">
+                          <button 
+                            onClick={() => navigate(`/invoice/${b._id}`)} 
+                            className="text-blue-600 hover:text-blue-700 font-extrabold text-xs bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-xl border border-blue-200 transition-colors"
+                          >
+                            🧾 Invoice
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
         )}
 
