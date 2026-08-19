@@ -81,11 +81,10 @@ const AppContent = () => {
     });
   }, [location.pathname]);
 
-  // Admin and Owner dashboards have their own full-screen sidebar layout — hide global Navbar/Footer
-
-  const noNavPaths = ['/admin', '/owner'];
+  // Admin dashboard has its own full-screen layout — hide global Navbar for /admin
+  const noNavPaths = ['/admin'];
   const showNavbar = !noNavPaths.some(p => location.pathname.startsWith(p)) || 
-                     ['/admin/login', '/owner/login', '/owner/register'].includes(location.pathname);
+                     ['/admin/login'].includes(location.pathname);
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900">

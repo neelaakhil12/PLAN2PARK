@@ -388,49 +388,6 @@ const OwnerDashboard = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans pb-24 text-slate-800">
-      
-      {/* ── TOP SECONDARY BAR / VIEW TABS ─────────────────────────────────── */}
-      <div className="bg-white border-b border-slate-200 sticky top-[60px] z-40 shadow-xs">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between h-14">
-          <div className="flex items-center gap-1 sm:gap-2 overflow-x-auto py-1">
-            {[
-              { id: 'dashboard', label: '📊 Dashboard' },
-              { id: 'orders', label: `📑 Orders (${bookings.length})` },
-              { id: 'add_spot', label: editingSpot ? '✏️ Edit Spot' : '➕ Add Spot' },
-              { id: 'profile', label: '👤 Profile' }
-            ].map(tab => (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => setCurrentView(tab.id)}
-                className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-extrabold transition-all shrink-0 cursor-pointer ${
-                  currentView === tab.id
-                    ? 'bg-emerald-500 text-white shadow-sm shadow-emerald-500/25'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => { setRefreshing(true); fetchOwnerData(); }}
-              disabled={refreshing}
-              className="p-2 text-slate-400 hover:text-slate-700 rounded-xl hover:bg-slate-100 transition-colors"
-              title="Refresh Data"
-            >
-              <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin text-emerald-600' : ''}`} />
-            </button>
-            <div className="hidden sm:flex items-center gap-2 bg-emerald-50 border border-emerald-200 px-3 py-1 rounded-full text-xs font-black text-emerald-800">
-              <span>Earnings:</span>
-              <span className="text-emerald-700 font-mono">₹{Number(totalEarnings).toFixed(2).replace(/\.00$/, '')}</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
       {/* ── MAIN CONTENT CONTAINER ────────────────────────────────────────── */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
 
