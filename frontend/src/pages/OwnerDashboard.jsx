@@ -771,269 +771,284 @@ const OwnerDashboard = () => {
         {/* ── VIEW 3: ADD / EDIT SPOT (MATCHING OWNER APP 1:1) ──────────────── */}
         {/* ═════════════════════════════════════════════════════════════════════ */}
         {currentView === 'add_spot' && (
-          <div className="max-w-3xl mx-auto space-y-6 animate-fadeIn pb-16">
-            {/* Header */}
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight flex items-center gap-2">
-                  {editingSpot ? 'Edit Parking Space' : 'List New Parking Space'} <span className="text-xl">➕</span>
-                </h1>
-                <p className="text-slate-500 text-sm mt-0.5">Turn your vacant space into recurring income on the PlanToPark network.</p>
-              </div>
-              {editingSpot && (
-                <button
-                  type="button"
-                  onClick={() => { setEditingSpot(null); setCurrentView('dashboard'); }}
-                  className="text-xs font-bold text-slate-500 hover:text-slate-800 bg-slate-200 px-3 py-1.5 rounded-xl cursor-pointer"
-                >
-                  Cancel Edit
-                </button>
-              )}
+          <div className="max-w-xl mx-auto space-y-5 animate-fadeIn pb-16">
+            {/* Header with Back Button matching Mobile Screenshot */}
+            <div className="flex items-center gap-4">
+              <button
+                type="button"
+                onClick={() => { setEditingSpot(null); setCurrentView('dashboard'); }}
+                className="h-11 w-11 rounded-2xl bg-slate-800/90 hover:bg-slate-700 text-white flex items-center justify-center transition-colors cursor-pointer border border-slate-700"
+              >
+                ←
+              </button>
+              <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+                {editingSpot ? 'Edit Parking Spot' : 'List New Parking Spot'}
+              </h1>
             </div>
 
-            {/* Form Card */}
-            <form onSubmit={handleSpotSubmit} className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-sm space-y-6">
+            {/* Dark Card Container Matching Mobile App */}
+            <form onSubmit={handleSpotSubmit} className="bg-[#0f172a] border border-slate-800 text-white rounded-3xl p-6 sm:p-7 shadow-2xl space-y-5">
 
-              {/* 1. Title & City */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-extrabold text-slate-600 uppercase tracking-wider mb-2">
-                    Spot Name / Title *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. DM ggb or Prime Driveway"
-                    value={spotForm.title}
-                    onChange={e => setSpotForm(p => ({ ...p, title: e.target.value }))}
-                    className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-800 focus:outline-none focus:border-emerald-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-extrabold text-slate-600 uppercase tracking-wider mb-2">
-                    City *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Hyderabad"
-                    value={spotForm.city}
-                    onChange={e => setSpotForm(p => ({ ...p, city: e.target.value, location: e.target.value }))}
-                    className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-800 focus:outline-none focus:border-emerald-500"
-                  />
-                </div>
+              {/* 1. Spot Name / Title */}
+              <div className="space-y-2">
+                <label className="block text-sm font-black text-slate-200">
+                  Spot Name / Title
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Covered Driveway near Metro"
+                  value={spotForm.title}
+                  onChange={e => setSpotForm(p => ({ ...p, title: e.target.value }))}
+                  className="w-full px-4 py-3.5 bg-[#1e293b] border border-slate-700/80 rounded-2xl text-sm font-semibold text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition-colors"
+                />
               </div>
 
-              {/* 2. Address with GPS Detect */}
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <label className="block text-xs font-extrabold text-slate-600 uppercase tracking-wider">
-                    Full Property Address *
+              {/* 2. Full Address (Complete) with Use GPS Button */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="block text-sm font-black text-slate-200">
+                    Full Address (Complete)
                   </label>
                   <button
                     type="button"
                     onClick={handleDetectGps}
                     disabled={locatingGps}
-                    className="text-xs font-bold text-emerald-600 hover:text-emerald-700 bg-emerald-50 px-3 py-1 rounded-xl border border-emerald-200 cursor-pointer flex items-center gap-1"
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs px-3.5 py-1.5 rounded-xl shadow-md transition-all cursor-pointer flex items-center gap-1.5 shrink-0"
                   >
-                    {locatingGps ? <Loader2 className="h-3 w-3 animate-spin" /> : <Navigation className="h-3 w-3" />}
-                    {locatingGps ? 'Locating...' : '🎯 Detect My GPS Location'}
+                    📍 {locatingGps ? 'Locating...' : 'Use GPS'}
                   </button>
                 </div>
                 <textarea
                   required
-                  rows={2}
-                  placeholder="e.g. Chaitanya Hills, Almasguda, BN Reddy Nagar, Hyderabad, Telangana"
+                  rows={3}
+                  placeholder="Complete address with colony, landmark & city"
                   value={spotForm.address}
                   onChange={e => setSpotForm(p => ({ ...p, address: e.target.value }))}
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-medium text-slate-800 focus:outline-none focus:border-emerald-500"
+                  className="w-full px-4 py-3 bg-[#1e293b] border border-slate-700/80 rounded-2xl text-sm font-medium text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition-colors resize-none"
                 />
               </div>
 
-              {/* 3. Pricing Matrix */}
-              <div>
-                <label className="block text-xs font-extrabold text-slate-600 uppercase tracking-wider mb-2">
-                  Pricing Matrix (₹ INR)
-                </label>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  <div>
-                    <span className="text-[11px] font-bold text-slate-400">Hourly (₹/hr) *</span>
-                    <input
-                      type="number"
-                      required
-                      min={5}
-                      value={spotForm.pricePerHour}
-                      onChange={e => setSpotForm(p => ({ ...p, pricePerHour: e.target.value }))}
-                      className="w-full px-3 py-2.5 mt-1 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 focus:outline-none focus:border-emerald-500"
-                    />
-                  </div>
-                  <div>
-                    <span className="text-[11px] font-bold text-slate-400">Daily (₹/day)</span>
-                    <input
-                      type="number"
-                      min={20}
-                      value={spotForm.pricePerDay}
-                      onChange={e => setSpotForm(p => ({ ...p, pricePerDay: e.target.value }))}
-                      className="w-full px-3 py-2.5 mt-1 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 focus:outline-none focus:border-emerald-500"
-                    />
-                  </div>
-                  <div>
-                    <span className="text-[11px] font-bold text-slate-400">Weekly (₹/wk)</span>
-                    <input
-                      type="number"
-                      min={100}
-                      value={spotForm.pricePerWeek}
-                      onChange={e => setSpotForm(p => ({ ...p, pricePerWeek: e.target.value }))}
-                      className="w-full px-3 py-2.5 mt-1 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 focus:outline-none focus:border-emerald-500"
-                    />
-                  </div>
-                  <div>
-                    <span className="text-[11px] font-bold text-slate-400">Monthly (₹/mo)</span>
-                    <input
-                      type="number"
-                      min={500}
-                      value={spotForm.pricePerMonth}
-                      onChange={e => setSpotForm(p => ({ ...p, pricePerMonth: e.target.value }))}
-                      className="w-full px-3 py-2.5 mt-1 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 focus:outline-none focus:border-emerald-500"
-                    />
-                  </div>
+              {/* 3. City and Pincode */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <label className="block text-sm font-black text-slate-200">City</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Hyderabad"
+                    value={spotForm.city}
+                    onChange={e => setSpotForm(p => ({ ...p, city: e.target.value, location: e.target.value }))}
+                    className="w-full px-4 py-3.5 bg-[#1e293b] border border-slate-700/80 rounded-2xl text-sm font-semibold text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="block text-sm font-black text-slate-200">Pincode</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="500097"
+                    value={spotForm.pincode || '500097'}
+                    onChange={e => setSpotForm(p => ({ ...p, pincode: e.target.value }))}
+                    className="w-full px-4 py-3.5 bg-[#1e293b] border border-slate-700/80 rounded-2xl text-sm font-semibold text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                  />
                 </div>
               </div>
 
-              {/* 4. Total Slots & Visual Slots Preview */}
-              <div>
-                <label className="block text-xs font-extrabold text-slate-600 uppercase tracking-wider mb-2">
-                  Total Parking Slots Capacity (1 to 20)
+              {/* 4. Google Maps Link (Optional) */}
+              <div className="space-y-2">
+                <label className="block text-sm font-black text-slate-200">
+                  Google Maps Link (Optional)
                 </label>
-                <div className="flex items-center gap-4">
+                <input
+                  type="text"
+                  placeholder="Paste Google Maps URL or use GPS above"
+                  value={spotForm.googleMapsLink}
+                  onChange={e => setSpotForm(p => ({ ...p, googleMapsLink: e.target.value }))}
+                  className="w-full px-4 py-3.5 bg-[#1e293b] border border-slate-700/80 rounded-2xl text-sm font-semibold text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+
+              {/* 5. Hourly Rate (₹) and Total Capacity (Slots) */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <label className="block text-sm font-black text-slate-200">Hourly Rate (₹)</label>
                   <input
                     type="number"
-                    min={1}
-                    max={20}
                     required
+                    min={5}
+                    placeholder="50"
+                    value={spotForm.pricePerHour}
+                    onChange={e => setSpotForm(p => ({ ...p, pricePerHour: e.target.value }))}
+                    className="w-full px-4 py-3.5 bg-[#1e293b] border border-slate-700/80 rounded-2xl text-sm font-black text-white focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="block text-sm font-black text-slate-200">Total Capacity (Slots)</label>
+                  <input
+                    type="number"
+                    required
+                    min={1}
+                    max={50}
+                    placeholder="5"
                     value={spotForm.totalSlots}
                     onChange={e => setSpotForm(p => ({ ...p, totalSlots: e.target.value }))}
-                    className="w-28 px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-base font-black text-slate-800 text-center focus:outline-none focus:border-emerald-500"
+                    className="w-full px-4 py-3.5 bg-[#1e293b] border border-slate-700/80 rounded-2xl text-sm font-black text-white focus:outline-none focus:border-indigo-500"
                   />
-                  <div className="flex-1 flex flex-wrap gap-1.5">
-                    {Array.from({ length: Math.min(20, Math.max(1, Number(spotForm.totalSlots || 1))) }, (_, i) => (
-                      <span key={i} className="bg-emerald-50 text-emerald-800 border border-emerald-200 font-mono font-bold text-xs px-2.5 py-1 rounded-lg">
-                        Slot-{i + 1}
-                      </span>
-                    ))}
+                </div>
+              </div>
+
+              {/* 6. Cancellation & Refund Policy */}
+              <div className="space-y-3 pt-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-base">🛡️</span>
+                  <div>
+                    <p className="text-sm font-black text-slate-200">Cancellation &amp; Refund Policy</p>
+                    <p className="text-xs text-slate-400">Select refund amount driver receives if they cancel:</p>
+                  </div>
+                </div>
+
+                <div className="space-y-2.5">
+                  {/* Option 1: 100% Full Refund */}
+                  <div
+                    onClick={() => setSpotForm(p => ({ ...p, cancellationPolicy: 'full' }))}
+                    className={`p-4 rounded-2xl border cursor-pointer transition-all flex items-start justify-between gap-3 ${
+                      spotForm.cancellationPolicy === 'full'
+                        ? 'bg-[#1e1b4b]/60 border-indigo-500 ring-1 ring-indigo-500'
+                        : 'bg-[#1e293b]/60 border-slate-800 hover:border-slate-700'
+                    }`}
+                  >
+                    <div>
+                      <p className="text-sm font-black text-white flex items-center gap-2">
+                        🟢 100% Full Refund
+                      </p>
+                      <p className="text-xs text-slate-400 mt-0.5">
+                        Seeker receives full 100% paid amount credited to wallet
+                      </p>
+                    </div>
+                    <div className={`h-5 w-5 rounded-full border-2 flex items-center justify-center shrink-0 mt-0.5 ${
+                      spotForm.cancellationPolicy === 'full' ? 'border-indigo-500 bg-indigo-500' : 'border-slate-600'
+                    }`}>
+                      {spotForm.cancellationPolicy === 'full' && <div className="h-2 w-2 rounded-full bg-white" />}
+                    </div>
+                  </div>
+
+                  {/* Option 2: 50% Half Refund */}
+                  <div
+                    onClick={() => setSpotForm(p => ({ ...p, cancellationPolicy: 'half' }))}
+                    className={`p-4 rounded-2xl border cursor-pointer transition-all flex items-start justify-between gap-3 ${
+                      spotForm.cancellationPolicy === 'half'
+                        ? 'bg-[#1e1b4b]/60 border-indigo-500 ring-1 ring-indigo-500'
+                        : 'bg-[#1e293b]/60 border-slate-800 hover:border-slate-700'
+                    }`}
+                  >
+                    <div>
+                      <p className="text-sm font-black text-white flex items-center gap-2">
+                        🟡 50% Half Refund
+                      </p>
+                      <p className="text-xs text-slate-400 mt-0.5">
+                        Seeker receives 50% refund; you keep 50% compensation
+                      </p>
+                    </div>
+                    <div className={`h-5 w-5 rounded-full border-2 flex items-center justify-center shrink-0 mt-0.5 ${
+                      spotForm.cancellationPolicy === 'half' ? 'border-indigo-500 bg-indigo-500' : 'border-slate-600'
+                    }`}>
+                      {spotForm.cancellationPolicy === 'half' && <div className="h-2 w-2 rounded-full bg-white" />}
+                    </div>
+                  </div>
+
+                  {/* Option 3: 0% No Refund */}
+                  <div
+                    onClick={() => setSpotForm(p => ({ ...p, cancellationPolicy: 'none' }))}
+                    className={`p-4 rounded-2xl border cursor-pointer transition-all flex items-start justify-between gap-3 ${
+                      spotForm.cancellationPolicy === 'none'
+                        ? 'bg-[#1e1b4b]/60 border-indigo-500 ring-1 ring-indigo-500'
+                        : 'bg-[#1e293b]/60 border-slate-800 hover:border-slate-700'
+                    }`}
+                  >
+                    <div>
+                      <p className="text-sm font-black text-white flex items-center gap-2">
+                        🔴 0% No Refund
+                      </p>
+                      <p className="text-xs text-slate-400 mt-0.5">
+                        Strict non-refundable booking
+                      </p>
+                    </div>
+                    <div className={`h-5 w-5 rounded-full border-2 flex items-center justify-center shrink-0 mt-0.5 ${
+                      spotForm.cancellationPolicy === 'none' ? 'border-indigo-500 bg-indigo-500' : 'border-slate-600'
+                    }`}>
+                      {spotForm.cancellationPolicy === 'none' && <div className="h-2 w-2 rounded-full bg-white" />}
+                    </div>
                   </div>
                 </div>
               </div>
 
-              {/* 5. Max Wallet Discount Allowed & Cancellation Policy */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* 7. Max Wallet Money Usable per Booking (₹) */}
+              <div className="space-y-2 pt-2">
+                <label className="block text-sm font-black text-slate-200 flex items-center gap-1.5">
+                  ⚡ Max Wallet Money Usable per Booking (₹)
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  max={50}
+                  value={spotForm.maxWalletDiscount}
+                  onChange={e => setSpotForm(p => ({ ...p, maxWalletDiscount: e.target.value }))}
+                  className="w-full px-4 py-3.5 bg-[#1e293b] border border-slate-700/80 rounded-2xl text-sm font-black text-white focus:outline-none focus:border-indigo-500"
+                />
+                <p className="text-xs text-slate-400">
+                  Drivers can deduct up to ₹10 from their PlanToPark Wallet balance on each booking.
+                </p>
+              </div>
+
+              {/* 8. EV Charger Facility Switch Toggle */}
+              <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between">
                 <div>
-                  <label className="block text-xs font-extrabold text-slate-600 uppercase tracking-wider mb-2">
-                    Max Seeker Wallet Discount Allowed (₹)
-                  </label>
-                  <input
-                    type="number"
-                    min={0}
-                    max={50}
-                    value={spotForm.maxWalletDiscount}
-                    onChange={e => setSpotForm(p => ({ ...p, maxWalletDiscount: e.target.value }))}
-                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-800 focus:outline-none focus:border-emerald-500"
-                  />
-                  <p className="text-[11px] text-slate-400 mt-1">Default is ₹10 off from digital wallet credits.</p>
+                  <p className="text-sm font-black text-slate-200 flex items-center gap-1.5">
+                    ⚡ EV Charger Facility
+                  </p>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Is electric vehicle charging available?
+                  </p>
                 </div>
-                <div>
-                  <label className="block text-xs font-extrabold text-slate-600 uppercase tracking-wider mb-2">
-                    Cancellation Refund Policy
-                  </label>
-                  <select
-                    value={spotForm.cancellationPolicy}
-                    onChange={e => setSpotForm(p => ({ ...p, cancellationPolicy: e.target.value }))}
-                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-800 focus:outline-none focus:border-emerald-500"
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setSpotForm(p => ({ ...p, hasEvCharger: !p.hasEvCharger }))}
+                    className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                      spotForm.hasEvCharger ? 'bg-indigo-600' : 'bg-slate-700'
+                    }`}
                   >
-                    <option value="full">100% Full Refund</option>
-                    <option value="half">50% Half Refund</option>
-                    <option value="none">0% Non-Refundable</option>
-                  </select>
+                    <span
+                      className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                        spotForm.hasEvCharger ? 'translate-x-5' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                  <span className={`text-xs font-black uppercase ${spotForm.hasEvCharger ? 'text-indigo-400' : 'text-slate-500'}`}>
+                    {spotForm.hasEvCharger ? 'ON' : 'OFF'}
+                  </span>
                 </div>
               </div>
 
-              {/* 6. Amenities */}
-              <div>
-                <label className="block text-xs font-extrabold text-slate-600 uppercase tracking-wider mb-2">
-                  Spot Amenities &amp; Features
-                </label>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <label className="flex items-center gap-3 p-3.5 bg-slate-50 border border-slate-200 rounded-2xl cursor-pointer hover:bg-slate-100 transition-colors">
-                    <input
-                      type="checkbox"
-                      checked={spotForm.hasEvCharger}
-                      onChange={e => setSpotForm(p => ({ ...p, hasEvCharger: e.target.checked }))}
-                      className="h-4 w-4 text-emerald-600 rounded"
-                    />
-                    <span className="text-xs font-extrabold text-slate-800">⚡ EV Charging</span>
-                  </label>
-                  <label className="flex items-center gap-3 p-3.5 bg-slate-50 border border-slate-200 rounded-2xl cursor-pointer hover:bg-slate-100 transition-colors">
-                    <input
-                      type="checkbox"
-                      checked={spotForm.hasCctv}
-                      onChange={e => setSpotForm(p => ({ ...p, hasCctv: e.target.checked }))}
-                      className="h-4 w-4 text-emerald-600 rounded"
-                    />
-                    <span className="text-xs font-extrabold text-slate-800">📹 CCTV Camera</span>
-                  </label>
-                  <label className="flex items-center gap-3 p-3.5 bg-slate-50 border border-slate-200 rounded-2xl cursor-pointer hover:bg-slate-100 transition-colors">
-                    <input
-                      type="checkbox"
-                      checked={spotForm.isCovered}
-                      onChange={e => setSpotForm(p => ({ ...p, isCovered: e.target.checked }))}
-                      className="h-4 w-4 text-emerald-600 rounded"
-                    />
-                    <span className="text-xs font-extrabold text-slate-800">🛡️ Covered / Gated</span>
-                  </label>
-                </div>
-              </div>
-
-              {/* 7. Image Upload */}
-              <div>
-                <label className="block text-xs font-extrabold text-slate-600 uppercase tracking-wider mb-2">
-                  Spot Photo (Upload File or Image URL)
-                </label>
-                <div className="flex flex-col sm:flex-row gap-3">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={e => {
-                      if (e.target.files && e.target.files[0]) {
-                        setSpotForm(p => ({ ...p, imageFile: e.target.files[0] }));
-                      }
-                    }}
-                    className="text-xs text-slate-600 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-extrabold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100"
-                  />
-                  <input
-                    type="url"
-                    placeholder="Or enter direct image URL"
-                    value={spotForm.imageUrl}
-                    onChange={e => setSpotForm(p => ({ ...p, imageUrl: e.target.value }))}
-                    className="flex-1 px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:border-emerald-500"
-                  />
-                </div>
-              </div>
-
-              {/* Submit Button */}
+              {/* Submit Button matching Mobile Screenshot */}
               <button
                 type="submit"
                 disabled={submittingSpot}
-                className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-black py-4 rounded-2xl text-base shadow-lg shadow-emerald-500/25 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                className="w-full bg-[#818cf8] hover:bg-[#6366f1] text-[#0f172a] hover:text-white font-black py-4 rounded-2xl text-base shadow-xl shadow-indigo-600/30 transition-all transform active:scale-98 flex items-center justify-center gap-2 cursor-pointer mt-4"
               >
                 {submittingSpot ? (
-                  <Loader2 className="h-5 w-5 animate-spin" />
+                  <Loader2 className="h-5 w-5 animate-spin text-slate-900" />
                 ) : (
-                  editingSpot ? 'Update Parking Space →' : 'List Parking Space →'
+                  editingSpot ? 'Update Parking Spot' : 'Publish Parking Listing'
                 )}
               </button>
             </form>
           </div>
         )}
+
+
 
         {/* ═════════════════════════════════════════════════════════════════════ */}
         {/* ── VIEW 4: PROFILE & BANK DETAILS (MATCHING OWNER APP 1:1) ───────── */}
