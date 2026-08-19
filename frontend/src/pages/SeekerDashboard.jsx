@@ -421,6 +421,8 @@ const SeekerDashboard = () => {
         return;
       }
 
+      let isPaymentCompleted = false;
+
       // Real Razorpay checkout flow
       const options = {
         key: keyId || 'rzp_test_TRbpfgVeLqTOdb',
@@ -430,6 +432,7 @@ const SeekerDashboard = () => {
         description: `Booking Reference: ${booking._id}`,
         order_id: orderId,
         handler: async function (response) {
+          isPaymentCompleted = true;
           try {
             const verifyRes = await fetch(`${API_URL}/bookings/${booking._id}/verify-payment`, {
               method: 'POST',
@@ -446,17 +449,19 @@ const SeekerDashboard = () => {
             });
 
             if (verifyRes.ok) {
-              alert('🎉 Razorpay Payment successful! Your slot is confirmed.');
               setPayingBooking(null);
               setSelectedSpace(null);
+              await fetchData();
               setCurrentView('bookings');
-              fetchData();
+              alert('🎉 Payment successful! Your parking slot is officially confirmed.');
             } else {
               const errData = await verifyRes.json();
               alert(errData.message || 'Payment signature verification failed.');
             }
           } catch (verErr) {
             console.error('Verification error:', verErr);
+          } finally {
+            setPayLoading(false);
           }
         },
         prefill: {
@@ -470,14 +475,15 @@ const SeekerDashboard = () => {
         modal: {
           ondismiss: async function () {
             setPayLoading(false);
-            // Cancel unpaid draft if dismissed so it never appears in bookings
-            try {
-              await fetch(`${API_URL}/bookings/${booking._id}/cancel`, {
-                method: 'PUT',
-                headers: { Authorization: `Bearer ${token}` }
-              });
-            } catch (e) {}
-            fetchData();
+            if (!isPaymentCompleted) {
+              try {
+                await fetch(`${API_URL}/bookings/${booking._id}/cancel`, {
+                  method: 'PUT',
+                  headers: { Authorization: `Bearer ${token}` }
+                });
+              } catch (e) {}
+              fetchData();
+            }
           }
         }
       };
@@ -488,8 +494,8 @@ const SeekerDashboard = () => {
     } catch (error) {
       console.error('Razorpay Error:', error);
       alert('An error occurred while launching Razorpay payment gateway.');
+      setPayLoading(false);
     }
-    setPayLoading(false);
   };
 
   const handleBookSubmit = async (e) => {
