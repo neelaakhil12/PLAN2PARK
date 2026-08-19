@@ -348,17 +348,13 @@ const SeekerDashboard = () => {
             { slotId: 'Slot-5', isAvailable: true },
           ];
 
-      if (!form.startTime || !form.hours) {
-        setBookingAvailableSlots(defaultSlots);
-        const free = defaultSlots.filter(s => s.isAvailable);
-        if (free.length > 0) setForm(prev => ({ ...prev, slotId: free[0].slotId }));
-        return;
-      }
+      const effectiveStartTime = form.startTime || new Date().toISOString();
+      const effectiveHours = form.hours || '1';
 
       setFetchingSlots(true);
       try {
         const res = await fetch(
-          `${API_URL}/spaces/${selectedSpace._id}/available-slots-by-time?startTime=${encodeURIComponent(form.startTime)}&hours=${form.hours}`,
+          `${API_URL}/spaces/${selectedSpace._id}/available-slots-by-time?startTime=${encodeURIComponent(effectiveStartTime)}&hours=${effectiveHours}`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
         if (res.ok) {
@@ -367,7 +363,11 @@ const SeekerDashboard = () => {
           setBookingAvailableSlots(slotsList);
           const free = slotsList.filter(s => s.isAvailable);
           if (free.length > 0) {
-            setForm(prev => ({ ...prev, slotId: free[0].slotId }));
+            setForm(prev => {
+              // If current slot is not available or empty, auto-select first free slot
+              const currentStillFree = free.some(s => s.slotId === prev.slotId);
+              return { ...prev, slotId: currentStillFree ? prev.slotId : free[0].slotId };
+            });
           } else {
             setForm(prev => ({ ...prev, slotId: '' }));
           }
@@ -1223,10 +1223,15 @@ const SeekerDashboard = () => {
 
                     {/* Select Parking Slot */}
                     <div>
-                      <label className="block text-xs font-extrabold text-slate-600 uppercase tracking-wider mb-2">
-                        Select Parking Slot
-                      </label>
-                      <div className="grid grid-cols-3 sm:grid-cols-5 gap-2.5">
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="block text-xs font-extrabold text-slate-600 uppercase tracking-wider">
+                          Select Parking Slot
+                        </label>
+                        {fetchingSlots && (
+                          <span className="text-[11px] font-bold text-slate-400 animate-pulse">Checking live slot availability...</span>
+                        )}
+                      </div>
+                      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
                         {bookingAvailableSlots.map(s => {
                           const isSelected = form.slotId === s.slotId;
                           return (
@@ -1237,14 +1242,20 @@ const SeekerDashboard = () => {
                               onClick={() => setForm(p => ({ ...p, slotId: s.slotId }))}
                               className={`py-3 px-2 rounded-2xl text-xs font-black transition-all border text-center ${
                                 !s.isAvailable
-                                  ? 'bg-slate-100 text-slate-300 border-slate-200 cursor-not-allowed line-through'
+                                  ? 'bg-rose-50 border-rose-300 text-rose-400 cursor-not-allowed select-none opacity-85'
                                   : isSelected
-                                  ? 'bg-emerald-500 text-white border-emerald-500 shadow-md shadow-emerald-500/25 scale-105'
-                                  : 'bg-white text-slate-700 border-slate-200 hover:border-emerald-400 hover:text-emerald-600'
+                                  ? 'bg-emerald-500 text-white border-emerald-500 shadow-lg shadow-emerald-500/25 scale-105'
+                                  : 'bg-white text-slate-700 border-slate-200 hover:border-emerald-400 hover:bg-emerald-50/40 hover:text-emerald-700'
                               }`}
                             >
-                              {s.slotId}
-                              {!s.isAvailable && <span className="block text-[8.5px] font-black text-rose-500 mt-0.5 uppercase">Booked</span>}
+                              <span className="text-sm font-black">{s.slotId}</span>
+                              {!s.isAvailable ? (
+                                <span className="block text-[9px] font-black text-rose-600 mt-1 uppercase tracking-wider">🚫 Booked</span>
+                              ) : isSelected ? (
+                                <span className="block text-[9px] font-black text-emerald-100 mt-1 uppercase tracking-wider">✓ Selected</span>
+                              ) : (
+                                <span className="block text-[9px] font-black text-emerald-600 mt-1 uppercase tracking-wider">🟢 Free</span>
+                              )}
                             </button>
                           );
                         })}
