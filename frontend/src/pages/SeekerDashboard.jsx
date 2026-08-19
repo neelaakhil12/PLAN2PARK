@@ -107,8 +107,16 @@ const SeekerDashboard = () => {
   const [extendLoading, setExtendLoading] = useState(false);
   const [expiringBookings, setExpiringBookings] = useState([]);
 
-  // New Booking form
-  const [form, setForm] = useState({ vehicleNumber: '', seekerName: '', seekerContact: '', hours: '1', startTime: '', slotId: '', bookingType: 'hourly' });
+  // New Booking form (Autofilled with current user account details)
+  const [form, setForm] = useState({ 
+    vehicleNumber: user?.vehicles?.[0]?.plateNumber || '', 
+    seekerName: user?.name || '', 
+    seekerContact: user?.contact || user?.phone || '', 
+    hours: '1', 
+    startTime: '', 
+    slotId: '', 
+    bookingType: 'hourly' 
+  });
   const [bookingAvailableSlots, setBookingAvailableSlots] = useState([]);
   const [fetchingSlots, setFetchingSlots] = useState(false);
   const [card, setCard] = useState({ number: '', expiry: '', cvc: '' });
@@ -190,6 +198,17 @@ const SeekerDashboard = () => {
     }
     fetchData();
   }, [location.search, token, searchQuery]);
+
+  useEffect(() => {
+    if (user) {
+      setForm(prev => ({
+        ...prev,
+        seekerName: prev.seekerName || user.name || '',
+        seekerContact: prev.seekerContact || user.contact || user.phone || '',
+        vehicleNumber: prev.vehicleNumber || user.vehicles?.[0]?.plateNumber || '',
+      }));
+    }
+  }, [user, selectedSpace]);
 
   const resetToRealLocation = () => {
     if (navigator.geolocation) {
@@ -938,6 +957,42 @@ const SeekerDashboard = () => {
                   <h3 className="text-lg font-black text-slate-900">Reservation Details</h3>
 
                   <form onSubmit={handleBookSubmit} className="space-y-6">
+                    {/* Driver & Contact Details (Autofilled from Account) */}
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="block text-xs font-extrabold text-slate-600 uppercase tracking-wider">
+                          Driver &amp; Contact Details
+                        </label>
+                        <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
+                          ✓ Auto-Filled from Account
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-[11px] font-bold text-slate-500 mb-1">Driver / Full Name</label>
+                          <input
+                            type="text"
+                            required
+                            placeholder="e.g. Akhil Kumar"
+                            value={form.seekerName}
+                            onChange={e => setForm(p => ({ ...p, seekerName: e.target.value }))}
+                            className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-800 focus:outline-none focus:border-emerald-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[11px] font-bold text-slate-500 mb-1">Phone Number / Contact</label>
+                          <input
+                            type="tel"
+                            required
+                            placeholder="e.g. +91 99895 51305"
+                            value={form.seekerContact}
+                            onChange={e => setForm(p => ({ ...p, seekerContact: e.target.value }))}
+                            className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-800 focus:outline-none focus:border-emerald-500"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
                     {/* Vehicle Plate Number */}
                     <div>
                       <label className="block text-xs font-extrabold text-slate-600 uppercase tracking-wider mb-2">
