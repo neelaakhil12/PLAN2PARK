@@ -127,9 +127,12 @@ const SeekerDashboard = () => {
   const [newModel, setNewModel] = useState('');
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [mapView, setMapView] = useState(false); // toggle map/list in find_parking
-  const [userLat, setUserLat] = useState(null);
-  const [userLng, setUserLng] = useState(null);
+  const [filterEv, setFilterEv] = useState(false);
+  const [selectedRadius, setSelectedRadius] = useState(null); // null (All), 1, 5, 10, 15, 20 km
+  const [viewMode, setViewMode] = useState('map'); // 'map' or 'list'
+  const [mapView, setMapView] = useState(false);
+  const [userLat, setUserLat] = useState(17.313);
+  const [userLng, setUserLng] = useState(78.545);
   const [nearMeLoading, setNearMeLoading] = useState(false);
   const [nearMeRadius, setNearMeRadius] = useState(5); // km
   const [activeSpaceId, setActiveSpaceId] = useState(null); // card ↔ map pin hover sync
@@ -799,238 +802,505 @@ const SeekerDashboard = () => {
           );
         })}
 
-        {/* ── VIEW: DASHBOARD ─────────────────────────────────────────── */}
+        {/* ── VIEW: DASHBOARD / DISCOVER (SEEKER APP 1:1) ───────────────── */}
         {currentView === 'dashboard' && (
           <div className="space-y-6">
-            {/* Pinned Location Banner */}
-            <div className="bg-emerald-50 border border-emerald-200/90 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
-              <div className="flex items-center gap-3 min-w-0">
-                <div className="h-10 w-10 rounded-xl bg-emerald-500 text-white flex items-center justify-center text-lg shrink-0 shadow-md shadow-emerald-500/20">
-                  📍
-                </div>
-                <div className="min-w-0">
-                  <p className="text-[10px] font-black text-emerald-800 uppercase tracking-widest">Pinned Search Location</p>
-                  <p className="text-sm font-extrabold text-slate-900 truncate">{pinnedLocationName}</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowPinModal(true)}
-                className="shrink-0 bg-white hover:bg-slate-50 border border-emerald-300 text-emerald-700 font-extrabold text-xs px-4 py-2.5 rounded-xl shadow-xs transition-all cursor-pointer flex items-center justify-center gap-1.5"
-              >
-                Change Location Pin 📍
-              </button>
-            </div>
+            {selectedSpace ? (
+              /* ── EXACT SEEKER APP MATCHING SPOT DETAILS & RESERVATION VIEW ── */
+              <div className="max-w-2xl mx-auto space-y-6 animate-fadeIn pb-12">
+                {/* Back button */}
+                <button
+                  onClick={() => setSelectedSpace(null)}
+                  className="flex items-center gap-2 text-xs font-black text-slate-600 hover:text-slate-900 bg-white border border-slate-200 px-4 py-2.5 rounded-2xl shadow-xs transition-colors cursor-pointer"
+                >
+                  ← Back to Discover Spots
+                </button>
 
-            {/* Greeting */}
-            <div>
-              <h1 className="text-2xl font-extrabold text-slate-900">
-                {getGreeting()}, {user?.name?.split(' ')[0]}!
-              </h1>
-              <p className="text-slate-500 text-sm mt-0.5">
-                {activeBookings.length > 0
-                  ? `You have ${activeBookings.length} active booking${activeBookings.length > 1 ? 's' : ''}. We've secured your spot.`
-                  : 'Your city is busy today. Find and book a spot easily.'}
-              </p>
-            </div>
+                {/* 1. SPOT BANNER & LIVE BADGES */}
+                <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-sm space-y-5">
+                  <div className="relative rounded-2xl overflow-hidden aspect-[16/9] sm:aspect-[21/9] bg-slate-100 border border-slate-100">
+                    <img
+                      src={getImageUrl ? getImageUrl(selectedSpace.images?.[0] || selectedSpace.image || selectedSpace.photoUrl) : (selectedSpace.image || selectedSpace.photoUrl)}
+                      alt={selectedSpace.title || selectedSpace.address}
+                      className="h-full w-full object-cover"
+                    />
+                    <div className="absolute top-3 left-3 flex flex-wrap gap-1.5">
+                      <span className="bg-emerald-600/95 text-white font-extrabold text-[10px] px-2.5 py-1 rounded-full backdrop-blur-md shadow uppercase tracking-wider">
+                        🛡️ VERIFIED PARKING
+                      </span>
+                      {selectedSpace.hasEvCharger && (
+                        <span className="bg-blue-600/95 text-white font-extrabold text-[10px] px-2.5 py-1 rounded-full backdrop-blur-md shadow uppercase tracking-wider">
+                          ⚡ EV CHARGING
+                        </span>
+                      )}
+                    </div>
+                  </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* LEFT COLUMN */}
-              <div className="lg:col-span-2 space-y-5">
-
-                {/* Active booking banner */}
-                {activeBookings.length > 0 && (() => {
-                  const b = activeBookings[0];
-                  return (
-                    <div className="bg-white border border-slate-200 rounded-2xl p-4 flex items-center gap-4 shadow-sm">
-                      <div className="h-12 w-12 rounded-xl bg-emerald-100 flex items-center justify-center shrink-0">
-                        <span className="text-emerald-700 font-black text-lg">P</span>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-bold text-slate-900 truncate text-sm">{b.spaceId?.address || 'Parking Spot'}</p>
-                        <p className="text-xs text-slate-400 mt-0.5">
-                          {b.vehicleNumber && <span className="font-mono font-bold text-slate-600">{b.vehicleNumber}</span>}
-                          {b.slotId && <span> · Slot {b.slotId}</span>}
-                          {b.startTime && <span> · {new Date(b.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} departure</span>}
-                        </p>
-                      </div>
-                      <span className="shrink-0 px-2.5 py-1 bg-emerald-500 text-white text-[10px] font-black uppercase rounded-full tracking-wide">
-                        {b.status === 'paid' ? 'In Progress' : b.status === 'allotted' ? 'Pay Now' : 'Pending'}
+                  {/* Title & Pricing Header */}
+                  <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 pt-1">
+                    <div>
+                      <h2 className="text-xl font-black text-slate-900 tracking-tight">
+                        {selectedSpace.title || selectedSpace.address}
+                      </h2>
+                      <p className="text-xs text-slate-500 font-medium flex items-center gap-1.5 mt-1">
+                        <MapPin className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                        {selectedSpace.address || selectedSpace.location}
+                      </p>
+                    </div>
+                    <div className="sm:text-right shrink-0">
+                      <p className="text-2xl font-black text-emerald-600">
+                        ₹{selectedSpace.pricePerHour || 50}<span className="text-xs font-bold text-slate-400">/hr</span>
+                      </p>
+                      <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full mt-1 border border-emerald-200">
+                        🟢 {bookingAvailableSlots.filter(s => s.isAvailable).length} of {bookingAvailableSlots.length || selectedSpace.totalSlots || 5} Slots Free
                       </span>
                     </div>
-                  );
-                })()}
+                  </div>
 
-                {/* Stats row */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  {[
-                    { label: 'Total Spent', value: `₹${totalSpent}`, icon: <DollarSign className="h-4 w-4 text-emerald-600" />, bg: 'bg-emerald-50', text: 'text-emerald-700' },
-                    { label: 'Bookings', value: analytics?.totalBookings || 0, icon: <Car className="h-4 w-4 text-blue-600" />, bg: 'bg-blue-50', text: 'text-blue-700' },
-                    { label: 'Active', value: activeBookings.length, icon: <Activity className="h-4 w-4 text-amber-600" />, bg: 'bg-amber-50', text: 'text-amber-700' },
-                    { label: 'Completed', value: completedBookings.length, icon: <CheckCircle className="h-4 w-4 text-slate-500" />, bg: 'bg-slate-100', text: 'text-slate-600' },
-                  ].map((s, i) => (
-                    <div key={i} className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
-                      <div className={`h-8 w-8 rounded-xl ${s.bg} flex items-center justify-center mb-2`}>{s.icon}</div>
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{s.label}</p>
-                      <p className={`text-xl font-black mt-0.5 ${s.text}`}>{s.value}</p>
-                    </div>
-                  ))}
+                  {/* Navigation Button */}
+                  <div className="pt-2 border-t border-slate-100 flex gap-2">
+                    <a
+                      href={selectedSpace.googleMapsLink || `https://maps.google.com/?q=${encodeURIComponent(selectedSpace.address)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-1 py-3 px-4 bg-slate-50 hover:bg-slate-100 text-slate-800 border border-slate-200 rounded-2xl text-xs font-bold transition-all flex items-center justify-center gap-2"
+                    >
+                      <Navigation className="h-3.5 w-3.5 text-blue-600" />
+                      Open Google Maps Navigation
+                    </a>
+                  </div>
                 </div>
 
-                {/* Nearby / Available spaces */}
-                <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
-                  <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+                {/* 2. RESERVATION DETAILS CARD */}
+                <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-sm space-y-6">
+                  <h3 className="text-lg font-black text-slate-900">Reservation Details</h3>
+
+                  <form onSubmit={handleBookSubmit} className="space-y-6">
+                    {/* Vehicle Plate Number */}
                     <div>
-                      <h2 className="font-bold text-slate-800">Nearby Spots</h2>
-                      <p className="text-xs text-slate-400 mt-0.5">{spaces.length} Found</p>
+                      <label className="block text-xs font-extrabold text-slate-600 uppercase tracking-wider mb-2">
+                        Vehicle Plate Number
+                      </label>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <select
+                          value={form.vehicleNumber}
+                          onChange={e => setForm(p => ({ ...p, vehicleNumber: e.target.value }))}
+                          className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-800 focus:outline-none focus:border-emerald-500"
+                        >
+                          <option value="" disabled>Select from Saved Vehicles</option>
+                          {user?.vehicles?.map(v => (
+                            <option key={v._id} value={v.plateNumber}>{v.plateNumber} ({v.model || v.vehicleType})</option>
+                          ))}
+                        </select>
+                        <input
+                          type="text"
+                          required
+                          placeholder="e.g. TS 08 EA 5678"
+                          value={form.vehicleNumber}
+                          onChange={e => setForm(p => ({ ...p, vehicleNumber: e.target.value.toUpperCase() }))}
+                          className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-800 uppercase focus:outline-none focus:border-emerald-500"
+                        />
+                      </div>
                     </div>
+
+                    {/* Vehicle Type Switcher */}
+                    <div>
+                      <label className="block text-xs font-extrabold text-slate-600 uppercase tracking-wider mb-2">
+                        Vehicle Type
+                      </label>
+                      <div className="grid grid-cols-2 gap-3">
+                        <button
+                          type="button"
+                          onClick={() => setForm(p => ({ ...p, bookingType: 'hourly' }))}
+                          className="py-3 px-4 rounded-2xl text-xs font-extrabold border transition-all bg-emerald-50 text-emerald-700 border-emerald-300 shadow-sm"
+                        >
+                          🚗 4-Wheeler (Car)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setForm(p => ({ ...p, bookingType: 'hourly' }))}
+                          className="py-3 px-4 rounded-2xl text-xs font-bold border border-slate-200 text-slate-600 hover:bg-slate-50 transition-all"
+                        >
+                          🏍️ 2-Wheeler (Bike)
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Parking Duration (Hours) Pills */}
+                    <div>
+                      <label className="block text-xs font-extrabold text-slate-600 uppercase tracking-wider mb-2">
+                        Parking Duration (Hours)
+                      </label>
+                      <div className="grid grid-cols-4 gap-2.5">
+                        {['1', '2', '4', '8'].map(hr => (
+                          <button
+                            key={hr}
+                            type="button"
+                            onClick={() => setForm(p => ({ ...p, hours: hr }))}
+                            className={`py-3 rounded-2xl text-xs font-black transition-all border ${
+                              form.hours === hr
+                                ? 'bg-emerald-500 text-white border-emerald-500 shadow-md shadow-emerald-500/20'
+                                : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                            }`}
+                          >
+                            {hr} hr{hr !== '1' ? 's' : ''}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Select Parking Slot */}
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="block text-xs font-extrabold text-slate-600 uppercase tracking-wider">
+                          Select Parking Slot
+                        </label>
+                        {fetchingSlots && (
+                          <span className="text-[11px] font-bold text-slate-400 animate-pulse">Checking live slot availability...</span>
+                        )}
+                      </div>
+                      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
+                        {bookingAvailableSlots.map(s => {
+                          const isSelected = form.slotId === s.slotId;
+                          return (
+                            <button
+                              key={s.slotId}
+                              type="button"
+                              disabled={!s.isAvailable}
+                              onClick={() => setForm(p => ({ ...p, slotId: s.slotId }))}
+                              className={`py-3 px-2 rounded-2xl text-xs font-black transition-all border text-center ${
+                                !s.isAvailable
+                                  ? 'bg-rose-50 border-rose-300 text-rose-400 cursor-not-allowed select-none opacity-85'
+                                  : isSelected
+                                  ? 'bg-emerald-500 text-white border-emerald-500 shadow-lg shadow-emerald-500/25 scale-105'
+                                  : 'bg-white text-slate-700 border-slate-200 hover:border-emerald-400 hover:bg-emerald-50/40 hover:text-emerald-700'
+                              }`}
+                            >
+                              <span className="text-sm font-black">{s.slotId}</span>
+                              {!s.isAvailable ? (
+                                <span className="block text-[9px] font-black text-rose-600 mt-1 uppercase tracking-wider">🚫 Booked</span>
+                              ) : isSelected ? (
+                                <span className="block text-[9px] font-black text-emerald-100 mt-1 uppercase tracking-wider">✓ Selected</span>
+                              ) : (
+                                <span className="block text-[9px] font-black text-emerald-600 mt-1 uppercase tracking-wider">🟢 Free</span>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* PlanToPark Wallet Money Deduction Card */}
+                    {(() => {
+                      const price = selectedSpace.pricePerHour || 50;
+                      const hrs = Number(form.hours || 1);
+                      const baseTotal = price * hrs;
+                      const maxDiscount = Number(selectedSpace.maxWalletDiscount ?? 10);
+                      const discount = (useWallet && maxDiscount > 0) ? Math.min(walletBalance, maxDiscount, baseTotal) : 0;
+                      const finalTotal = Math.max(0, baseTotal - discount);
+
+                      return (
+                        <>
+                          <div className="bg-emerald-50/70 border border-emerald-200/80 rounded-2xl p-4.5 space-y-3">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2.5">
+                                <span className="text-lg">👛</span>
+                                <div>
+                                  <p className="text-xs font-black text-emerald-950">PlanToPark Wallet Balance</p>
+                                  <p className="text-[11px] text-emerald-700 font-bold">₹{walletBalance} available</p>
+                                </div>
+                              </div>
+                              <label className="relative inline-flex items-center cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={useWallet}
+                                  onChange={e => setUseWallet(e.target.checked)}
+                                  className="sr-only peer"
+                                />
+                                <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
+                              </label>
+                            </div>
+                            {useWallet && discount > 0 && (
+                              <p className="text-[11px] font-bold text-emerald-800 bg-white/80 px-3 py-1.5 rounded-xl border border-emerald-100">
+                                ✨ ₹{discount} wallet discount automatically applied!
+                              </p>
+                            )}
+                          </div>
+
+                          {/* Price Breakdown */}
+                          <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 space-y-2 text-xs">
+                            <div className="flex justify-between text-slate-500 font-medium">
+                              <span>Parking Fee ({hrs} hr{hrs > 1 ? 's' : ''} × ₹{price})</span>
+                              <span className="font-bold text-slate-800">₹{baseTotal}</span>
+                            </div>
+                            {discount > 0 && (
+                              <div className="flex justify-between text-emerald-600 font-bold">
+                                <span>Wallet Discount Applied</span>
+                                <span>- ₹{discount}</span>
+                              </div>
+                            )}
+                            <div className="flex justify-between text-slate-500 font-medium">
+                              <span>Platform Convenience Fee</span>
+                              <span className="font-bold text-slate-800">₹0 (Free)</span>
+                            </div>
+                            <div className="pt-3 border-t border-slate-200 flex items-center justify-between text-base font-black text-slate-900">
+                              <span>Total Payable</span>
+                              <span className="text-2xl font-black text-emerald-600">₹{finalTotal}</span>
+                            </div>
+                          </div>
+
+                          {/* Action Button */}
+                          <button
+                            type="submit"
+                            disabled={loading || payLoading}
+                            className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-black py-4 rounded-2xl text-base shadow-lg shadow-emerald-500/25 transition-all transform active:scale-98 flex items-center justify-center gap-2 cursor-pointer"
+                          >
+                            {loading || payLoading ? (
+                              <Loader2 className="h-5 w-5 animate-spin text-white" />
+                            ) : (
+                              finalTotal === 0 ? 'Confirm with Wallet • Free' : `Confirm & Pay • ₹${finalTotal}`
+                            )}
+                          </button>
+                        </>
+                      );
+                    })()}
+                  </form>
+                </div>
+              </div>
+            ) : (
+              /* ── DISCOVER MAIN SCREEN (SEEKER APP 1:1) ── */
+              <div className="space-y-5">
+                {/* 1. Pinned Location Banner */}
+                <div className="bg-emerald-50 border border-emerald-200/90 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="h-10 w-10 rounded-xl bg-emerald-500 text-white flex items-center justify-center text-lg shrink-0 shadow-md shadow-emerald-500/20">
+                      📍
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-black text-emerald-800 uppercase tracking-widest">Pinned Search Location</p>
+                      <p className="text-sm font-extrabold text-slate-900 truncate">{pinnedLocationName}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
                     <button
-                      onClick={() => setCurrentView('find_parking')}
-                      className="text-xs font-semibold text-emerald-600 hover:text-emerald-700 flex items-center gap-1"
+                      type="button"
+                      onClick={handleUseGps}
+                      disabled={locatingGps}
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs px-3.5 py-2.5 rounded-xl shadow-xs transition-all cursor-pointer flex items-center gap-1.5"
                     >
-                      View all <ChevronRight className="h-3 w-3" />
+                      🎯 {locatingGps ? 'Locating...' : 'GPS Detect'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowPinModal(true)}
+                      className="bg-white hover:bg-slate-50 border border-emerald-300 text-emerald-700 font-extrabold text-xs px-3.5 py-2.5 rounded-xl shadow-xs transition-all cursor-pointer"
+                    >
+                      Change Pin 📍
                     </button>
                   </div>
-
-                    {/* Mini space cards */}
-                    <div className="divide-y divide-slate-50">
-                      {spaces.slice(0, 6).map(space => {
-                        const freeSlots = space.slots?.filter(s => s.isAvailable).length || 0;
-                        const spotImg = getImageUrl ? getImageUrl(space.images?.[0] || space.image || space.photoUrl) : (space.image || space.photoUrl);
-                        return (
-                          <div key={space._id} className="flex items-center gap-4 px-5 py-4 hover:bg-slate-50 transition-colors">
-                            <img src={spotImg} alt={space.title || 'Parking Spot'} className="h-14 w-14 rounded-xl object-cover border border-slate-200 shrink-0" />
-                            <div className="flex-1 min-w-0">
-                              <p className="font-extrabold text-slate-900 text-sm truncate">{space.title || space.address}</p>
-                              <p className="text-xs text-slate-400 flex items-center gap-1 mt-0.5 truncate">
-                                <MapPin className="h-3 w-3 shrink-0 text-slate-400" />{space.address || space.location}
-                              </p>
-                            </div>
-                            <div className="text-right shrink-0">
-                              <p className="font-black text-emerald-600 text-sm">₹{space.pricePerHour}/hr</p>
-                              <p className={`text-[10px] font-bold mt-0.5 ${freeSlots > 0 ? 'text-emerald-600' : 'text-rose-500'}`}>
-                                {freeSlots} free slot{freeSlots !== 1 ? 's' : ''}
-                              </p>
-                            </div>
-                            <button
-                              onClick={() => {
-                                setSelectedSpace(space);
-                                const now = new Date().toISOString().slice(0, 16);
-                                setForm(p => ({ ...p, seekerName: user?.name || '', seekerContact: user?.contact || '', startTime: now, bookingType: 'hourly', hours: '1' }));
-                                setCurrentView('find_parking');
-                              }}
-                              disabled={freeSlots === 0}
-                              className={`shrink-0 px-3.5 py-2 rounded-xl text-xs font-black transition-colors ${freeSlots > 0 ? 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-xs cursor-pointer' : 'bg-slate-100 text-slate-400 cursor-not-allowed'}`}
-                            >
-                              Book
-                            </button>
-                          </div>
-                        );
-                      })}
-                    {spaces.length === 0 && (
-                      <div className="px-5 py-10 text-center text-slate-400 text-sm">
-                        No parking spaces available in your area right now.
-                      </div>
-                    )}
-                  </div>
                 </div>
 
-                {/* Review prompts for completed bookings */}
-                {completedBookings.length > 0 && (
-                  <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5">
-                    <h3 className="font-bold text-amber-800 mb-1">⭐ Leave a Review</h3>
-                    <p className="text-xs text-amber-600 mb-4">Help the community by rating your parking experience.</p>
-                    <div className="space-y-3">
-                      {completedBookings.slice(0, 2).map(b => (
-                        <div key={b._id} className="bg-white border border-amber-100 rounded-xl p-3.5 flex items-center justify-between gap-3">
-                          <div className="min-w-0">
-                            <p className="font-semibold text-slate-800 text-sm truncate">{b.spaceId?.address}</p>
-                            <p className="text-xs text-slate-400">Slot: {b.slotId || '—'}</p>
-                          </div>
-                          <button
-                            onClick={() => { setReviewBooking(b); setRating(5); }}
-                            className="shrink-0 bg-amber-500 hover:bg-amber-600 text-white font-bold px-3 py-1.5 rounded-lg text-xs transition-colors"
-                          >
-                            Write Review
-                          </button>
-                        </div>
-                      ))}
+                {/* 2. Seeker App Search & Filter Header */}
+                <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-sm space-y-4">
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    {/* Search Input */}
+                    <div className="flex-1 bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 flex items-center gap-3">
+                      <Search className="h-4 w-4 text-slate-400 shrink-0" />
+                      <input
+                        type="text"
+                        placeholder="Search city, area, landmark, or spot name..."
+                        value={searchQuery}
+                        onChange={e => setSearchQuery(e.target.value)}
+                        className="flex-grow bg-transparent text-xs sm:text-sm font-semibold focus:outline-none text-slate-800"
+                      />
+                      {searchQuery && (
+                        <button onClick={() => setSearchQuery('')} className="text-slate-400 hover:text-slate-600">
+                          <XCircle className="h-4 w-4" />
+                        </button>
+                      )}
+                    </div>
+
+                    {/* EV Filter Toggle */}
+                    <button
+                      type="button"
+                      onClick={() => setFilterEv(p => !p)}
+                      className={`px-4 py-3 rounded-2xl text-xs font-black transition-all border flex items-center gap-1.5 ${
+                        filterEv
+                          ? 'bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-500/20'
+                          : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                      }`}
+                    >
+                      ⚡ EV Only
+                    </button>
+
+                    {/* View Mode Toggle */}
+                    <div className="flex items-center bg-slate-100 p-1 rounded-2xl border border-slate-200">
+                      <button
+                        type="button"
+                        onClick={() => setViewMode('map')}
+                        className={`px-4 py-2 rounded-xl text-xs font-extrabold transition-all flex items-center gap-1.5 ${
+                          viewMode === 'map' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                        }`}
+                      >
+                        <Map className="h-3.5 w-3.5" /> Map View
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setViewMode('list')}
+                        className={`px-4 py-2 rounded-xl text-xs font-extrabold transition-all flex items-center gap-1.5 ${
+                          viewMode === 'list' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                        }`}
+                      >
+                        <List className="h-3.5 w-3.5" /> List View
+                      </button>
                     </div>
                   </div>
-                )}
-              </div>
 
-              {/* RIGHT COLUMN */}
-              <div className="space-y-5">
-                {/* Booking History / Spent card */}
-                <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-2xl p-5 text-white shadow-lg shadow-emerald-200">
-                  <div className="flex items-center justify-between mb-3">
-                    <p className="text-emerald-100 text-xs font-bold uppercase tracking-wider">Total Amount Spent</p>
-                    <Wallet className="h-4 w-4 text-emerald-200" />
-                  </div>
-                  <p className="text-3xl font-black">₹{totalSpent > 0 ? totalSpent : '0'}</p>
-                  <p className="text-emerald-200 text-xs mt-1">on completed parking bookings</p>
-                  <button 
-                    onClick={() => setCurrentView('bookings')}
-                    className="mt-4 w-full py-2 bg-white/20 hover:bg-white/30 text-white font-bold text-xs rounded-xl transition-colors border border-white/20">
-                    View Booking History →
-                  </button>
-                </div>
-
-                {/* Quick Actions */}
-                <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
-                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Quick Actions</p>
-                  <div className="space-y-2">
+                  {/* Radius Distance Filter Chips */}
+                  <div className="flex items-center gap-2 overflow-x-auto pb-1">
+                    <span className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider shrink-0">Radius:</span>
                     {[
-                      { label: 'Find Parking', sub: 'Nearby at destination', icon: <Search className="h-4 w-4 text-emerald-600" />, bg: 'bg-emerald-50', view: 'find_parking' },
-                      { label: 'My Vehicles', sub: `Manage ${user?.vehicles?.length || 0} vehicles`, icon: <Car className="h-4 w-4 text-blue-600" />, bg: 'bg-blue-50', view: 'profile' },
-                      { label: 'Support Desk', sub: '24/7 help desk hotline', icon: <AlertTriangle className="h-4 w-4 text-amber-600" />, bg: 'bg-amber-50', view: 'complaints' },
-                    ].map((a, i) => (
+                      { label: '🌐 All', value: null },
+                      { label: '🎯 1 km', value: 1 },
+                      { label: '🎯 5 km', value: 5 },
+                      { label: '🎯 10 km', value: 10 },
+                      { label: '🎯 15 km', value: 15 },
+                      { label: '🎯 20 km', value: 20 },
+                    ].map(r => (
                       <button
-                        key={i}
-                        onClick={() => setCurrentView(a.view)}
-                        className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-slate-50 transition-colors text-left"
+                        key={r.label}
+                        type="button"
+                        onClick={() => setSelectedRadius(r.value)}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-extrabold transition-all border shrink-0 ${
+                          selectedRadius === r.value
+                            ? 'bg-emerald-500 text-white border-emerald-500 shadow-sm'
+                            : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                        }`}
                       >
-                        <div className={`h-9 w-9 rounded-xl ${a.bg} flex items-center justify-center shrink-0`}>
-                          {a.icon}
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-sm font-semibold text-slate-800">{a.label}</p>
-                          <p className="text-xs text-slate-400">{a.sub}</p>
-                        </div>
-                        <ChevronRight className="h-4 w-4 text-slate-300 ml-auto shrink-0" />
+                        {r.label}
                       </button>
                     ))}
                   </div>
                 </div>
 
-                {/* Recent Activity */}
-                <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
-                  <div className="flex items-center justify-between mb-3">
-                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Recent Activity</p>
-                    <button onClick={() => setCurrentView('history')} className="text-[11px] text-emerald-600 font-semibold hover:text-emerald-700">View All</button>
+                {/* 3. Interactive Leaflet Map View */}
+                {viewMode === 'map' && (
+                  <div className="bg-white border border-slate-200 rounded-3xl p-4 shadow-sm overflow-hidden space-y-3">
+                    <div className="flex items-center justify-between px-2">
+                      <p className="text-xs font-extrabold text-slate-700 flex items-center gap-1.5">
+                        <Map className="h-4 w-4 text-emerald-600" /> Interactive Live Parking Map
+                      </p>
+                      <span className="text-[11px] font-bold text-slate-400">
+                        {spaces.length} verified spots plotted
+                      </span>
+                    </div>
+                    <div className="h-[420px] rounded-2xl overflow-hidden border border-slate-200 relative">
+                      <SpacesMap
+                        spaces={spaces}
+                        userLat={userLat || 17.313}
+                        userLng={userLng || 78.545}
+                        activeSpaceId={activeSpaceId}
+                        onBook={(space) => {
+                          setSelectedSpace(space);
+                          const now = new Date().toISOString().slice(0, 16);
+                          setForm(p => ({ ...p, seekerName: user?.name || '', seekerContact: user?.contact || '', startTime: now, bookingType: 'hourly', hours: '1' }));
+                        }}
+                      />
+                    </div>
                   </div>
-                  <div className="space-y-3">
-                    {bookings.slice(0, 4).map(b => (
-                      <div key={b._id} className="flex items-start gap-3">
-                        <span className={`mt-1 h-2 w-2 rounded-full shrink-0 ${
-                          b.status === 'completed' ? 'bg-emerald-500' :
-                          b.status === 'cancelled' ? 'bg-rose-400' :
-                          b.status === 'paid' ? 'bg-blue-500' : 'bg-amber-400'
-                        }`} />
-                        <div className="min-w-0">
-                          <p className="text-xs font-medium text-slate-700 truncate">{b.spaceId?.address || 'Parking Spot'}</p>
-                          <p className="text-[10px] text-slate-400 mt-0.5">₹{b.totalAmount} · {b.hours} hrs · {new Date(b.createdAt).toLocaleDateString()}</p>
+                )}
+
+                {/* 4. Seeker App 1:1 Spot Cards Grid */}
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-base font-black text-slate-900">
+                      Nearby Verified Parking Spots ({spaces.length})
+                    </h3>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                    {spaces.map(space => {
+                      const freeSlots = space.slots?.filter(s => s.isAvailable).length ?? space.totalSlots ?? 5;
+                      const isFull = freeSlots <= 0;
+                      const spotImg = getImageUrl ? getImageUrl(space.images?.[0] || space.image || space.photoUrl) : (space.image || space.photoUrl);
+
+                      return (
+                        <div
+                          key={space._id}
+                          className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm hover:shadow-md transition-all flex flex-col justify-between group"
+                        >
+                          <div>
+                            {/* Photo & Badges */}
+                            <div className="relative aspect-[16/10] bg-slate-100 overflow-hidden">
+                              <img
+                                src={spotImg}
+                                alt={space.title || space.address}
+                                className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-300"
+                              />
+                              <div className="absolute top-3 left-3 flex flex-wrap gap-1.5">
+                                <span className="bg-emerald-600/95 text-white font-black text-[9px] px-2.5 py-1 rounded-full uppercase tracking-wider shadow">
+                                  VERIFIED OWNER SPOT
+                                </span>
+                                {space.hasEvCharger && (
+                                  <span className="bg-blue-600/95 text-white font-black text-[9px] px-2 py-1 rounded-full uppercase tracking-wider shadow">
+                                    ⚡ EV
+                                  </span>
+                                )}
+                              </div>
+                              <div className="absolute bottom-3 right-3 bg-slate-900/85 backdrop-blur-md text-white font-black text-xs px-3 py-1.5 rounded-xl">
+                                ₹{space.pricePerHour || 50}/hr
+                              </div>
+                            </div>
+
+                            {/* Content */}
+                            <div className="p-5 space-y-2.5">
+                              <h4 className="font-extrabold text-slate-900 text-base leading-snug truncate">
+                                {space.title || space.address}
+                              </h4>
+                              <p className="text-xs text-slate-500 font-medium flex items-center gap-1.5 truncate">
+                                <MapPin className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                                {space.address || space.location}
+                              </p>
+
+                              <div className="flex items-center gap-2 pt-1">
+                                <span className={`text-[10px] font-black px-2.5 py-1 rounded-lg uppercase tracking-wider ${
+                                  !isFull ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-rose-50 text-rose-600 border border-rose-200'
+                                }`}>
+                                  {!isFull ? `🟢 ${freeSlots} of ${space.totalSlots || 5} Free` : '🚫 Full'}
+                                </span>
+                                <span className="text-[10px] font-extrabold text-slate-500 bg-slate-100 px-2 py-1 rounded-lg">
+                                  🚗 4-Wheeler
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Book Button */}
+                          <div className="p-5 pt-0">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedSpace(space);
+                                const now = new Date().toISOString().slice(0, 16);
+                                setForm(p => ({ ...p, seekerName: user?.name || '', seekerContact: user?.contact || '', startTime: now, bookingType: 'hourly', hours: '1' }));
+                              }}
+                              disabled={isFull}
+                              className={`w-full py-3.5 rounded-2xl text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-xs ${
+                                !isFull
+                                  ? 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-emerald-500/20'
+                                  : 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                              }`}
+                            >
+                              {!isFull ? 'Book This Spot →' : 'Slot Currently Occupied'}
+                            </button>
+                          </div>
                         </div>
-                      </div>
-                    ))}
-                    {bookings.length === 0 && (
-                      <p className="text-xs text-slate-400 text-center py-3">No activity yet.</p>
-                    )}
+                      );
+                    })}
                   </div>
                 </div>
               </div>
-            </div>
+            )}
           </div>
         )}
 
