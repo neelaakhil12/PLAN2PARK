@@ -39,6 +39,21 @@ const getShortVehicleTypeLabel = (type) => {
   return mapping[type] || type;
 };
 
+const StatusBadge = ({ status }) => {
+  switch (status) {
+    case 'paid':
+      return <span className="bg-emerald-100 text-emerald-800 text-xs font-bold px-2.5 py-1 rounded-full border border-emerald-200">✓ Paid</span>;
+    case 'allotted':
+      return <span className="bg-blue-100 text-blue-800 text-xs font-bold px-2.5 py-1 rounded-full border border-blue-200">🅿️ Allotted</span>;
+    case 'completed':
+      return <span className="bg-slate-100 text-slate-700 text-xs font-bold px-2.5 py-1 rounded-full border border-slate-200">Completed</span>;
+    case 'cancelled':
+      return <span className="bg-rose-100 text-rose-800 text-xs font-bold px-2.5 py-1 rounded-full border border-rose-200">Cancelled</span>;
+    default:
+      return <span className="bg-amber-100 text-amber-800 text-xs font-bold px-2.5 py-1 rounded-full border border-amber-200">{status || 'Pending'}</span>;
+  }
+};
+
 const SeekerDashboard = () => {
   const { token, user, API_URL, logout } = useContext(AuthContext);
   const location = useLocation();
