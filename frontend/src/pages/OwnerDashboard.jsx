@@ -1051,199 +1051,89 @@ const OwnerDashboard = () => {
 
 
         {/* ═════════════════════════════════════════════════════════════════════ */}
-        {/* ── VIEW 4: PROFILE & BANK DETAILS (MATCHING OWNER APP 1:1) ───────── */}
+        {/* ── VIEW 4: PROFILE (MATCHING OWNER APP 1:1) ───────────────────────── */}
         {/* ═════════════════════════════════════════════════════════════════════ */}
         {currentView === 'profile' && (
-          <div className="max-w-3xl mx-auto space-y-6 animate-fadeIn pb-16">
+          <div className="max-w-xl mx-auto space-y-6 animate-fadeIn pb-16">
             {/* Header */}
             <div>
               <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight flex items-center gap-2">
-                Space Owner Profile <span className="text-xl">👤</span>
+                My Profile <span className="text-xl">👤</span>
               </h1>
-              <p className="text-slate-500 text-sm mt-0.5">Manage your account settings, payout bank details, and security.</p>
+              <p className="text-slate-500 text-sm mt-0.5">Account settings &amp; partner status.</p>
             </div>
 
-            {/* Profile Hero Card */}
+            {/* Profile Hero Card Matching Mobile Owner Profile 1:1 */}
             <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-sm flex flex-col items-center text-center space-y-4">
-              <div className="h-24 w-24 rounded-full bg-gradient-to-br from-blue-500 to-indigo-700 flex items-center justify-center text-white text-3xl font-black shadow-lg shadow-blue-500/25 border-4 border-blue-200 overflow-hidden">
-                {user?.profileImage && user.profileImage.length > 5 && !profileImgError ? (
-                  <img
-                    src={user.profileImage.startsWith('data:') ? user.profileImage : (getImageUrl ? getImageUrl(user.profileImage) : user.profileImage)}
-                    alt=""
-                    className="h-full w-full object-cover"
-                    onError={() => setProfileImgError(true)}
-                  />
-                ) : (
-                  <span>{(user?.name || 'O').trim().charAt(0).toUpperCase()}</span>
-                )}
+              <div className="relative">
+                <div className="h-24 w-24 rounded-full bg-gradient-to-br from-emerald-500 to-teal-700 flex items-center justify-center text-white text-3xl font-black shadow-lg shadow-emerald-500/25 border-4 border-emerald-100 overflow-hidden">
+                  {user?.profileImage && user.profileImage.length > 5 && !profileImgError ? (
+                    <img
+                      src={user.profileImage.startsWith('data:') ? user.profileImage : (getImageUrl ? getImageUrl(user.profileImage) : user.profileImage)}
+                      alt=""
+                      className="h-full w-full object-cover"
+                      onError={() => setProfileImgError(true)}
+                    />
+                  ) : (
+                    <span>{(user?.name || 'O').trim().charAt(0).toUpperCase()}</span>
+                  )}
+                </div>
               </div>
+
               <div>
-                <h2 className="text-xl font-black text-slate-900 capitalize">{user?.name || 'Parking Owner'}</h2>
-                <p className="text-xs text-slate-400 font-medium mt-0.5">{user?.email || 'owner@plantopark.com'} • {user?.contact || '+91 8919360467'}</p>
-                <span className="inline-block mt-2 bg-blue-50 text-blue-700 font-extrabold text-[11px] px-3 py-1 rounded-full border border-blue-200">
-                  Verified Space Owner
+                <h2 className="text-2xl font-black text-slate-900 capitalize">{user?.name || 'Space Owner'}</h2>
+                <p className="text-xs text-slate-400 font-medium mt-0.5">{user?.email || 'owner@plantopark.com'}</p>
+                {user?.contact && (
+                  <p className="text-xs text-emerald-600 font-extrabold mt-1">📞 {user.contact}</p>
+                )}
+                <span className="inline-block mt-3 bg-emerald-50 text-emerald-700 font-extrabold text-[11px] px-3.5 py-1 rounded-full border border-emerald-200 uppercase tracking-wider">
+                  PARKING SPACE OWNER
                 </span>
               </div>
             </div>
 
-            {/* Bank Account Details Form */}
-            <form onSubmit={handleProfileSubmit} className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-sm space-y-6">
-              <div className="border-b border-slate-100 pb-3">
-                <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
-                  🏦 Bank Account Details for Payouts
-                </h3>
-                <p className="text-xs text-slate-500 mt-0.5">Where your driver reservation fees are deposited.</p>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-extrabold text-slate-600 uppercase tracking-wider mb-2">
-                    Account Holder Name
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Harish Kumar"
-                    value={profileForm.bankAccountDetails.accountName}
-                    onChange={e => setProfileForm(p => ({
-                      ...p,
-                      bankAccountDetails: { ...p.bankAccountDetails, accountName: e.target.value }
-                    }))}
-                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-800 focus:outline-none focus:border-emerald-500"
-                  />
+            {/* Account Quick Stats */}
+            <div className="space-y-2">
+              <h3 className="text-xs font-black uppercase text-slate-400 tracking-wider">Account Status</h3>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-white border border-slate-200 rounded-2xl p-4 text-center">
+                  <p className="text-base font-black text-emerald-600">Active</p>
+                  <p className="text-xs font-bold text-slate-400 mt-0.5">Status</p>
                 </div>
-                <div>
-                  <label className="block text-xs font-extrabold text-slate-600 uppercase tracking-wider mb-2">
-                    Bank Account Number
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. 50100234567890"
-                    value={profileForm.bankAccountDetails.accountNumber}
-                    onChange={e => setProfileForm(p => ({
-                      ...p,
-                      bankAccountDetails: { ...p.bankAccountDetails, accountNumber: e.target.value }
-                    }))}
-                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-800 font-mono focus:outline-none focus:border-emerald-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-extrabold text-slate-600 uppercase tracking-wider mb-2">
-                    IFSC Code
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. HDFC0001234"
-                    value={profileForm.bankAccountDetails.ifscCode}
-                    onChange={e => setProfileForm(p => ({
-                      ...p,
-                      bankAccountDetails: { ...p.bankAccountDetails, ifscCode: e.target.value.toUpperCase() }
-                    }))}
-                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-800 uppercase font-mono focus:outline-none focus:border-emerald-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-extrabold text-slate-600 uppercase tracking-wider mb-2">
-                    Bank Name
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. HDFC Bank"
-                    value={profileForm.bankAccountDetails.bankName}
-                    onChange={e => setProfileForm(p => ({
-                      ...p,
-                      bankAccountDetails: { ...p.bankAccountDetails, bankName: e.target.value }
-                    }))}
-                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-800 focus:outline-none focus:border-emerald-500"
-                  />
+                <div className="bg-white border border-slate-200 rounded-2xl p-4 text-center">
+                  <p className="text-base font-black text-emerald-600">Verified</p>
+                  <p className="text-xs font-bold text-slate-400 mt-0.5">Space Partner</p>
                 </div>
               </div>
+            </div>
 
-              <div className="pt-2 border-t border-slate-100">
-                <h4 className="text-xs font-black uppercase text-slate-400 mb-3">Owner Contact Details</h4>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-500 mb-1">Full Name</label>
-                    <input
-                      type="text"
-                      value={profileForm.name}
-                      onChange={e => setProfileForm(p => ({ ...p, name: e.target.value }))}
-                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-800 focus:outline-none focus:border-emerald-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-500 mb-1">Contact Phone</label>
-                    <input
-                      type="tel"
-                      value={profileForm.contact}
-                      onChange={e => setProfileForm(p => ({ ...p, contact: e.target.value }))}
-                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-800 focus:outline-none focus:border-emerald-500"
-                    />
-                  </div>
+            {/* Support & Legal */}
+            <div className="space-y-2">
+              <h3 className="text-xs font-black uppercase text-slate-400 tracking-wider">Support &amp; Legal</h3>
+              <div className="space-y-2.5">
+                <a
+                  href="tel:+918919360467"
+                  className="bg-white hover:bg-slate-50 border border-slate-200 rounded-2xl p-4 flex items-center justify-between text-slate-800 font-extrabold text-sm transition-colors block"
+                >
+                  <span>📞 24/7 Owner Support Desk</span>
+                  <span className="text-slate-400 text-xs font-bold">Call →</span>
+                </a>
+                <div
+                  className="bg-white border border-slate-200 rounded-2xl p-4 flex items-center justify-between text-slate-800 font-extrabold text-sm"
+                >
+                  <span>📜 Partner Terms &amp; Privacy Policy</span>
+                  <span className="text-slate-400 text-xs font-bold">Standard</span>
                 </div>
               </div>
-
-              <button
-                type="submit"
-                disabled={savingProfile}
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-extrabold py-3.5 rounded-2xl text-sm shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
-              >
-                {savingProfile ? <Loader2 className="h-4 w-4 animate-spin" /> : '💾 Save Bank & Profile Details'}
-              </button>
-            </form>
-
-            {/* Change Password Card */}
-            <form onSubmit={handlePasswordSubmit} className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-sm space-y-4">
-              <h3 className="text-base font-black text-slate-900">🔒 Security &amp; Change Password</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-500 mb-1">New Password</label>
-                  <input
-                    type="password"
-                    required
-                    placeholder="Enter new password"
-                    value={passwordForm.newPassword}
-                    onChange={e => setPasswordForm(p => ({ ...p, newPassword: e.target.value }))}
-                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-800 focus:outline-none focus:border-emerald-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-500 mb-1">Confirm Password</label>
-                  <input
-                    type="password"
-                    required
-                    placeholder="Confirm new password"
-                    value={passwordForm.confirmPassword}
-                    onChange={e => setPasswordForm(p => ({ ...p, confirmPassword: e.target.value }))}
-                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-800 focus:outline-none focus:border-emerald-500"
-                  />
-                </div>
-              </div>
-              <button
-                type="submit"
-                disabled={savingPassword}
-                className="bg-slate-900 hover:bg-black text-white font-extrabold text-xs px-5 py-3 rounded-2xl shadow-sm transition-all cursor-pointer"
-              >
-                {savingPassword ? 'Updating...' : 'Update Password'}
-              </button>
-            </form>
+            </div>
 
             {/* Sign Out Card */}
-            <div className="bg-rose-50/50 border border-rose-200 rounded-3xl p-6 flex items-center justify-between gap-4">
-              <div>
-                <h4 className="font-extrabold text-rose-900 text-sm">Sign Out of Space Owner Portal</h4>
-                <p className="text-xs text-rose-600 mt-0.5">Securely log out of this device.</p>
-              </div>
-              <button
-                onClick={() => { logout(); navigate('/login'); }}
-                className="bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs px-5 py-2.5 rounded-xl shadow-xs transition-all cursor-pointer shrink-0 flex items-center gap-1.5"
-              >
-                <LogOut className="h-3.5 w-3.5" /> Sign Out
-              </button>
-            </div>
+            <button
+              onClick={() => { logout(); navigate('/login'); }}
+              className="w-full bg-rose-600 hover:bg-rose-700 text-white font-black py-3.5 rounded-2xl text-sm shadow-md shadow-rose-600/20 transition-all cursor-pointer flex items-center justify-center gap-2"
+            >
+              <LogOut className="h-4 w-4" /> Sign Out
+            </button>
           </div>
         )}
 
