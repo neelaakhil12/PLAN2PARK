@@ -4,7 +4,7 @@ import { AuthContext } from '../context/AuthContext';
 import {
   Bell, ChevronDown, User, LogOut, Search, BookOpen,
   Clock, Heart, MessageSquare, LayoutDashboard, Menu, X,
-  MapPin, Car
+  MapPin, Car, Wallet
 } from 'lucide-react';
 
 const Navbar = () => {
