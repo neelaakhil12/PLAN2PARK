@@ -748,8 +748,55 @@ const SeekerDashboard = () => {
   };
 
   const activeBookings = bookings.filter(b => b.status === 'paid');
-  const completedBookings = bookings.filter(b => b.status === 'completed');
   const totalSpent = analytics?.totalSpent || 0;
+
+  // Geocoding distance calculation helper (Haversine Formula)
+  const calculateDistanceKm = (lat1, lon1, lat2, lon2) => {
+    if (!lat1 || !lon1 || !lat2 || !lon2) return null;
+    const R = 6371; // Earth radius in KM
+    const dLat = ((lat2 - lat1) * Math.PI) / 180;
+    const dLon = ((lon2 - lon1) * Math.PI) / 180;
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos((lat1 * Math.PI) / 180) *
+        Math.cos((lat2 * Math.PI) / 180) *
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    const dist = R * c;
+    return dist < 0.1 ? 0.1 : Math.round(dist * 10) / 10;
+  };
+
+  // Dynamically filtered spaces based on search, EV filter, radius, and distance
+  const displaySpaces = spaces
+    .map(space => {
+      const sLat = space.coordinates?.lat || space.lat;
+      const sLng = space.coordinates?.lng || space.lng;
+      const dist = calculateDistanceKm(userLat || 17.313, userLng || 78.545, sLat, sLng);
+      return {
+        ...space,
+        calculatedDist: dist !== null ? dist : 999,
+        distBadge: dist !== null ? `${dist} km away` : 'Nearby',
+      };
+    })
+    .sort((a, b) => (a.calculatedDist || 999) - (b.calculatedDist || 999))
+    .filter(item => {
+      if (item.isActive === false) return false;
+      const activeRadius = selectedRadius !== null ? selectedRadius : nearMeRadius;
+      if (activeRadius && item.calculatedDist !== null && item.calculatedDist > activeRadius) {
+        return false;
+      }
+      const q = searchQuery.toLowerCase().trim();
+      const matchesSearch =
+        !q ||
+        (item.title && item.title.toLowerCase().includes(q)) ||
+        (item.address && item.address.toLowerCase().includes(q)) ||
+        (item.location && item.location.toLowerCase().includes(q)) ||
+        (item.city && item.city.toLowerCase().includes(q));
+
+      const matchesEv = filterEv ? item.hasEvCharger : true;
+      return matchesSearch && matchesEv;
+    });
 
   // ─────────────────────────────────────────────────────────────────────────
   // LOADING STATE
@@ -1191,12 +1238,12 @@ const SeekerDashboard = () => {
                         <Map className="h-4 w-4 text-emerald-600" /> Interactive Live Parking Map
                       </p>
                       <span className="text-[11px] font-bold text-slate-400">
-                        {spaces.length} verified spots plotted
+                        {displaySpaces.length} verified spots plotted
                       </span>
                     </div>
                     <div className="h-[420px] rounded-2xl overflow-hidden border border-slate-200 relative">
                       <SpacesMap
-                        spaces={spaces}
+                        spaces={displaySpaces}
                         userLat={userLat || 17.313}
                         userLng={userLng || 78.545}
                         activeSpaceId={activeSpaceId}
@@ -1214,90 +1261,118 @@ const SeekerDashboard = () => {
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <h3 className="text-base font-black text-slate-900">
-                      Nearby Verified Parking Spots ({spaces.length})
+                      Nearby Verified Parking Spots ({displaySpaces.length})
                     </h3>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                    {spaces.map(space => {
-                      const freeSlots = space.slots?.filter(s => s.isAvailable).length ?? space.totalSlots ?? 5;
-                      const isFull = freeSlots <= 0;
-                      const spotImg = getImageUrl ? getImageUrl(space.images?.[0] || space.image || space.photoUrl) : (space.image || space.photoUrl);
+                  {displaySpaces.length === 0 ? (
+                    <div className="bg-white border border-slate-200 rounded-3xl p-10 text-center space-y-3">
+                      <p className="text-base font-black text-slate-700">No parking spots found within selected radius.</p>
+                      <p className="text-xs text-slate-400">Try expanding your radius filter or resetting the search.</p>
+                      <button
+                        type="button"
+                        onClick={() => { setSelectedRadius(null); setSearchQuery(''); setFilterEv(false); }}
+                        className="bg-emerald-500 hover:bg-emerald-600 text-white font-extrabold text-xs px-4 py-2 rounded-xl transition-all"
+                      >
+                        Reset Filters (Show All Spots)
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                      {displaySpaces.map(space => {
+                        const freeSlots = space.slots?.filter(s => s.isAvailable).length ?? space.totalSlots ?? 5;
+                        const isFull = freeSlots <= 0;
+                        const spotImg = getImageUrl ? getImageUrl(space.images?.[0] || space.image || space.photoUrl) : (space.image || space.photoUrl);
+                        const sLat = space.coordinates?.lat || space.lat;
+                        const sLng = space.coordinates?.lng || space.lng;
 
-                      return (
-                        <div
-                          key={space._id}
-                          className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm hover:shadow-md transition-all flex flex-col justify-between group"
-                        >
-                          <div>
-                            {/* Photo & Badges */}
-                            <div className="relative aspect-[16/10] bg-slate-100 overflow-hidden">
-                              <img
-                                src={spotImg}
-                                alt={space.title || space.address}
-                                className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-300"
-                              />
-                              <div className="absolute top-3 left-3 flex flex-wrap gap-1.5">
-                                <span className="bg-emerald-600/95 text-white font-black text-[9px] px-2.5 py-1 rounded-full uppercase tracking-wider shadow">
-                                  VERIFIED OWNER SPOT
-                                </span>
-                                {space.hasEvCharger && (
-                                  <span className="bg-blue-600/95 text-white font-black text-[9px] px-2 py-1 rounded-full uppercase tracking-wider shadow">
-                                    ⚡ EV
+                        return (
+                          <div
+                            key={space._id}
+                            className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm hover:shadow-md transition-all flex flex-col justify-between group"
+                          >
+                            <div>
+                              {/* Photo & Badges */}
+                              <div className="relative aspect-[16/10] bg-slate-100 overflow-hidden">
+                                <img
+                                  src={spotImg}
+                                  alt={space.title || space.address}
+                                  className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                />
+                                <div className="absolute top-3 left-3 flex flex-wrap gap-1.5">
+                                  <span className="bg-emerald-600/95 text-white font-black text-[9px] px-2.5 py-1 rounded-full uppercase tracking-wider shadow">
+                                    VERIFIED OWNER SPOT
                                   </span>
-                                )}
+                                  {space.hasEvCharger && (
+                                    <span className="bg-blue-600/95 text-white font-black text-[9px] px-2 py-1 rounded-full uppercase tracking-wider shadow">
+                                      ⚡ EV
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="absolute bottom-3 right-3 bg-slate-900/85 backdrop-blur-md text-white font-black text-xs px-3 py-1.5 rounded-xl">
+                                  ₹{space.pricePerHour || 50}/hr
+                                </div>
                               </div>
-                              <div className="absolute bottom-3 right-3 bg-slate-900/85 backdrop-blur-md text-white font-black text-xs px-3 py-1.5 rounded-xl">
-                                ₹{space.pricePerHour || 50}/hr
+
+                              {/* Content */}
+                              <div className="p-5 space-y-2.5">
+                                <h4 className="font-extrabold text-slate-900 text-base leading-snug truncate">
+                                  {space.title || space.address}
+                                </h4>
+                                <p className="text-xs text-slate-500 font-medium flex items-center gap-1.5 truncate">
+                                  <MapPin className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                                  {space.address || space.location}
+                                </p>
+
+                                <div className="flex items-center gap-2 pt-1 flex-wrap">
+                                  <span className={`text-[10px] font-black px-2.5 py-1 rounded-lg uppercase tracking-wider ${
+                                    !isFull ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-rose-50 text-rose-600 border border-rose-200'
+                                  }`}>
+                                    {!isFull ? `🟢 ${freeSlots} of ${space.totalSlots || 5} Free` : '🚫 Full'}
+                                  </span>
+                                  <span className="text-[10px] font-extrabold text-slate-600 bg-slate-100 px-2 py-1 rounded-lg">
+                                    🎯 {space.distBadge || 'Nearby'}
+                                  </span>
+                                  {sLat && (
+                                    <a
+                                      href={`https://www.google.com/maps/dir/?api=1&destination=${sLat},${sLng}`}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      onClick={e => e.stopPropagation()}
+                                      className="text-[10px] font-black bg-blue-50 hover:bg-blue-100 text-blue-600 px-2 py-1 rounded-lg flex items-center gap-1"
+                                      title="Open GPS Navigation"
+                                    >
+                                      🧭 Directions
+                                    </a>
+                                  )}
+                                </div>
                               </div>
                             </div>
 
-                            {/* Content */}
-                            <div className="p-5 space-y-2.5">
-                              <h4 className="font-extrabold text-slate-900 text-base leading-snug truncate">
-                                {space.title || space.address}
-                              </h4>
-                              <p className="text-xs text-slate-500 font-medium flex items-center gap-1.5 truncate">
-                                <MapPin className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-                                {space.address || space.location}
-                              </p>
-
-                              <div className="flex items-center gap-2 pt-1">
-                                <span className={`text-[10px] font-black px-2.5 py-1 rounded-lg uppercase tracking-wider ${
-                                  !isFull ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-rose-50 text-rose-600 border border-rose-200'
-                                }`}>
-                                  {!isFull ? `🟢 ${freeSlots} of ${space.totalSlots || 5} Free` : '🚫 Full'}
-                                </span>
-                                <span className="text-[10px] font-extrabold text-slate-500 bg-slate-100 px-2 py-1 rounded-lg">
-                                  🚗 4-Wheeler
-                                </span>
-                              </div>
+                            {/* Book Button */}
+                            <div className="p-5 pt-0">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSelectedSpace(space);
+                                  const now = new Date().toISOString().slice(0, 16);
+                                  setForm(p => ({ ...p, seekerName: user?.name || '', seekerContact: user?.contact || '', startTime: now, bookingType: 'hourly', hours: '1' }));
+                                }}
+                                disabled={isFull}
+                                className={`w-full py-3.5 rounded-2xl text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-xs ${
+                                  !isFull
+                                    ? 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-emerald-500/20'
+                                    : 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                                }`}
+                              >
+                                {!isFull ? 'Book This Spot →' : 'Slot Currently Occupied'}
+                              </button>
                             </div>
                           </div>
-
-                          {/* Book Button */}
-                          <div className="p-5 pt-0">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setSelectedSpace(space);
-                                const now = new Date().toISOString().slice(0, 16);
-                                setForm(p => ({ ...p, seekerName: user?.name || '', seekerContact: user?.contact || '', startTime: now, bookingType: 'hourly', hours: '1' }));
-                              }}
-                              disabled={isFull}
-                              className={`w-full py-3.5 rounded-2xl text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-xs ${
-                                !isFull
-                                  ? 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-emerald-500/20'
-                                  : 'bg-slate-100 text-slate-400 cursor-not-allowed'
-                              }`}
-                            >
-                              {!isFull ? 'Book This Spot →' : 'Slot Currently Occupied'}
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -1625,82 +1700,104 @@ const SeekerDashboard = () => {
                     <Search className="h-4 w-4 text-slate-400 shrink-0" />
                     <input
                       type="text"
-                      placeholder="Search by city, area or street…"
+                      placeholder="Search by city, area, landmark, or spot name…"
                       value={searchQuery}
                       onChange={e => setSearchQuery(e.target.value)}
-                      className="flex-grow bg-transparent text-sm focus:outline-none text-slate-700"
+                      className="flex-grow bg-transparent text-sm focus:outline-none text-slate-800 font-semibold"
                     />
+                    {searchQuery && (
+                      <button onClick={() => setSearchQuery('')} className="text-slate-400 hover:text-slate-600">
+                        <XCircle className="h-4 w-4" />
+                      </button>
+                    )}
                   </div>
 
-                  {/* Near Me */}
+                  {/* EV Filter Toggle */}
                   <button
                     type="button"
-                    onClick={async () => {
-                      if (!navigator.geolocation) return alert('Geolocation not supported.');
-                      setNearMeLoading(true);
-                      navigator.geolocation.getCurrentPosition(
-                        async (pos) => {
-                          const la = pos.coords.latitude;
-                          const ln = pos.coords.longitude;
-                          setUserLat(la); setUserLng(ln);
-                          try {
-                            const res = await fetch(
-                              `${API_URL}/spaces/nearby?lat=${la}&lng=${ln}&radius=${nearMeRadius}`,
-                              { headers: { Authorization: `Bearer ${token}` } }
-                            );
-                            if (res.ok) { const d = await res.json(); setSpaces(d); }
-                          } catch(e) { console.error(e); }
-                          setNearMeLoading(false);
-                        },
-                        () => { alert('Allow location access.'); setNearMeLoading(false); }
-                      );
-                    }}
-                    className="flex items-center gap-2 px-4 py-2.5 bg-blue-500 hover:bg-blue-600 text-white font-bold text-sm rounded-2xl transition-colors shadow-sm whitespace-nowrap"
+                    onClick={() => setFilterEv(p => !p)}
+                    className={`px-4 py-2.5 rounded-2xl text-xs font-black transition-all border flex items-center gap-1.5 shadow-sm ${
+                      filterEv
+                        ? 'bg-blue-600 text-white border-blue-600 shadow-blue-500/20'
+                        : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                    }`}
                   >
-                    {nearMeLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Navigation className="h-4 w-4" />}
-                    Near Me
+                    ⚡ EV Only
                   </button>
 
-                  {/* Radius */}
-                  <select
-                    value={nearMeRadius}
-                    onChange={e => setNearMeRadius(Number(e.target.value))}
-                    className="px-3 py-2 bg-white border border-slate-200 rounded-2xl text-sm font-semibold text-slate-700 focus:outline-none cursor-pointer"
+                  {/* Near Me GPS button */}
+                  <button
+                    type="button"
+                    onClick={handleUseGps}
+                    disabled={locatingGps}
+                    className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm rounded-2xl transition-colors shadow-sm whitespace-nowrap cursor-pointer"
                   >
-                    {[1,2,5,10,20].map(r => <option key={r} value={r}>{r} km</option>)}
-                  </select>
+                    {locatingGps ? <Loader2 className="h-4 w-4 animate-spin" /> : <Navigation className="h-4 w-4" />}
+                    {locatingGps ? 'Locating...' : 'Near Me'}
+                  </button>
                 </div>
 
-                {/* Near-me result count */}
-                {userLat && userLng && (
-                  <p className="text-xs text-blue-600 font-semibold flex items-center gap-1">
-                    <Navigation className="h-3.5 w-3.5" />
-                    {spaces.filter(s => s.coordinates?.lat).length} spaces with map pins within {nearMeRadius} km
-                  </p>
-                )}
+                {/* Radius Distance Filter Chips */}
+                <div className="flex items-center gap-2 overflow-x-auto pb-1">
+                  <span className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider shrink-0">Radius:</span>
+                  {[
+                    { label: '🌐 All', value: null },
+                    { label: '🎯 1 km', value: 1 },
+                    { label: '🎯 2 km', value: 2 },
+                    { label: '🎯 5 km', value: 5 },
+                    { label: '🎯 10 km', value: 10 },
+                    { label: '🎯 15 km', value: 15 },
+                    { label: '🎯 20 km', value: 20 },
+                  ].map(r => (
+                    <button
+                      key={r.label}
+                      type="button"
+                      onClick={() => setSelectedRadius(r.value)}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-extrabold transition-all border shrink-0 cursor-pointer ${
+                        selectedRadius === r.value
+                          ? 'bg-emerald-500 text-white border-emerald-500 shadow-sm'
+                          : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                      }`}
+                    >
+                      {r.label}
+                    </button>
+                  ))}
+                  <span className="text-xs text-emerald-600 font-extrabold ml-auto shrink-0">
+                    {displaySpaces.length} spots matched
+                  </span>
+                </div>
 
                 {/* ── SPLIT PANEL ─────────────────────────────────────────── */}
                 <div className="flex flex-col lg:flex-row gap-4" style={{ minHeight: '580px' }}>
 
                   {/* LEFT — scrollable card list */}
                   <div className="lg:w-[420px] xl:w-[460px] shrink-0 space-y-3 lg:overflow-y-auto lg:max-h-[600px] lg:pr-1">
-                    {spaces.length === 0 ? (
-                      <div className="flex flex-col items-center justify-center py-20 text-slate-400 text-sm gap-3">
+                    {displaySpaces.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center py-20 text-slate-400 text-sm gap-3 bg-white rounded-2xl border border-slate-200 p-8">
                         <MapPin className="h-10 w-10 text-slate-300" />
-                        <p>No parking spaces available.</p>
-                        <p className="text-xs">Try the Near Me button or adjust search.</p>
+                        <p className="font-extrabold text-slate-700">No parking spaces matched your filters.</p>
+                        <p className="text-xs text-slate-400">Try selecting "🌐 All" radius or clearing your search.</p>
+                        <button
+                          onClick={() => { setSelectedRadius(null); setSearchQuery(''); setFilterEv(false); }}
+                          className="mt-2 text-xs font-black text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-xl"
+                        >
+                          Reset All Filters
+                        </button>
                       </div>
-                    ) : spaces.map(space => {
-                      const freeSlots = space.slots?.filter(s => s.isAvailable).length || 0;
+                    ) : displaySpaces.map(space => {
+                      const freeSlots = space.slots?.filter(s => s.isAvailable).length ?? space.totalSlots ?? 5;
                       const isFav     = favorites.includes(space._id);
                       const isActive  = activeSpaceId === space._id;
                       const spotImg   = getImageUrl ? getImageUrl(space.images?.[0] || space.image || space.photoUrl) : (space.image || space.photoUrl);
+                      const sLat      = space.coordinates?.lat || space.lat;
+                      const sLng      = space.coordinates?.lng || space.lng;
+
                       return (
                         <div
                           key={space._id}
                           onMouseEnter={() => setActiveSpaceId(space._id)}
                           onMouseLeave={() => setActiveSpaceId(null)}
-                          onClick={() => space.coordinates?.lat && setActiveSpaceId(space._id)}
+                          onClick={() => sLat && setActiveSpaceId(space._id)}
                           className={`bg-white border rounded-2xl overflow-hidden shadow-sm cursor-pointer transition-all duration-200 ${
                             isActive
                               ? 'border-emerald-400 shadow-emerald-100 shadow-md ring-2 ring-emerald-200'
@@ -1712,13 +1809,13 @@ const SeekerDashboard = () => {
                             <div className="relative shrink-0 w-32 sm:w-36">
                               <img src={spotImg} alt={space.title || 'Parking Spot'} className="h-full w-full object-cover min-h-[110px]" />
                               {freeSlots > 0 && (
-                                <span className="absolute top-2 left-2 bg-emerald-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded-md">
+                                <span className="absolute top-2 left-2 bg-emerald-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded-md shadow">
                                   AVAILABLE
                                 </span>
                               )}
                               <button
                                 onClick={e => { e.stopPropagation(); handleToggleFavorite(space._id); }}
-                                className="absolute top-2 right-2 h-7 w-7 bg-white/90 backdrop-blur rounded-full flex items-center justify-center shadow text-rose-500 hover:scale-110 transition-transform"
+                                className="absolute top-2 right-2 h-7 w-7 bg-white/90 backdrop-blur rounded-full flex items-center justify-center shadow text-rose-500 hover:scale-110 transition-transform cursor-pointer"
                               >
                                 <Heart className={`h-3.5 w-3.5 ${isFav ? 'fill-rose-500' : ''}`} />
                               </button>
@@ -1733,36 +1830,47 @@ const SeekerDashboard = () => {
                                   <span className="truncate">{space.address || space.location}</span>
                                 </p>
                                 <div className="flex items-center gap-2 flex-wrap mt-1">
-                                  <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${freeSlots > 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-600'}`}>
+                                  <span className={`text-[9px] font-black px-2 py-0.5 rounded-md ${freeSlots > 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-600'}`}>
                                     {freeSlots > 0 ? `${freeSlots} Free` : 'Full'}
                                   </span>
-                                  <span className="text-[9px] font-bold bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded-full">
-                                    {space.totalSlots} total
+                                  <span className="text-[9px] font-extrabold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md">
+                                    {space.distBadge || 'Nearby'}
                                   </span>
-                                  {space.coordinates?.lat && (
-                                    <span className="text-[9px] font-bold bg-blue-50 text-blue-500 px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
-                                      <MapPin className="h-2.5 w-2.5" />GPS
-                                    </span>
-                                  )}
-                                  {space.suitableVehicles && space.suitableVehicles.length > 0 && (
-                                    <span className="text-[9px] font-bold bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded-full">
-                                      Fits: {space.suitableVehicles.map(getShortVehicleTypeLabel).join(', ')}
-                                    </span>
+                                  {sLat && (
+                                    <a
+                                      href={`https://www.google.com/maps/dir/?api=1&destination=${sLat},${sLng}`}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      onClick={e => e.stopPropagation()}
+                                      className="text-[9px] font-black bg-blue-50 hover:bg-blue-100 text-blue-600 px-2 py-0.5 rounded-md flex items-center gap-0.5 cursor-pointer"
+                                      title="Open GPS Navigation"
+                                    >
+                                      🧭 Directions
+                                    </a>
                                   )}
                                 </div>
                               </div>
 
                               <div className="flex items-center justify-between mt-3">
                                 <div>
-                                  <span className="text-base font-black text-emerald-600">₹{space.pricePerHour}</span>
+                                  <span className="text-base font-black text-emerald-600">₹{space.pricePerHour || 50}</span>
                                   <span className="text-xs text-slate-400 font-semibold">/hr</span>
                                 </div>
                                 <button
-                                  onClick={e => { e.stopPropagation(); setSelectedSpace(space); const now = new Date().toISOString().slice(0,16); setForm(p => ({ ...p, seekerName: user?.name||'', seekerContact: user?.contact||'', startTime: now })); }}
+                                  onClick={e => {
+                                    e.stopPropagation();
+                                    setSelectedSpace(space);
+                                    const now = new Date().toISOString().slice(0,16);
+                                    setForm(p => ({ ...p, seekerName: user?.name||'', seekerContact: user?.contact||'', startTime: now, bookingType: 'hourly', hours: '1' }));
+                                  }}
                                   disabled={freeSlots === 0}
-                                  className={`px-4 py-1.5 rounded-xl font-bold text-xs transition-colors ${freeSlots > 0 ? 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-sm' : 'bg-slate-100 text-slate-400 cursor-not-allowed'}`}
+                                  className={`px-4 py-2 rounded-xl font-black text-xs transition-all cursor-pointer ${
+                                    freeSlots > 0
+                                      ? 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-xs'
+                                      : 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                                  }`}
                                 >
-                                  {freeSlots > 0 ? 'Book Now' : 'Full'}
+                                  {freeSlots > 0 ? 'Book Now →' : 'Full'}
                                 </button>
                               </div>
                             </div>
@@ -1775,25 +1883,10 @@ const SeekerDashboard = () => {
                   {/* RIGHT — sticky map */}
                   <div className="flex-1 rounded-2xl overflow-hidden border border-slate-200 shadow-sm relative" style={{ minHeight: '400px' }}>
                     <div className="sticky top-4 h-full" style={{ minHeight: '560px' }}>
-                      {routeDetails && activeSpaceId && (
-                        <div className="absolute top-4 left-4 right-4 z-20 bg-slate-900/95 backdrop-blur text-white rounded-2xl p-4 shadow-xl border border-slate-800 flex items-center gap-3">
-                          <div className="h-9 w-9 bg-emerald-500 rounded-xl flex items-center justify-center shrink-0 shadow-md">
-                            <Navigation className="h-4 w-4 text-white transform rotate-45 animate-pulse" />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="font-extrabold text-[13px] text-white truncate">{routeDetails.instruction || 'Proceed to destination'}</p>
-                            <div className="flex items-center gap-2 mt-1 text-[11px] text-emerald-400 font-extrabold">
-                              <span>⏱️ {Math.round(routeDetails.duration / 60)} mins</span>
-                              <span>·</span>
-                              <span>🚗 {(routeDetails.distance / 1000).toFixed(1)} km</span>
-                            </div>
-                          </div>
-                        </div>
-                      )}
                       <SpacesMap
-                        spaces={spaces}
-                        userLat={userLat}
-                        userLng={userLng}
+                        spaces={displaySpaces}
+                        userLat={userLat || 17.313}
+                        userLng={userLng || 78.545}
                         activeSpaceId={activeSpaceId}
                         height="100%"
                         onBook={(space) => {
@@ -1801,12 +1894,9 @@ const SeekerDashboard = () => {
                           const now = new Date().toISOString().slice(0,16);
                           setForm(p => ({ ...p, seekerName: user?.name||'', seekerContact: user?.contact||'', startTime: now, bookingType: 'hourly', hours: '1' }));
                         }}
-                        onMarkerHover={(sid) => setActiveSpaceId(sid)}
-                        onRouteUpdate={setRouteDetails}
                       />
                     </div>
                   </div>
-
                 </div>
               </div>
             )}
