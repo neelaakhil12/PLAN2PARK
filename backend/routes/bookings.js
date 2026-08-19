@@ -748,6 +748,34 @@ router.get('/:id/available-slots', protect, async (req, res) => {
   }
 });
 
+// @desc    Check out of parking spot (Seeker or Owner)
+// @route   POST /api/bookings/:id/checkout
+// @access  Private
+router.post('/:id/checkout', protect, async (req, res) => {
+  try {
+    const booking = await Booking.findById(req.params.id);
+    if (!booking) return res.status(404).json({ message: 'Booking not found' });
+
+    booking.status = 'completed';
+    booking.checkedOutAt = new Date();
+    await booking.save();
+
+    // Release slot
+    const space = await ParkingSpace.findById(booking.spaceId);
+    if (space && booking.slotId) {
+      const slot = space.slots?.find((s) => s.slotId === booking.slotId);
+      if (slot) {
+        slot.isAvailable = true;
+        await space.save();
+      }
+    }
+
+    res.json({ message: 'Checked out successfully! Spot has been released.', booking });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
 // @desc    Extend a booking duration (Seeker)
 // @route   POST /api/bookings/:id/extend
 // @access  Private (Seeker only)
