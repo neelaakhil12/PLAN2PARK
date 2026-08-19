@@ -160,7 +160,7 @@ export default function SpotDetailsScreen({ route, navigation }) {
           },
         });
 
-        let orderData = { orderId: 'order_' + Math.random().toString(36).substring(2, 9), amount: finalPayablePrice * 100, keyId: 'rzp_test_TMLHMiwE70n6U3' };
+        let orderData = { orderId: 'order_' + Math.random().toString(36).substring(2, 9), amount: finalPayablePrice * 100, keyId: 'rzp_test_TRbpfgVeLqTOdb' };
         if (orderRes.ok) {
           orderData = await orderRes.json();
         }
