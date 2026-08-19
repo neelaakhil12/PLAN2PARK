@@ -85,6 +85,7 @@ const SeekerDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [payLoading, setPayLoading] = useState(false);
   const [walletBalance, setWalletBalance] = useState(150);
+  const [walletTransactions, setWalletTransactions] = useState([]);
   const [useWallet, setUseWallet] = useState(true);
   const [showEditProfileModal, setShowEditProfileModal] = useState(false);
   const [showAddVehicleForm, setShowAddVehicleForm] = useState(false);
@@ -166,6 +167,9 @@ const SeekerDashboard = () => {
         setFavorites(uData.favorites || []);
         if (uData.walletBalance !== undefined) {
           setWalletBalance(uData.walletBalance);
+        }
+        if (uData.walletTransactions && uData.walletTransactions.length > 0) {
+          setWalletTransactions(uData.walletTransactions);
         }
       }
     } catch (e) { console.error(e); }
@@ -2365,19 +2369,50 @@ const SeekerDashboard = () => {
             {/* Wallet Activity History */}
             <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
               <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-                <h3 className="font-bold text-slate-800">Wallet Transactions</h3>
-                <span className="text-xs font-bold text-emerald-600">Active</span>
+                <div>
+                  <h3 className="font-bold text-slate-800">Wallet Transactions &amp; Refunds</h3>
+                  <p className="text-xs text-slate-400">Complete record of deductions, instant discounts, and cancellation credits.</p>
+                </div>
+                <span className="text-xs font-bold bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-full border border-emerald-200">
+                  {walletTransactions.length > 0 ? walletTransactions.length + 1 : 1} Records
+                </span>
               </div>
-              <div className="p-6">
-                <div className="flex items-start gap-3 p-3.5 bg-slate-50 border border-slate-100 rounded-xl">
-                  <div className="h-8 w-8 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-sm shrink-0">
+              <div className="p-6 space-y-3">
+                {/* Dynamically Render All Wallet Transactions */}
+                {walletTransactions.map((tx, idx) => {
+                  const isCredit = tx.type === 'credit';
+                  return (
+                    <div key={tx._id || idx} className="flex items-start gap-3.5 p-3.5 bg-slate-50 border border-slate-100 rounded-2xl hover:bg-slate-100/70 transition-colors">
+                      <div className={`h-9 w-9 rounded-full flex items-center justify-center font-black text-sm shrink-0 shadow-xs ${
+                        isCredit ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' : 'bg-rose-100 text-rose-700 border border-rose-200'
+                      }`}>
+                        {isCredit ? '+' : '−'}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-black text-slate-900 leading-snug">{tx.description || (isCredit ? 'Wallet Credit / Refund' : 'Parking Wallet Deduction')}</p>
+                        <p className="text-[10px] text-slate-400 font-medium mt-0.5">
+                          {tx.date ? new Date(tx.date).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : 'Recent transaction'}
+                        </p>
+                      </div>
+                      <span className={`font-mono font-black text-sm shrink-0 ${
+                        isCredit ? 'text-emerald-600' : 'text-rose-600'
+                      }`}>
+                        {isCredit ? `+₹${Number(tx.amount).toFixed(2)}` : `−₹${Number(tx.amount).toFixed(2)}`}
+                      </span>
+                    </div>
+                  );
+                })}
+
+                {/* Base Welcome Signup Credit */}
+                <div className="flex items-start gap-3.5 p-3.5 bg-emerald-50/40 border border-emerald-100 rounded-2xl">
+                  <div className="h-9 w-9 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-black text-sm shrink-0 border border-emerald-200 shadow-xs">
                     +
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs font-extrabold text-slate-800">Welcome Signup Credit</p>
-                    <p className="text-[10px] text-slate-400 mt-0.5">Automated registration welcome bonus</p>
+                    <p className="text-xs font-black text-slate-900">Welcome Registration Signup Credit</p>
+                    <p className="text-[10px] text-emerald-600 font-medium mt-0.5">Automated registration welcome bonus</p>
                   </div>
-                  <span className="font-mono font-black text-emerald-600 text-sm">+₹150.00</span>
+                  <span className="font-mono font-black text-emerald-600 text-sm shrink-0">+₹150.00</span>
                 </div>
               </div>
             </div>
