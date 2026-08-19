@@ -273,11 +273,10 @@ const enrichSpaceWithSlotAvailability = async (spaces) => {
   const now = new Date();
   const spaceIds = spaces.map((s) => s._id);
 
-  // Find all confirmed paid active bookings where end time is in future
+  // Find all active bookings (allotted or paid) where end time is in the future
   const activeBookings = await Booking.find({
     spaceId: { $in: spaceIds },
-    status: 'paid',
-    paymentStatus: 'paid',
+    status: { $in: ['allotted', 'paid', 'pending_approval'] },
     endTime: { $gt: now },
   });
 
@@ -303,6 +302,14 @@ const enrichSpaceWithSlotAvailability = async (spaces) => {
         ...slot,
         isAvailable: !bookedSet.has(slot.slotId),
       }));
+    } else {
+      spaceObj.slots = Array.from({ length: total }, (_, i) => {
+        const slotId = `Slot-${i + 1}`;
+        return {
+          slotId,
+          isAvailable: !bookedSet.has(slotId),
+        };
+      });
     }
 
     spaceObj.availableSlots = available;
@@ -317,37 +324,28 @@ router.get('/:id/available-slots-by-time', async (req, res) => {
     const space = await ParkingSpace.findById(req.params.id);
     if (!space) return res.status(404).json({ message: 'Space not found' });
 
-    const { startTime, hours } = req.query;
+    const totalSlots = space.totalSlots || (space.slots ? space.slots.length : 5);
     let slots = space.slots && space.slots.length > 0
-      ? space.slots.map(s => ({ slotId: s.slotId, isAvailable: s.isAvailable }))
-      : [
-          { slotId: 'Slot-1', isAvailable: true },
-          { slotId: 'Slot-2', isAvailable: true },
-          { slotId: 'Slot-3', isAvailable: true },
-          { slotId: 'Slot-4', isAvailable: true },
-          { slotId: 'Slot-5', isAvailable: true }
-        ];
+      ? space.slots.map(s => ({ slotId: s.slotId, isAvailable: true }))
+      : Array.from({ length: totalSlots }, (_, i) => ({ slotId: `Slot-${i + 1}`, isAvailable: true }));
 
-    if (startTime && hours) {
-      const start = new Date(startTime);
-      const end = new Date(start.getTime() + Number(hours) * 60 * 60 * 1000);
+    const { startTime, hours } = req.query;
+    const now = new Date();
+    const start = startTime ? new Date(startTime) : now;
+    const end = new Date(start.getTime() + (Number(hours) || 1) * 60 * 60 * 1000);
 
-      const activeBookings = await Booking.find({
-        spaceId: req.params.id,
-        status: { $in: ['pending_approval', 'allotted', 'paid'] },
-        $or: [
-          { startTime: { $lt: end, $gte: start } },
-          { endTime: { $gt: start, $lte: end } },
-          { startTime: { $lte: start }, endTime: { $gte: end } }
-        ]
-      });
+    const activeBookings = await Booking.find({
+      spaceId: req.params.id,
+      status: { $in: ['pending_approval', 'allotted', 'paid'] },
+      startTime: { $lt: end },
+      endTime: { $gt: start },
+    });
 
-      const bookedSlots = new Set(activeBookings.map(b => b.slotId).filter(Boolean));
-      slots = slots.map(s => ({
-        ...s,
-        isAvailable: !bookedSlots.has(s.slotId)
-      }));
-    }
+    const bookedSlots = new Set(activeBookings.map(b => b.slotId).filter(Boolean));
+    slots = slots.map(s => ({
+      ...s,
+      isAvailable: !bookedSlots.has(s.slotId)
+    }));
 
     res.json(slots);
   } catch (error) {

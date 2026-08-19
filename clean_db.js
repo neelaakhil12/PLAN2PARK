@@ -1,4 +1,4 @@
-const mongoose = require('mongoose');
+const mongoose = require('./backend/node_modules/mongoose');
 
 async function cleanup() {
   await mongoose.connect('mongodb://localhost:27017/plantopark');
