@@ -1,0 +1,398 @@
+{
+  "users": [
+    {
+      "_id": "6a743bc78b637b15ab6e63b5",
+      "name": "System Admin",
+      "email": "plantopark@gmail.com",
+      "password": "$2a$10$I..kAq23kqsLCrgI4Ix8JuI.TnrbKiOAACn.bbYOXKzWBdsxV9W7a",
+      "role": "admin",
+      "status": "verified",
+      "profileImage": "",
+      "driverLicenseNumber": "",
+      "driverLicenseImage": "",
+      "bankAccountDetails": {
+        "accountName": "",
+        "accountNumber": "",
+        "ifscCode": "",
+        "bankName": ""
+      },
+      "contact": "8919360467",
+      "favorites": [],
+      "ownerPaidRevenue": 0,
+      "vehicles": [],
+      "createdAt": "2026-08-06T07:46:15.096Z",
+      "updatedAt": "2026-08-07T08:20:08.963Z",
+      "__v": 0,
+      "resetPasswordExpire": "2026-08-07T08:35:08.961Z",
+      "resetPasswordOtp": "911029",
+      "resetPasswordToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjZhNzQzYmM3OGI2MzdiMTVhYjZlNjNiNSIsImVtYWlsIjoicGxhbnRvcGFya0BnbWFpbC5jb20iLCJpYXQiOjE3ODYwOTA4MDgsImV4cCI6MTc4NjA5MTcwOH0.ScqqbaTn9HISm7iucTTAayZkOIcFLbgtjKYTVtgLGPg"
+    },
+    {
+      "_id": "6a759e7f0e39fbd7ec17818e",
+      "name": "harish",
+      "email": "harishneela71@gmail.com",
+      "password": "$2a$10$/UtAvWDehsIkQPAqB7.gW.2AIhLdTCQKW5LtJB.lgZPHmTOlD1nsa",
+      "role": "owner",
+      "status": "verified",
+      "profileImage": "/uploads/user-1786729627012-678123196.png",
+      "driverLicenseNumber": "",
+      "driverLicenseImage": "",
+      "bankAccountDetails": {
+        "accountName": "",
+        "accountNumber": "",
+        "ifscCode": "",
+        "bankName": ""
+      },
+      "contact": "8074194666",
+      "favorites": [],
+      "ownerPaidRevenue": 0,
+      "resetPasswordOtp": null,
+      "resetPasswordToken": null,
+      "resetPasswordExpire": null,
+      "vehicles": [],
+      "createdAt": "2026-08-07T08:59:43.269Z",
+      "updatedAt": "2026-08-14T17:47:07.014Z",
+      "__v": 1,
+      "walletBalance": 0,
+      "walletTransactions": []
+    },
+    {
+      "_id": "6a75a0240e39fbd7ec178198",
+      "name": "akhil",
+      "email": "neelaakhilharish@gmail.com",
+      "password": "$2a$10$WY21hCAH3C2DvWoMpc2JB.xxExoai4NDpfXB.c6Q5zX3FxPlgfXZe",
+      "role": "seeker",
+      "status": "verified",
+      "profileImage": "/uploads/user-1786729248490-874369502.png",
+      "driverLicenseNumber": "",
+      "driverLicenseImage": "",
+      "bankAccountDetails": {
+        "accountName": "",
+        "accountNumber": "",
+        "ifscCode": "",
+        "bankName": ""
+      },
+      "contact": "9989551305",
+      "favorites": [],
+      "ownerPaidRevenue": 0,
+      "resetPasswordOtp": null,
+      "resetPasswordToken": null,
+      "resetPasswordExpire": null,
+      "vehicles": [
+        {
+          "plateNumber": "TS07WJ2099",
+          "vehicleType": "Car",
+          "_id": "6a7f5264bb0ab0aa18f37edc"
+        }
+      ],
+      "createdAt": "2026-08-07T09:06:44.814Z",
+      "updatedAt": "2026-08-14T17:40:48.501Z",
+      "__v": 5,
+      "walletBalance": 40,
+      "walletTransactions": [
+        {
+          "type": "credit",
+          "amount": 0.5,
+          "description": "Refund (50% Half Refund) for cancelled booking at parking gym",
+          "date": "2026-08-14T16:07:04.239Z",
+          "bookingId": "6a7f379476206cd68b69937b",
+          "_id": "6a7f3d284e43a436ea3a2462"
+        },
+        {
+          "type": "debit",
+          "amount": 0.5,
+          "description": "Wallet discount applied for booking at parking gym",
+          "date": "2026-08-14T16:32:00.603Z",
+          "_id": "6a7f43001ce13251b07fd622"
+        },
+        {
+          "type": "credit",
+          "amount": 50,
+          "description": "Refund (50% Half Refund) for cancelled booking at kittu gym parking ",
+          "date": "2026-08-14T16:34:53.800Z",
+          "bookingId": "6a7f438a1ce13251b07fd72f",
+          "_id": "6a7f43ad1ce13251b07fd757"
+        },
+        {
+          "type": "debit",
+          "amount": 10,
+          "description": "Wallet discount applied for booking at kittu gym parking ",
+          "date": "2026-08-14T16:35:16.040Z",
+          "_id": "6a7f43c41ce13251b07fd7a7"
+        }
+      ],
+      "passwordChangedAt": "2026-08-14T17:10:41.754Z",
+      "previousPassword": "$2a$10$uGlp2ixDf/4RoT09b1KGiulSmi8ha9YJREoeTOGuWhBP0XBUP5cmO"
+    },
+    {
+      "_id": "6a75bc20879a8b6692022409",
+      "name": "Akhil Owner",
+      "email": "neelaakhilharishowner@gmail.com",
+      "password": "$2a$10$0VMA7vb4cO7SxohN.6UmqOzdvmZsTg2JXbUk40gZyamTxxblTxhqS",
+      "role": "owner",
+      "status": "verified",
+      "profileImage": "",
+      "driverLicenseNumber": "",
+      "driverLicenseImage": "",
+      "bankAccountDetails": {
+        "accountName": "",
+        "accountNumber": "",
+        "ifscCode": "",
+        "bankName": ""
+      },
+      "contact": "9876543210",
+      "favorites": [],
+      "ownerPaidRevenue": 0,
+      "resetPasswordOtp": null,
+      "resetPasswordToken": null,
+      "resetPasswordExpire": null,
+      "vehicles": [],
+      "createdAt": "2026-08-07T11:06:08.619Z",
+      "updatedAt": "2026-08-07T11:06:08.619Z",
+      "__v": 0
+    }
+  ],
+  "parkingspaces": [
+    {
+      "_id": "6a75fdca879a8b66920224a3",
+      "ownerId": "6a759e7f0e39fbd7ec17818e",
+      "title": "parking gym",
+      "address": "Chaitanya Hills, Almasguda, Hyderabad, Telangana, India",
+      "location": "Chaitanya Hills, Almasguda, Hyderabad, Telangana, India",
+      "city": "Almasguda",
+      "googleMapsLink": "https://maps.google.com/?q=17.312828377082624,78.5450576848011",
+      "hasEvCharger": true,
+      "coordinates": {
+        "lat": 17.312908947584624,
+        "lng": 78.54538693099457
+      },
+      "totalSlots": 5,
+      "pricePerHour": 1,
+      "pricePerDay": 400,
+      "pricePerWeek": 8400,
+      "pricePerMonth": 36000,
+      "image": "https://images.unsplash.com/photo-1506015391300-4802dc74de2e?w=1200&q=80",
+      "status": "approved",
+      "suitableVehicles": [
+        "4-wheeler"
+      ],
+      "slots": [
+        {
+          "slotId": "Slot-1",
+          "name": "Slot #1",
+          "isAvailable": true,
+          "_id": "6a75fdca879a8b66920224a4"
+        },
+        {
+          "slotId": "Slot-2",
+          "name": "Slot #2",
+          "isAvailable": true,
+          "_id": "6a75fdca879a8b66920224a5"
+        },
+        {
+          "slotId": "Slot-3",
+          "name": "Slot #3",
+          "isAvailable": true,
+          "_id": "6a75fdca879a8b66920224a6"
+        },
+        {
+          "slotId": "Slot-4",
+          "name": "Slot #4",
+          "isAvailable": true,
+          "_id": "6a75fdca879a8b66920224a7"
+        },
+        {
+          "slotId": "Slot-5",
+          "name": "Slot #5",
+          "isAvailable": true,
+          "_id": "6a75fdca879a8b66920224a8"
+        }
+      ],
+      "createdAt": "2026-08-07T15:46:18.919Z",
+      "updatedAt": "2026-08-14T16:17:36.137Z",
+      "__v": 0,
+      "isActive": true,
+      "cancellationPolicy": "half",
+      "maxWalletDiscount": 10
+    },
+    {
+      "_id": "6a7f2cba9572758b04726035",
+      "ownerId": "6a759e7f0e39fbd7ec17818e",
+      "title": "kittu gym parking ",
+      "address": "5M65+J7Q, Telangana 501506, India",
+      "location": "5M65+J7Q, Telangana 501506, India",
+      "city": "Hyderabad",
+      "googleMapsLink": "https://maps.google.com/?q=17.161922454833984,78.6580581665039",
+      "hasEvCharger": true,
+      "coordinates": {
+        "lat": 17.161922454833984,
+        "lng": 78.6580581665039
+      },
+      "totalSlots": 5,
+      "pricePerHour": 50,
+      "pricePerDay": 400,
+      "pricePerWeek": 8400,
+      "pricePerMonth": 36000,
+      "image": "https://images.unsplash.com/photo-1506015391300-4802dc74de2e?w=1200&q=80",
+      "status": "approved",
+      "isActive": true,
+      "suitableVehicles": [
+        "4-wheeler"
+      ],
+      "slots": [
+        {
+          "slotId": "Slot-1",
+          "name": "Slot #1",
+          "isAvailable": true,
+          "_id": "6a7f2cba9572758b04726036"
+        },
+        {
+          "slotId": "Slot-2",
+          "name": "Slot #2",
+          "isAvailable": true,
+          "_id": "6a7f2cba9572758b04726037"
+        },
+        {
+          "slotId": "Slot-3",
+          "name": "Slot #3",
+          "isAvailable": true,
+          "_id": "6a7f2cba9572758b04726038"
+        },
+        {
+          "slotId": "Slot-4",
+          "name": "Slot #4",
+          "isAvailable": true,
+          "_id": "6a7f2cba9572758b04726039"
+        },
+        {
+          "slotId": "Slot-5",
+          "name": "Slot #5",
+          "isAvailable": true,
+          "_id": "6a7f2cba9572758b0472603a"
+        }
+      ],
+      "createdAt": "2026-08-14T14:56:58.199Z",
+      "updatedAt": "2026-08-14T17:11:44.421Z",
+      "__v": 0,
+      "cancellationPolicy": "half",
+      "maxWalletDiscount": 20
+    }
+  ],
+  "bookings": [
+    {
+      "_id": "6a7f379476206cd68b69937b",
+      "seekerId": "6a75a0240e39fbd7ec178198",
+      "spaceId": "6a75fdca879a8b66920224a3",
+      "bookingType": "hourly",
+      "slotId": "Slot-1",
+      "vehicleNumber": "TS07AB1234",
+      "seekerName": "akhil",
+      "driverImage": "",
+      "seekerContact": "9989551305",
+      "hours": 1,
+      "startTime": "2026-08-14T15:43:16.059Z",
+      "endTime": "2026-08-14T16:43:16.059Z",
+      "totalAmount": 1,
+      "adminCommission": 0.1,
+      "ownerEarnings": 0.4,
+      "status": "cancelled",
+      "paymentStatus": "paid",
+      "invoiceId": null,
+      "paidAt": null,
+      "createdAt": "2026-08-14T15:43:16.101Z",
+      "updatedAt": "2026-08-14T16:07:04.248Z",
+      "__v": 0,
+      "transactionReference": "pay_TPhfXrkDf5WDJe",
+      "refundAmount": 0.5,
+      "refundPolicyApplied": "half",
+      "refundStatus": "half"
+    },
+    {
+      "_id": "6a7f43441ce13251b07fd667",
+      "seekerId": "6a75a0240e39fbd7ec178198",
+      "spaceId": "6a7f2cba9572758b04726035",
+      "bookingType": "hourly",
+      "slotId": "Slot-1",
+      "vehicleNumber": "TS07WJ2099",
+      "seekerName": "akhil",
+      "driverImage": "",
+      "seekerContact": "9989551305",
+      "hours": 2,
+      "startTime": "2026-08-14T16:33:08.042Z",
+      "endTime": "2026-08-14T18:33:08.042Z",
+      "totalAmount": 100,
+      "walletAmountUsed": 0,
+      "adminCommission": 0,
+      "ownerEarnings": 0,
+      "status": "allotted",
+      "paymentStatus": "unpaid",
+      "invoiceId": null,
+      "paidAt": null,
+      "refundAmount": 0,
+      "refundStatus": "none",
+      "refundPolicyApplied": "full",
+      "createdAt": "2026-08-14T16:33:08.052Z",
+      "updatedAt": "2026-08-14T16:33:08.052Z",
+      "__v": 0
+    },
+    {
+      "_id": "6a7f438a1ce13251b07fd72f",
+      "seekerId": "6a75a0240e39fbd7ec178198",
+      "spaceId": "6a7f2cba9572758b04726035",
+      "bookingType": "hourly",
+      "slotId": "Slot-2",
+      "vehicleNumber": "TS07WJ2099",
+      "seekerName": "akhil",
+      "driverImage": "",
+      "seekerContact": "9989551305",
+      "hours": 2,
+      "startTime": "2026-08-14T16:34:18.620Z",
+      "endTime": "2026-08-14T18:34:18.620Z",
+      "totalAmount": 100,
+      "walletAmountUsed": 0,
+      "adminCommission": 10,
+      "ownerEarnings": 45,
+      "status": "cancelled",
+      "paymentStatus": "paid",
+      "invoiceId": null,
+      "paidAt": null,
+      "refundAmount": 50,
+      "refundStatus": "half",
+      "refundPolicyApplied": "half",
+      "createdAt": "2026-08-14T16:34:18.629Z",
+      "updatedAt": "2026-08-14T16:34:53.803Z",
+      "__v": 0,
+      "transactionReference": "pay_TPiXXh2GyKKbqY"
+    },
+    {
+      "_id": "6a7f43c41ce13251b07fd7a9",
+      "seekerId": "6a75a0240e39fbd7ec178198",
+      "spaceId": "6a7f2cba9572758b04726035",
+      "bookingType": "hourly",
+      "slotId": "Slot-2",
+      "vehicleNumber": "TS07AB1234",
+      "seekerName": "akhil",
+      "driverImage": "",
+      "seekerContact": "9989551305",
+      "hours": 2,
+      "startTime": "2026-08-14T16:35:16.032Z",
+      "endTime": "2026-08-14T18:35:16.032Z",
+      "totalAmount": 90,
+      "walletAmountUsed": 10,
+      "adminCommission": 0,
+      "ownerEarnings": 0,
+      "status": "allotted",
+      "paymentStatus": "unpaid",
+      "invoiceId": null,
+      "paidAt": null,
+      "refundAmount": 0,
+      "refundStatus": "none",
+      "refundPolicyApplied": "full",
+      "createdAt": "2026-08-14T16:35:16.044Z",
+      "updatedAt": "2026-08-14T16:35:16.044Z",
+      "__v": 0
+    }
+  ],
+  "reviews": [],
+  "complaints": []
+}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useContext, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -10,14 +10,17 @@ import {
   RefreshControl,
   Platform,
   StatusBar,
+  ScrollView,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AuthContext } from '../../context/AuthContext';
-import { getBaseApiUrl } from '../../config/api';
+import { getBaseApiUrl, endpoints, COMMON_HEADERS } from '../../config/api';
 import { COLORS } from '../../theme/colors';
 import PinLocationModal from '../../components/PinLocationModal';
 import ProfileEditorModal from '../../components/ProfileEditorModal';
+import DynamicParkingMap, { getSpotDemand } from '../../components/DynamicParkingMap';
 
 // Geocoding distance calculation helper (Haversine Formula)
 function calculateDistanceKm(lat1, lon1, lat2, lon2) {
@@ -36,16 +39,29 @@ function calculateDistanceKm(lat1, lon1, lat2, lon2) {
   return dist < 0.1 ? 0.1 : Math.round(dist * 10) / 10;
 }
 
+const RADIUS_OPTIONS = [
+  { label: 'All', value: null, icon: '🌐' },
+  { label: '1 km', value: 1, icon: '🎯' },
+  { label: '5 km', value: 5, icon: '🎯' },
+  { label: '10 km', value: 10, icon: '🎯' },
+  { label: '15 km', value: 15, icon: '🎯' },
+  { label: '20 km', value: 20, icon: '🎯' },
+];
+
 export default function SeekerHomeScreen({ navigation }) {
-  const { user, updateProfile, logout } = useContext(AuthContext);
+  const { user, token, updateProfile, logout } = useContext(AuthContext);
   const insets = useSafeAreaInsets();
   const topPadding = Math.max(insets.top, Platform.OS === 'android' ? (StatusBar.currentHeight || 24) : 0);
 
   const [spaces, setSpaces] = useState([]);
+  const [unreadNotifs, setUnreadNotifs] = useState(0);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterEv, setFilterEv] = useState(false);
+  const [selectedRadius, setSelectedRadius] = useState(null); // null (All), 1, 5, 10, 15, 20 km
+  const [viewMode, setViewMode] = useState('map'); // 'map' or 'list'
+  const [selectedMapSpot, setSelectedMapSpot] = useState(null);
 
   // Location pinning state (prompts upon login/open)
   const [pinnedLocation, setPinnedLocation] = useState('Almasguda (17.313, 78.545)');
@@ -54,10 +70,41 @@ export default function SeekerHomeScreen({ navigation }) {
   // Profile completion state (ONLY for newly registered users)
   const [showProfileModal, setShowProfileModal] = useState(false);
 
+  // Parse coordinates from pinnedLocation (e.g. "Almasguda (17.313, 78.545)")
+  const userCoords = useMemo(() => {
+    const match = pinnedLocation.match(/\(([0-9.]+),\s*([0-9.]+)\)/);
+    if (match) {
+      return { lat: parseFloat(match[1]), lng: parseFloat(match[2]) };
+    }
+    return { lat: 17.313, lng: 78.545 };
+  }, [pinnedLocation]);
+
+  const fetchUnreadNotifications = async () => {
+    if (!token) return;
+    try {
+      const res = await fetch(endpoints.getNotifications, {
+        headers: { ...COMMON_HEADERS, Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setUnreadNotifs(data.unreadCount || 0);
+      }
+    } catch (e) {
+      // ignore
+    }
+  };
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchUnreadNotifications();
+    }, [token])
+  );
+
   useEffect(() => {
     fetchSpaces();
     checkProfileCompletion();
-  }, [user]);
+    fetchUnreadNotifications();
+  }, [user, token]);
 
   const checkProfileCompletion = async () => {
     if (!user?._id) return;
@@ -146,8 +193,8 @@ export default function SeekerHomeScreen({ navigation }) {
 
   // Process spaces with Geocoding distance calculation & proximity sorting
   const processedSpaces = spaces.map((space) => {
-    const sLat = space.coordinates?.lat || space.lat;
-    const sLng = space.coordinates?.lng || space.lng;
+    const sLat = space.coordinates?.lat || space.lat || (space.location?.coordinates && space.location.coordinates[1]);
+    const sLng = space.coordinates?.lng || space.lng || (space.location?.coordinates && space.location.coordinates[0]);
     const dist = calculateDistanceKm(seekerCoords.lat, seekerCoords.lng, sLat, sLng);
     return {
       ...space,
@@ -157,10 +204,18 @@ export default function SeekerHomeScreen({ navigation }) {
   });
 
   // Sort by nearest distance first
-  const sortedSpaces = processedSpaces.sort((a, b) => a.calculatedDist - b.calculatedDist);
+  const sortedSpaces = [...processedSpaces].sort((a, b) => (a.calculatedDist || 999) - (b.calculatedDist || 999));
 
-  // Apply search & EV filters
+  // Apply search, EV, Active status & Distance Radius filters
   const displaySpaces = sortedSpaces.filter((item) => {
+    // Hide offline spaces from seeker list
+    if (item.isActive === false) return false;
+
+    // Distance Radius Filter
+    if (selectedRadius !== null && item.calculatedDist !== null && item.calculatedDist > selectedRadius) {
+      return false;
+    }
+
     const queryLower = searchQuery.toLowerCase();
     const matchesSearch =
       !searchQuery ||
@@ -174,13 +229,16 @@ export default function SeekerHomeScreen({ navigation }) {
   });
 
   const renderSpotCard = ({ item }) => {
-    const availableSlotsCount = item.slots
-      ? item.slots.filter((s) => s.isAvailable !== false).length
-      : item.availableSpots || item.totalSlots || 5;
+    const totalSlots = item.totalSlots || (item.slots ? item.slots.length : 5);
+    const availableSlots = item.availableSlots !== undefined
+      ? item.availableSlots
+      : (item.slots ? item.slots.filter((s) => s.isAvailable !== false).length : totalSlots);
+    const isFull = availableSlots <= 0;
+    const demand = getSpotDemand({ ...item, totalSlots, availableSlots });
 
     return (
       <TouchableOpacity
-        style={styles.spotCard}
+        style={[styles.spotCard, isFull && { opacity: 0.85 }]}
         onPress={() => navigation.navigate('SpotDetails', { space: item })}
         activeOpacity={0.88}
       >
@@ -195,26 +253,37 @@ export default function SeekerHomeScreen({ navigation }) {
         <Text style={styles.spotTitle}>{item.title || item.location || 'Owner Parking Space'}</Text>
         <Text style={styles.spotAddress}>📍 {item.address || item.location || ''}</Text>
 
+        {/* Distance + Vehicle + Live Demand Badges Row */}
         <View style={styles.distanceRow}>
           <View style={styles.distChip}>
             <Text style={styles.distIcon}>🎯</Text>
             <Text style={styles.distTxt}>{item.distBadge}</Text>
           </View>
           <Text style={styles.vehiclePill}>🚗 {item.suitableVehicles ? item.suitableVehicles.join(', ') : '4-wheeler'}</Text>
+          <View style={[styles.cardDemandBadge, { backgroundColor: demand.bg, borderColor: demand.color }]}>
+            <Text style={[styles.cardDemandTxt, { color: demand.color }]}>
+              {demand.badge}
+            </Text>
+          </View>
         </View>
+
+        <Text style={styles.cardTagline}>Helps users decide before traveling.</Text>
 
         <View style={styles.divider} />
 
         <View style={styles.cardFooter}>
           <View style={styles.metaCol}>
-            <Text style={styles.metaLabel}>Available Slots</Text>
-            <Text style={styles.metaVal}>{availableSlotsCount} / {item.totalSlots || 5} Available</Text>
+            <Text style={styles.metaLabel}>Real-Time Capacity</Text>
+            <Text style={[styles.metaVal, { color: demand.color, fontWeight: '800' }]} numberOfLines={1}>
+              {isFull ? '🔴 FULL (0 Left)' : `🟢 ${availableSlots} of ${totalSlots} Slots Free`}
+            </Text>
           </View>
           <TouchableOpacity
-            style={styles.bookBtn}
+            style={[styles.bookBtn, isFull && { backgroundColor: '#334155' }]}
             onPress={() => navigation.navigate('SpotDetails', { space: item })}
+            activeOpacity={0.85}
           >
-            <Text style={styles.bookBtnTxt}>Book Spot →</Text>
+            <Text style={styles.bookBtnTxt}>{isFull ? 'View Info' : 'Book Spot →'}</Text>
           </TouchableOpacity>
         </View>
       </TouchableOpacity>
@@ -229,9 +298,24 @@ export default function SeekerHomeScreen({ navigation }) {
           <Text style={styles.welcomeText}>Hello, {user?.name || 'Seeker'} 👋</Text>
           <Text style={styles.headerSub}>Find secure owner parking nearby</Text>
         </View>
-        <TouchableOpacity onPress={logout} style={styles.logoutBtn}>
-          <Text style={styles.logoutTxt}>Logout</Text>
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          <TouchableOpacity
+            onPress={() => navigation.navigate('Notifications')}
+            style={styles.notifBellBtn}
+            activeOpacity={0.75}
+          >
+            <Text style={{ fontSize: 20 }}>🔔</Text>
+            {unreadNotifs > 0 && (
+              <View style={styles.notifBadge}>
+                <Text style={styles.notifBadgeTxt}>{unreadNotifs > 9 ? '9+' : unreadNotifs}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity onPress={logout} style={styles.logoutBtn}>
+            <Text style={styles.logoutTxt}>Logout</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Pinned Location Banner */}
@@ -250,7 +334,7 @@ export default function SeekerHomeScreen({ navigation }) {
         </View>
       </TouchableOpacity>
 
-      {/* Search Bar & Filters */}
+      {/* Search Bar & Distance Filter Options */}
       <View style={styles.searchSection}>
         <View style={styles.searchBar}>
           <Text style={styles.searchIcon}>🔍</Text>
@@ -262,23 +346,108 @@ export default function SeekerHomeScreen({ navigation }) {
             onChangeText={setSearchQuery}
           />
         </View>
-        <View style={styles.filterRow}>
+
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filterScroll}
+        >
+          {RADIUS_OPTIONS.map((opt) => {
+            const isSelected = selectedRadius === opt.value;
+            return (
+              <TouchableOpacity
+                key={opt.label}
+                style={[styles.filterPill, isSelected && styles.filterPillActive]}
+                onPress={() => setSelectedRadius(opt.value)}
+                activeOpacity={0.75}
+              >
+                <Text style={[styles.filterPillTxt, isSelected && styles.filterPillTxtActive]}>
+                  {opt.icon} {opt.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+
           <TouchableOpacity
             style={[styles.filterPill, filterEv && styles.filterPillActive]}
             onPress={() => setFilterEv(!filterEv)}
+            activeOpacity={0.75}
           >
             <Text style={[styles.filterPillTxt, filterEv && styles.filterPillTxtActive]}>
-              ⚡ EV Charging Only
+              ⚡ EV Only
             </Text>
           </TouchableOpacity>
-        </View>
+        </ScrollView>
       </View>
 
-      {/* Spot List */}
+      {/* Parking Demand Heat Map Info Banner */}
+      <View style={styles.heatMapBanner}>
+        <View style={styles.heatMapHeader}>
+          <Text style={styles.heatMapTitle}>🔥 Parking Demand Heat Map</Text>
+          <View style={styles.heatMapLegend}>
+            <View style={styles.legendPill}>
+              <View style={[styles.legendDot, { backgroundColor: '#10b981' }]} />
+              <Text style={styles.legendTxt}>Easy</Text>
+            </View>
+            <View style={styles.legendPill}>
+              <View style={[styles.legendDot, { backgroundColor: '#f59e0b' }]} />
+              <Text style={styles.legendTxt}>Moderate</Text>
+            </View>
+            <View style={styles.legendPill}>
+              <View style={[styles.legendDot, { backgroundColor: '#ef4444' }]} />
+              <Text style={styles.legendTxt}>Full</Text>
+            </View>
+          </View>
+        </View>
+        <Text style={styles.heatMapTagline}>Helps users decide before traveling.</Text>
+      </View>
+
+      {/* View Mode Toggle Switch (Map vs List) */}
+      <View style={styles.viewModeRow}>
+        <TouchableOpacity
+          style={[styles.viewModeBtn, viewMode === 'map' && styles.viewModeBtnActive]}
+          onPress={() => setViewMode('map')}
+          activeOpacity={0.8}
+        >
+          <Text style={[styles.viewModeTxt, viewMode === 'map' && styles.viewModeTxtActive]}>
+            🗺️ Live Map View ({displaySpaces.length})
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.viewModeBtn, viewMode === 'list' && styles.viewModeBtnActive]}
+          onPress={() => setViewMode('list')}
+          activeOpacity={0.8}
+        >
+          <Text style={[styles.viewModeTxt, viewMode === 'list' && styles.viewModeTxtActive]}>
+            📋 List View
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Main Content: Map or List */}
       {loading ? (
         <View style={styles.centerLoading}>
           <ActivityIndicator size="large" color={COLORS.primary} />
           <Text style={styles.loadingTxt}>Fetching owner parking spaces from database...</Text>
+        </View>
+      ) : viewMode === 'map' ? (
+        <View style={{ flex: 1 }}>
+          <DynamicParkingMap
+            userLat={userCoords.lat}
+            userLng={userCoords.lng}
+            userLocationName={pinnedLocation}
+            spots={displaySpaces}
+            selectedSpot={selectedMapSpot}
+            onSelectSpot={(spot, navigateDirectly) => {
+              if (navigateDirectly) {
+                navigation.navigate('SpotDetails', { space: spot });
+              } else {
+                setSelectedMapSpot(spot);
+              }
+            }}
+            onCloseCard={() => setSelectedMapSpot(null)}
+          />
         </View>
       ) : (
         <FlatList
@@ -354,12 +523,42 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 8,
-    backgroundColor: COLORS.cardBg,
+    backgroundColor: '#334155',
   },
   logoutTxt: {
-    color: COLORS.danger,
+    color: COLORS.white,
     fontSize: 12,
     fontWeight: '700',
+  },
+  notifBellBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: COLORS.cardBg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.borderDark,
+    position: 'relative',
+  },
+  notifBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    backgroundColor: '#ef4444',
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 3,
+    borderWidth: 1.5,
+    borderColor: COLORS.darkBg,
+  },
+  notifBadgeTxt: {
+    color: '#ffffff',
+    fontSize: 9,
+    fontWeight: '900',
   },
   pinnedBanner: {
     flexDirection: 'row',
@@ -423,9 +622,12 @@ const styles = StyleSheet.create({
     color: COLORS.white,
     fontSize: 14,
   },
-  filterRow: {
+  filterScroll: {
     flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
     marginTop: 10,
+    paddingRight: 10,
   },
   filterPill: {
     paddingHorizontal: 14,
@@ -434,6 +636,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.cardBg,
     borderWidth: 1,
     borderColor: COLORS.borderDark,
+    marginRight: 8,
   },
   filterPillActive: {
     backgroundColor: COLORS.primaryLight,
@@ -447,6 +650,109 @@ const styles = StyleSheet.create({
   filterPillTxtActive: {
     color: COLORS.primaryDark,
     fontWeight: '700',
+  },
+  heatMapBanner: {
+    marginHorizontal: 16,
+    marginTop: 8,
+    marginBottom: 4,
+    padding: 10,
+    backgroundColor: '#1e293b',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#334155',
+  },
+  heatMapHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 2,
+  },
+  heatMapTitle: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  heatMapLegend: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  legendPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  legendDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  legendTxt: {
+    color: '#e2e8f0',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  heatMapTagline: {
+    color: '#94a3b8',
+    fontSize: 10,
+    fontStyle: 'italic',
+    marginTop: 2,
+  },
+  cardDemandBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 1,
+    marginLeft: 4,
+  },
+  cardDemandTxt: {
+    fontSize: 9,
+    fontWeight: '900',
+  },
+  cardTagline: {
+    color: '#94a3b8',
+    fontSize: 10,
+    fontStyle: 'italic',
+    marginTop: 4,
+    marginBottom: 2,
+  },
+  viewModeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    backgroundColor: '#0b1120',
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.borderDark,
+  },
+  viewModeBtn: {
+    flex: 1,
+    paddingVertical: 9,
+    borderRadius: 12,
+    backgroundColor: COLORS.cardBg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.borderDark,
+  },
+  viewModeBtnActive: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  viewModeTxt: {
+    color: COLORS.textMuted,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  viewModeTxtActive: {
+    color: '#ffffff',
+    fontWeight: '900',
   },
   listContainer: {
     paddingHorizontal: 16,
@@ -512,22 +818,23 @@ const styles = StyleSheet.create({
   distanceRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    marginBottom: 10,
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 6,
   },
   distChip: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(16, 185, 129, 0.18)',
     paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
     borderWidth: 1,
     borderColor: COLORS.primary,
   },
   distIcon: {
-    fontSize: 12,
-    marginRight: 4,
+    fontSize: 11,
+    marginRight: 3,
   },
   distTxt: {
     color: COLORS.primary,
@@ -548,27 +855,32 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: 10,
   },
-  metaCol: {},
+  metaCol: {
+    flex: 1,
+    marginRight: 8,
+  },
   metaLabel: {
-    fontSize: 11,
+    fontSize: 10,
     color: COLORS.textMuted,
+    marginBottom: 2,
   },
   metaVal: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: COLORS.white,
+    fontSize: 13,
+    fontWeight: '800',
   },
   bookBtn: {
     backgroundColor: COLORS.primary,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
     borderRadius: 10,
+    flexShrink: 0,
   },
   bookBtnTxt: {
     color: COLORS.white,
-    fontWeight: '700',
-    fontSize: 13,
+    fontWeight: '800',
+    fontSize: 12,
   },
   centerLoading: {
     flex: 1,

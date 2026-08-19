@@ -3,6 +3,7 @@ const router = express.Router();
 const User = require('../models/User');
 const Booking = require('../models/Booking');
 const ParkingSpace = require('../models/ParkingSpace');
+const Notification = require('../models/Notification');
 const { protect, adminOnly, ownerOnly, seekerOnly } = require('../middleware/auth');
 const multer = require('multer');
 const path = require('path');
@@ -107,22 +108,27 @@ router.post('/', protect, seekerOnly, upload.single('driverImageFile'), async (r
       const seekerBalance = seeker ? (seeker.walletBalance || 0) : 0;
       if (seekerBalance > 0) {
         walletAmountUsed = Math.min(seekerBalance, maxDiscountAllowed, totalAmount);
-        if (walletAmountUsed > 0) {
-          seeker.walletBalance = Number(((seeker.walletBalance || 0) - walletAmountUsed).toFixed(2));
-          if (!seeker.walletTransactions) seeker.walletTransactions = [];
-          seeker.walletTransactions.push({
-            type: 'debit',
-            amount: walletAmountUsed,
-            description: `Wallet discount applied for booking at ${space.title || 'Parking Spot'}`,
-            date: new Date(),
-          });
-          await seeker.save();
-        }
       }
     }
 
     const finalPayableAmount = Math.max(0, totalAmount - walletAmountUsed);
     const isFullyPaidByWallet = finalPayableAmount === 0 && walletAmountUsed > 0;
+
+    // If 100% paid by wallet, deduct wallet balance now
+    if (isFullyPaidByWallet) {
+      const seeker = await User.findById(req.user._id);
+      if (seeker) {
+        seeker.walletBalance = Number(((seeker.walletBalance || 0) - walletAmountUsed).toFixed(2));
+        if (!seeker.walletTransactions) seeker.walletTransactions = [];
+        seeker.walletTransactions.push({
+          type: 'debit',
+          amount: walletAmountUsed,
+          description: `Full wallet payment for booking at ${space.title || 'Parking Spot'}`,
+          date: new Date(),
+        });
+        await seeker.save();
+      }
+    }
 
     const booking = await Booking.create({
       seekerId: req.user._id,
@@ -142,6 +148,26 @@ router.post('/', protect, seekerOnly, upload.single('driverImageFile'), async (r
       paymentStatus: isFullyPaidByWallet ? 'paid' : 'unpaid',
       paidAt: isFullyPaidByWallet ? new Date() : null,
     });
+
+    try {
+      await Notification.create({
+        userId: req.user._id,
+        targetRole: 'seeker',
+        type: isFullyPaidByWallet ? 'payment_success' : 'booking_confirmation',
+        title: isFullyPaidByWallet ? '🎉 Parking Confirmed & Paid!' : '🎟️ Booking Reserved - Slot Allocated!',
+        message: `Your booking for slot ${targetSlotId} at ${space.title || 'Parking Space'} is confirmed. Total: ₹${finalPayableAmount}.`,
+        data: {
+          bookingId: booking._id,
+          spaceId: space._id,
+          spaceTitle: space.title,
+          amount: finalPayableAmount,
+          slot: targetSlotId,
+          expiresAt: endTime,
+        },
+      });
+    } catch (notifErr) {
+      console.log('Notification trigger error:', notifErr.message);
+    }
 
     res.status(201).json({
       message: isFullyPaidByWallet
@@ -361,46 +387,7 @@ router.put('/:id/complete', protect, async (req, res) => {
   }
 });
 
-// @desc    Cancel booking (releases slot)
-// @route   PUT /api/bookings/:id/cancel
-// @access  Private
-router.put('/:id/cancel', protect, async (req, res) => {
-  try {
-    const booking = await Booking.findById(req.params.id);
-
-    if (!booking) {
-      return res.status(404).json({ message: 'Booking not found' });
-    }
-
-    const space = await ParkingSpace.findById(booking.spaceId);
-    if (!space) {
-      return res.status(404).json({ message: 'Parking space not found' });
-    }
-
-    const isSeeker = booking.seekerId.toString() === req.user._id.toString();
-    const isOwner = space.ownerId.toString() === req.user._id.toString();
-
-    if (!isSeeker && !isOwner) {
-      return res.status(401).json({ message: 'Not authorized to cancel this booking' });
-    }
-
-    // Release the slot if it was already allotted
-    if (booking.slotId) {
-      const slot = space.slots.find((s) => s.slotId === booking.slotId);
-      if (slot) {
-        slot.isAvailable = true;
-        await space.save();
-      }
-    }
-
-    booking.status = 'cancelled';
-    await booking.save();
-
-    res.json({ message: 'Booking cancelled successfully', booking });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-});
+// (Old cancel route removed in favor of unified cancelBookingHandler below)
 
 // ─── RAZORPAY INTEGRATION & FINANCIAL MANAGEMENT ROUTES ───────────────────
 const Razorpay = require('razorpay');
@@ -496,6 +483,23 @@ router.post('/:id/verify-payment', protect, seekerOnly, async (req, res) => {
       booking.ownerEarnings = Number(booking.totalAmount.toFixed(2));
       await booking.save();
 
+      // Deduct wallet amount upon verified payment success
+      if (booking.walletAmountUsed > 0) {
+        const seeker = await User.findById(booking.seekerId);
+        if (seeker && seeker.walletBalance >= booking.walletAmountUsed) {
+          seeker.walletBalance = Number(((seeker.walletBalance || 0) - booking.walletAmountUsed).toFixed(2));
+          if (!seeker.walletTransactions) seeker.walletTransactions = [];
+          seeker.walletTransactions.push({
+            type: 'debit',
+            amount: booking.walletAmountUsed,
+            description: `Wallet discount applied for booking at parking spot`,
+            date: new Date(),
+            bookingId: booking._id,
+          });
+          await seeker.save();
+        }
+      }
+
       return res.json({ message: 'Mock payment verified successfully!', booking });
     }
 
@@ -509,13 +513,40 @@ router.post('/:id/verify-payment', protect, seekerOnly, async (req, res) => {
       return res.status(400).json({ message: 'Payment verification failed. Invalid signature.' });
     }
 
-    // Update booking status
-    booking.paymentStatus = 'paid';
-    booking.status = 'paid';
-    booking.transactionReference = razorpay_payment_id;
-    booking.adminCommission = 0;
-    booking.ownerEarnings = Number(booking.totalAmount.toFixed(2));
-    await booking.save();
+    // Deduct wallet amount upon verified payment success
+    if (booking.walletAmountUsed > 0) {
+      const seeker = await User.findById(booking.seekerId);
+      if (seeker && seeker.walletBalance >= booking.walletAmountUsed) {
+        seeker.walletBalance = Number(((seeker.walletBalance || 0) - booking.walletAmountUsed).toFixed(2));
+        if (!seeker.walletTransactions) seeker.walletTransactions = [];
+        seeker.walletTransactions.push({
+          type: 'debit',
+          amount: booking.walletAmountUsed,
+          description: `Wallet discount applied for booking at parking spot`,
+          date: new Date(),
+          bookingId: booking._id,
+        });
+        await seeker.save();
+      }
+    }
+
+    try {
+      await Notification.create({
+        userId: booking.seekerId,
+        targetRole: 'seeker',
+        type: 'payment_success',
+        title: '💳 Payment Successful!',
+        message: `Your payment of ₹${booking.totalAmount} for Slot ${booking.slotId} is complete. Your digital parking pass is active!`,
+        data: {
+          bookingId: booking._id,
+          spaceId: booking.spaceId,
+          amount: booking.totalAmount,
+          slot: booking.slotId,
+        },
+      });
+    } catch (notifErr) {
+      console.log('Notification trigger error:', notifErr.message);
+    }
 
     res.json({ message: 'Payment verified and captured successfully!', booking });
   } catch (error) {
@@ -790,6 +821,15 @@ const cancelBookingHandler = async (req, res) => {
     }
 
     booking.status = 'cancelled';
+
+    // Release slot immediately so others can book
+    if (space && booking.slotId) {
+      const slot = space.slots.find((s) => s.slotId === booking.slotId);
+      if (slot) {
+        slot.isAvailable = true;
+        await space.save();
+      }
+    }
 
     let refundAmount = 0;
     let policyApplied = (space && space.cancellationPolicy) ? space.cancellationPolicy : 'full';

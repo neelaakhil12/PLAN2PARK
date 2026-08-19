@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useContext, useCallback } from 'react';
 import {
   View,
   Text,
@@ -10,49 +10,58 @@ import {
   RefreshControl,
   Alert,
   Linking,
+  Platform,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { AuthContext } from '../../context/AuthContext';
-import { getBaseApiUrl } from '../../config/api';
 import { COLORS } from '../../theme/colors';
+import { getBaseApiUrl, endpoints } from '../../config/api';
 import Header from '../../components/Header';
 
 export default function BookingsScreen({ navigation }) {
   const { token } = useContext(AuthContext);
-
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  useEffect(() => {
-    fetchMyBookings();
-  }, []);
-
   const fetchMyBookings = async () => {
+    if (!token) return;
     try {
       const baseUrl = await getBaseApiUrl();
       const res = await fetch(`${baseUrl}/bookings/my-bookings`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      const data = await res.json();
       if (res.ok) {
-        setBookings(Array.isArray(data) ? data : data.bookings || []);
+        const data = await res.json();
+        setBookings(data);
       }
     } catch (err) {
-      console.error('Error fetching bookings:', err);
+      console.error(err);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   };
 
+  useFocusEffect(
+    useCallback(() => {
+      fetchMyBookings();
+    }, [token])
+  );
+
   const handleCancelBooking = async (item) => {
     const bookingId = item._id;
     const space = item.spaceId;
     const policy = space?.cancellationPolicy || 'full';
-    const estimatedRefund = policy === 'full' ? item.totalAmount : policy === 'half' ? Number((item.totalAmount * 0.5).toFixed(2)) : 0;
+    const amount = Number(item.totalAmount) || 0;
+    const estimatedRefund = policy === 'full' ? amount : policy === 'half' ? Number((amount * 0.5).toFixed(2)) : 0;
     const policyName = policy === 'full' ? '100% Full Refund' : policy === 'half' ? '50% Half Refund' : '0% Non-Refundable';
 
     const doCancel = async () => {
+      // Optimistic update
+      setBookings((prev) =>
+        prev.map((b) => (b._id === bookingId ? { ...b, status: 'cancelled', refundAmount: estimatedRefund } : b))
+      );
       try {
         const baseUrl = await getBaseApiUrl();
         const res = await fetch(`${baseUrl}/bookings/${bookingId}/cancel`, {
@@ -64,44 +73,32 @@ export default function BookingsScreen({ navigation }) {
           const msg = resData.message || (estimatedRefund > 0 
             ? `Reservation cancelled successfully! ₹${estimatedRefund} has been refunded to your PlanToPark Wallet.` 
             : 'Reservation cancelled.');
-          if (typeof window !== 'undefined' && window.alert) {
-            window.alert(msg);
-          } else {
-            Alert.alert('Cancelled & Refunded', msg);
-          }
+          Alert.alert('Cancelled', msg);
           fetchMyBookings();
         } else {
-          if (typeof window !== 'undefined' && window.alert) {
-            window.alert(resData.message || 'Could not cancel booking');
-          } else {
-            Alert.alert('Error', resData.message || 'Could not cancel booking');
-          }
+          Alert.alert('Notice', resData.message || 'Could not cancel booking');
+          fetchMyBookings();
         }
       } catch (err) {
-        if (typeof window !== 'undefined' && window.alert) {
-          window.alert('Failed to cancel booking');
-        } else {
-          Alert.alert('Error', 'Failed to cancel booking');
-        }
+        Alert.alert('Error', 'Failed to reach server. Please try again.');
+        fetchMyBookings();
       }
     };
 
-    const confirmMsg = `Cancel this reservation?\n\nOwner Refund Policy: ${policyName}\nRefund to Your Wallet: ₹${estimatedRefund}`;
+    const confirmMsg = amount > 0
+      ? `Cancel this reservation?\n\nOwner Refund Policy: ${policyName}\nRefund to Your Wallet: ₹${estimatedRefund}`
+      : `Cancel this reservation?\n\nThis spot will be released immediately.`;
 
-    if (typeof window !== 'undefined' && window.confirm) {
-      if (window.confirm(confirmMsg)) {
-        doCancel();
-      }
-    } else {
-      Alert.alert('Cancel Reservation', confirmMsg, [
-        { text: 'No, Keep Pass', style: 'cancel' },
-        { text: `Yes, Cancel (Get ₹${estimatedRefund} Refund)`, style: 'destructive', onPress: doCancel },
-      ]);
-    }
+    Alert.alert('Cancel Reservation', confirmMsg, [
+      { text: 'No, Keep Pass', style: 'cancel' },
+      { text: amount > 0 ? `Yes, Cancel (Get ₹${estimatedRefund} Refund)` : 'Yes, Cancel Pass', style: 'destructive', onPress: doCancel },
+    ]);
   };
 
   const handleDeleteBooking = async (bookingId) => {
     const doDelete = async () => {
+      // Optimistic delete
+      setBookings((prev) => prev.filter((b) => b._id !== bookingId));
       try {
         const baseUrl = await getBaseApiUrl();
         const res = await fetch(`${baseUrl}/bookings/${bookingId}`, {
@@ -113,34 +110,36 @@ export default function BookingsScreen({ navigation }) {
         }
       } catch (err) {
         console.error(err);
+        fetchMyBookings();
       }
     };
 
-    if (typeof window !== 'undefined' && window.confirm) {
-      if (window.confirm('Remove this parking pass from list?')) {
-        doDelete();
-      }
-    } else {
-      Alert.alert('Delete Pass', 'Remove this pass from your list?', [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Delete', style: 'destructive', onPress: doDelete },
-      ]);
-    }
+    Alert.alert('Delete Pass', 'Permanently remove this parking pass from your list?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: doDelete },
+    ]);
   };
 
   const handleOpenMap = (space) => {
     if (!space) return;
-    const lat = space.coordinates?.lat || space.lat;
-    const lng = space.coordinates?.lng || space.lng;
-    let url = space.locationLink || space.googleMapsLink;
-    if (!url && lat && lng) {
-      url = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
-    } else if (!url && space.address) {
-      url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(space.address + ', ' + (space.city || 'Hyderabad'))}`;
-    }
-    if (url) {
-      if (typeof window !== 'undefined') window.open(url, '_blank');
-      else Linking.openURL(url);
+    const lat = space.location?.coordinates?.[1] || space.coordinates?.lat || space.lat;
+    const lng = space.location?.coordinates?.[0] || space.coordinates?.lng || space.lng;
+    
+    if (lat && lng) {
+      const geoUrl = Platform.OS === 'android'
+        ? `google.navigation:q=${lat},${lng}`
+        : `maps://app?daddr=${lat},${lng}`;
+      const webUrl = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
+      
+      Linking.canOpenURL(geoUrl).then((supported) => {
+        if (supported) Linking.openURL(geoUrl);
+        else Linking.openURL(webUrl);
+      }).catch(() => {
+        Linking.openURL(webUrl);
+      });
+    } else if (space.address) {
+      const searchUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(space.address + ', Hyderabad')}`;
+      Linking.openURL(searchUrl);
     }
   };
 
@@ -189,7 +188,7 @@ export default function BookingsScreen({ navigation }) {
             {isPaid ? 'YOUR ASSIGNED SLOT' : isCancelled ? (refundAmt > 0 ? 'REFUND CREDITED TO WALLET' : 'RESERVATION CANCELLED') : 'RESERVATION STATUS'}
           </Text>
           <Text style={[styles.slotHighlightVal, !isPaid && { color: isCancelled ? (refundAmt > 0 ? '#10b981' : '#94a3b8') : '#ef4444', fontSize: isCancelled ? 16 : 16 }]}>
-            {isPaid ? `🅿️ ${slot}` : isCancelled ? (refundAmt > 0 ? `💸 ₹${refundAmt} Refunded to Wallet` : 'Cancelled (Non-Refundable)') : 'Payment Incomplete (Failed)'}
+            {isPaid ? `🅿️ ${slot}` : isCancelled ? (refundAmt > 0 ? `💸 ₹${refundAmt} Refunded to Wallet` : 'Cancelled (Released)') : 'Payment Incomplete (Failed)'}
           </Text>
         </View>
 
@@ -198,63 +197,71 @@ export default function BookingsScreen({ navigation }) {
         <Text style={styles.spotAddress}>📍 {space?.address || 'City Center'}, {space?.city || 'Hyderabad'}</Text>
 
         {/* Google Maps Turn-by-Turn GPS Navigation Button */}
-        {isPaid && (
-          <TouchableOpacity
-            style={styles.navigateBtn}
-            onPress={() => handleOpenMap(space)}
-            activeOpacity={0.85}
-          >
-            <Text style={styles.navigateBtnIcon}>🗺️</Text>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.navigateBtnTitle}>Navigate to Parking Spot (Google Maps)</Text>
-              <Text style={styles.navigateBtnSub}>Turn-by-turn driving directions straight to the spot</Text>
-            </View>
-            <Text style={styles.navigateBtnArrow}>→</Text>
-          </TouchableOpacity>
-        )}
+        <TouchableOpacity
+          style={styles.gpsNavBtn}
+          onPress={() => handleOpenMap(space)}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.gpsNavTxt}>🗺️ Open Turn-by-Turn GPS Navigation</Text>
+        </TouchableOpacity>
 
-        {/* Booking Details Grid */}
-        <View style={styles.infoGrid}>
-          <View style={styles.infoCol}>
-            <Text style={styles.infoLabel}>Vehicle Plate</Text>
-            <Text style={styles.infoVal}>{item.vehicleNumber || item.vehiclePlate || 'N/A'}</Text>
+        {/* Meta Info Grid */}
+        <View style={styles.metaGrid}>
+          <View style={styles.metaItem}>
+            <Text style={styles.metaLabel}>VEHICLE</Text>
+            <Text style={styles.metaVal}>{item.vehicleNumber || 'TS07AB1234'}</Text>
           </View>
-          <View style={styles.infoCol}>
-            <Text style={styles.infoLabel}>Duration</Text>
-            <Text style={styles.infoVal}>{item.hours || 1} Hour(s)</Text>
+          <View style={styles.metaItem}>
+            <Text style={styles.metaLabel}>HOURS</Text>
+            <Text style={styles.metaVal}>{item.hours || 2} hrs</Text>
           </View>
-          <View style={styles.infoCol}>
-            <Text style={styles.infoLabel}>Total Amount</Text>
-            <Text style={[styles.infoVal, { color: isPaid ? '#10b981' : '#ef4444', fontWeight: '800' }]}>₹{item.totalAmount || 0}</Text>
+          <View style={styles.metaItem}>
+            <Text style={styles.metaLabel}>AMOUNT</Text>
+            <Text style={[styles.metaVal, { color: COLORS.primary }]}>₹{item.totalAmount || 0}</Text>
+          </View>
+          <View style={styles.metaItem}>
+            <Text style={styles.metaLabel}>REFUND POLICY</Text>
+            <Text style={[styles.metaVal, { color: space?.cancellationPolicy === 'none' ? '#ef4444' : '#10b981' }]}>
+              {space?.cancellationPolicy === 'full' ? '100% Full' : space?.cancellationPolicy === 'half' ? '50% Half' : 'None'}
+            </Text>
           </View>
         </View>
 
-        <View style={styles.timeBox}>
+        {/* Reservation Date & Time */}
+        <View style={styles.timeRow}>
           <Text style={styles.timeTxt}>
-            🕒 {new Date(item.startTime || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} →{' '}
-            {new Date(item.endTime || Date.now() + 7200000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            📅 {new Date(item.startTime || item.createdAt).toLocaleDateString('en-IN', {
+              day: 'numeric',
+              month: 'short',
+              year: 'numeric',
+            })}
+          </Text>
+          <Text style={styles.timeTxt}>
+            ⏰ {new Date(item.startTime || item.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} →{' '}
+            {new Date(item.endTime || (new Date(item.startTime || item.createdAt).getTime() + (item.hours || 2) * 3600000)).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
           </Text>
         </View>
 
-        {/* Action Buttons */}
+        {/* Action Buttons: Cancel vs Delete */}
         <View style={{ flexDirection: 'row', gap: 10, marginTop: 10 }}>
           {isPaid && !isCancelled && !isCompleted && (
             <TouchableOpacity
               style={[styles.cancelBtn, { flex: 1 }]}
               onPress={() => handleCancelBooking(item)}
+              activeOpacity={0.8}
             >
               <Text style={styles.cancelTxt}>Cancel Reservation</Text>
             </TouchableOpacity>
           )}
 
-          {(!isPaid || isCancelled || isCompleted) && (
-            <TouchableOpacity
-              style={[styles.cancelBtn, { flex: 1, borderColor: '#ef444480' }]}
-              onPress={() => handleDeleteBooking(item._id)}
-            >
-              <Text style={[styles.cancelTxt, { color: '#f87171' }]}>🗑️ Delete Pass</Text>
-            </TouchableOpacity>
-          )}
+          {/* Delete Button for any cancelled, completed, failed, or active pass */}
+          <TouchableOpacity
+            style={[styles.deletePassBtn, (isPaid && !isCancelled && !isCompleted) ? { width: 110 } : { flex: 1 }]}
+            onPress={() => handleDeleteBooking(item._id)}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.deletePassTxt}>🗑️ Delete Pass</Text>
+          </TouchableOpacity>
         </View>
       </View>
     );
@@ -320,149 +327,152 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   passTitle: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: COLORS.primary,
+    color: COLORS.white,
+    fontWeight: '900',
+    fontSize: 13,
     letterSpacing: 0.5,
   },
   statusBadge: {
     paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
     borderWidth: 1,
   },
   statusTxt: {
     fontSize: 10,
-    fontWeight: '800',
+    fontWeight: '900',
     letterSpacing: 0.5,
   },
   slotHighlightBox: {
-    backgroundColor: '#064e3b35',
+    backgroundColor: '#064e3b25',
     borderWidth: 1.5,
     borderColor: '#10b981',
     borderRadius: 12,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    marginBottom: 12,
+    padding: 12,
     alignItems: 'center',
+    marginBottom: 12,
   },
   slotHighlightLabel: {
-    color: '#6ee7b7',
+    color: '#34d399',
     fontSize: 10,
     fontWeight: '800',
-    letterSpacing: 1,
+    letterSpacing: 0.8,
     marginBottom: 2,
   },
   slotHighlightVal: {
-    color: '#10b981',
-    fontSize: 20,
+    color: COLORS.white,
+    fontSize: 22,
     fontWeight: '900',
+    letterSpacing: 1,
   },
   spotName: {
+    color: COLORS.white,
     fontSize: 17,
     fontWeight: '800',
-    color: COLORS.white,
     marginBottom: 2,
   },
   spotAddress: {
-    fontSize: 13,
     color: COLORS.textMuted,
+    fontSize: 12,
     marginBottom: 12,
   },
-  navigateBtn: {
-    backgroundColor: '#3b82f618',
+  gpsNavBtn: {
+    backgroundColor: '#1e3a8a30',
     borderWidth: 1,
     borderColor: '#3b82f6',
-    borderRadius: 12,
-    padding: 12,
-    flexDirection: 'row',
+    borderRadius: 10,
+    paddingVertical: 10,
     alignItems: 'center',
     marginBottom: 12,
   },
-  navigateBtnIcon: {
-    fontSize: 22,
-    marginRight: 10,
-  },
-  navigateBtnTitle: {
+  gpsNavTxt: {
     color: '#60a5fa',
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '800',
   },
-  navigateBtnSub: {
-    color: '#94a3b8',
-    fontSize: 11,
-    marginTop: 2,
-  },
-  navigateBtnArrow: {
-    color: '#60a5fa',
-    fontSize: 16,
-    fontWeight: '800',
-    marginLeft: 8,
-  },
-  infoGrid: {
+  metaGrid: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    backgroundColor: COLORS.darkBg,
-    padding: 12,
+    backgroundColor: '#1e293b50',
     borderRadius: 10,
+    padding: 10,
     marginBottom: 10,
   },
-  infoCol: {
+  metaItem: {
     alignItems: 'center',
   },
-  infoLabel: {
-    fontSize: 10,
+  metaLabel: {
     color: COLORS.textMuted,
-  },
-  infoVal: {
-    fontSize: 13,
+    fontSize: 9,
     fontWeight: '700',
-    color: COLORS.white,
-    marginTop: 2,
+    marginBottom: 2,
   },
-  timeBox: {
-    alignItems: 'center',
-    paddingVertical: 6,
+  metaVal: {
+    color: COLORS.white,
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  timeRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    borderTopWidth: 1,
+    borderTopColor: COLORS.borderDark,
+    paddingTop: 10,
+    marginBottom: 4,
   },
   timeTxt: {
-    color: COLORS.textLight,
-    fontSize: 12,
+    color: COLORS.textMuted,
+    fontSize: 11,
     fontWeight: '600',
   },
   cancelBtn: {
-    marginTop: 10,
-    paddingVertical: 8,
-    alignItems: 'center',
-    borderRadius: 8,
     borderWidth: 1,
-    borderColor: COLORS.danger,
+    borderColor: '#ef4444',
+    borderRadius: 10,
+    paddingVertical: 10,
+    alignItems: 'center',
+    backgroundColor: '#450a0a20',
   },
   cancelTxt: {
-    color: COLORS.danger,
-    fontSize: 12,
-    fontWeight: '700',
+    color: '#ef4444',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  deletePassBtn: {
+    borderWidth: 1,
+    borderColor: '#64748b',
+    borderRadius: 10,
+    paddingVertical: 10,
+    alignItems: 'center',
+    backgroundColor: '#1e293b',
+  },
+  deletePassTxt: {
+    color: '#f87171',
+    fontSize: 13,
+    fontWeight: '800',
   },
   centerLoading: {
     flex: 1,
-    justifyContent: 'center',
     alignItems: 'center',
+    justifyContent: 'center',
   },
   emptyContainer: {
     alignItems: 'center',
+    justifyContent: 'center',
     marginTop: 80,
   },
   emptyEmoji: {
-    fontSize: 48,
+    fontSize: 50,
     marginBottom: 12,
   },
   emptyTitle: {
     color: COLORS.white,
     fontSize: 18,
-    fontWeight: '700',
+    fontWeight: '800',
+    marginBottom: 4,
   },
   emptySub: {
     color: COLORS.textMuted,
     fontSize: 13,
-    marginTop: 4,
   },
 });

@@ -9,6 +9,7 @@ import {
   ScrollView,
   Platform,
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { COLORS } from '../theme/colors';
 import Button from './Button';
 
@@ -109,7 +110,76 @@ export default function ProfileEditorModal({
 
         <ScrollView style={styles.body} showsVerticalScrollIndicator={false}>
           {/* Avatar / Pass Photo Selection */}
-          <Text style={styles.fieldLabel}>Select Pass Photo / Avatar Icon</Text>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <Text style={styles.fieldLabel}>Select Pass Photo / Avatar</Text>
+            <TouchableOpacity
+              style={{
+                backgroundColor: '#10b98120',
+                borderWidth: 1,
+                borderColor: '#10b981',
+                borderRadius: 12,
+                paddingHorizontal: 8,
+                paddingVertical: 3,
+              }}
+              onPress={() => {
+                Alert.alert(
+                  'Upload Pass Photo',
+                  'Choose photo source:',
+                  [
+                    {
+                      text: '📷 Take Photo',
+                      onPress: async () => {
+                        try {
+                          const cameraPerm = await ImagePicker.requestCameraPermissionsAsync();
+                          if (!cameraPerm.granted) {
+                            Alert.alert('Camera Permission', 'Camera access is required.');
+                            return;
+                          }
+                          const result = await ImagePicker.launchCameraAsync({
+                            mediaTypes: ['images'],
+                            allowsEditing: false,
+                            quality: 0.6,
+                            base64: true,
+                          });
+                          if (!result.canceled && result.assets && result.assets.length > 0) {
+                            const asset = result.assets[0];
+                            const base64Data = asset.base64 ? `data:image/jpeg;base64,${asset.base64}` : asset.uri;
+                            setSelectedAvatar(base64Data);
+                          }
+                        } catch (err) {
+                          Alert.alert('Camera Issue', err.message);
+                        }
+                      },
+                    },
+                    {
+                      text: '🖼️ Choose from Gallery',
+                      onPress: async () => {
+                        try {
+                          const result = await ImagePicker.launchImageLibraryAsync({
+                            mediaTypes: ['images'],
+                            allowsEditing: false,
+                            quality: 0.6,
+                            base64: true,
+                          });
+                          if (!result.canceled && result.assets && result.assets.length > 0) {
+                            const asset = result.assets[0];
+                            const base64Data = asset.base64 ? `data:image/jpeg;base64,${asset.base64}` : asset.uri;
+                            setSelectedAvatar(base64Data);
+                          }
+                        } catch (err) {
+                          Alert.alert('Gallery Issue', err.message);
+                        }
+                      },
+                    },
+                    { text: 'Cancel', style: 'cancel' },
+                  ]
+                );
+              }}
+            >
+              <Text style={{ color: '#10b981', fontSize: 11, fontWeight: '700' }}>📷 Upload Photo</Text>
+            </TouchableOpacity>
+          </View>
+
           <View style={styles.avatarRow}>
             {AVATAR_OPTIONS.map((item) => {
               const isSelected = selectedAvatar === item.emoji;
@@ -130,7 +200,7 @@ export default function ProfileEditorModal({
           <View style={styles.inputBox}>
             <Text style={styles.inputIcon}>👤</Text>
             <TextInput
-              style={[styles.input, Platform.OS === 'web' && { outlineStyle: 'none' }]}
+              style={styles.input}
               placeholder="Enter your full name"
               placeholderTextColor={COLORS.textMuted}
               value={name}
@@ -143,7 +213,7 @@ export default function ProfileEditorModal({
           <View style={styles.inputBox}>
             <Text style={styles.inputIcon}>✉️</Text>
             <TextInput
-              style={[styles.input, Platform.OS === 'web' && { outlineStyle: 'none' }]}
+              style={styles.input}
               placeholder="Enter email address"
               placeholderTextColor={COLORS.textMuted}
               keyboardType="email-address"
@@ -158,7 +228,7 @@ export default function ProfileEditorModal({
           <View style={styles.inputBox}>
             <Text style={styles.inputIcon}>📞</Text>
             <TextInput
-              style={[styles.input, Platform.OS === 'web' && { outlineStyle: 'none' }]}
+              style={styles.input}
               placeholder="Enter phone number"
               placeholderTextColor={COLORS.textMuted}
               keyboardType="phone-pad"
@@ -172,7 +242,7 @@ export default function ProfileEditorModal({
           <View style={styles.inputBox}>
             <Text style={styles.inputIcon}>🚗</Text>
             <TextInput
-              style={[styles.input, Platform.OS === 'web' && { outlineStyle: 'none' }]}
+              style={styles.input}
               placeholder="e.g. TS 07 AB 1234"
               placeholderTextColor={COLORS.textMuted}
               autoCapitalize="characters"

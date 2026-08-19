@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { AuthContext } from '../../context/AuthContext';
 import { COLORS } from '../../theme/colors';
+import * as ImagePicker from 'expo-image-picker';
 import { endpoints, getImageUrl } from '../../config/api';
 import Header from '../../components/Header';
 import Button from '../../components/Button';
@@ -33,48 +34,95 @@ export default function ProfileScreen() {
     setShowEditModal(false);
   };
 
-  const handlePickProfileImage = () => {
-    if (typeof document !== 'undefined') {
-      const input = document.createElement('input');
-      input.type = 'file';
-      input.accept = 'image/*';
-      input.onchange = (e) => {
-        const file = e.target.files && e.target.files[0];
-        if (file) {
-          // Check size limit (max 5MB)
-          if (file.size > 5 * 1024 * 1024) {
-            if (typeof window !== 'undefined' && window.alert) {
-              window.alert('Selected image exceeds 5MB limit. Please choose a smaller photo.');
-            } else {
-              Alert.alert('File Too Large', 'Please select an image smaller than 5MB.');
-            }
-            return;
-          }
-
-          setUploadingImage(true);
-          setImageLoadError(false);
-          const reader = new FileReader();
-          reader.onload = async () => {
-            const base64 = reader.result;
-            try {
-              await updateProfile({ profileImage: base64, passPhoto: base64 });
-              if (typeof window !== 'undefined' && window.alert) {
-                window.alert('Profile photo updated successfully! 📸');
-              }
-            } catch (err) {
-              console.error('Image upload failed', err);
-              if (typeof window !== 'undefined' && window.alert) {
-                window.alert('Failed to upload profile photo. Please try again.');
-              }
-            } finally {
-              setUploadingImage(false);
-            }
-          };
-          reader.readAsDataURL(file);
+  const handleGalleryUpload = async () => {
+    try {
+      try {
+        const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (perm.status === 'denied' && !perm.canAskAgain && Platform.OS === 'ios') {
+          Alert.alert('Permission Required', 'Please enable photo library access in device settings.');
+          return;
         }
-      };
-      input.click();
+      } catch (pErr) {
+        console.warn('Permission request note:', pErr.message);
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: false,
+        quality: 0.6,
+        base64: true,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const asset = result.assets[0];
+        const base64Data = asset.base64 ? `data:image/jpeg;base64,${asset.base64}` : asset.uri;
+
+        setUploadingImage(true);
+        setImageLoadError(false);
+        try {
+          await updateProfile({ profileImage: base64Data, passPhoto: base64Data });
+          Alert.alert('Success', 'Profile photo updated successfully! 📸');
+        } catch (err) {
+          console.error('Image upload failed', err);
+          Alert.alert('Upload Error', 'Failed to update profile photo: ' + (err.message || 'Error'));
+        } finally {
+          setUploadingImage(false);
+        }
+      }
+    } catch (e) {
+      console.error('Picker error', e);
+      Alert.alert('Photo Picker Issue', e.message || 'Could not open gallery.');
     }
+  };
+
+  const handleCameraUpload = async () => {
+    try {
+      const cameraPerm = await ImagePicker.requestCameraPermissionsAsync();
+      if (!cameraPerm.granted) {
+        Alert.alert('Camera Permission Required', 'Please allow camera access to take a profile photo.');
+        return;
+      }
+
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ['images'],
+        allowsEditing: false,
+        quality: 0.6,
+        base64: true,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const asset = result.assets[0];
+        const base64Data = asset.base64 ? `data:image/jpeg;base64,${asset.base64}` : asset.uri;
+
+        setUploadingImage(true);
+        setImageLoadError(false);
+        try {
+          await updateProfile({ profileImage: base64Data, passPhoto: base64Data });
+          Alert.alert('Success', 'Profile photo updated successfully! 📸');
+        } catch (err) {
+          console.error('Image upload failed', err);
+          Alert.alert('Upload Error', 'Failed to update profile photo: ' + (err.message || 'Error'));
+        } finally {
+          setUploadingImage(false);
+        }
+      }
+    } catch (e) {
+      console.error('Camera error', e);
+      Alert.alert('Camera Issue', e.message || 'Could not open camera.');
+    }
+  };
+
+  const handlePickProfileImage = () => {
+    Alert.alert(
+      'Update Profile Photo',
+      'Choose how you would like to set your profile picture:',
+      [
+        { text: '📷 Take Photo', onPress: handleCameraUpload },
+        { text: '🖼️ Choose from Gallery', onPress: handleGalleryUpload },
+        { text: 'Cancel', style: 'cancel' },
+      ],
+      { cancelable: true }
+    );
   };
 
   const isEmojiAvatar = user?.profileImage && user?.profileImage.length <= 4;

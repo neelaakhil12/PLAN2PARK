@@ -59,6 +59,7 @@ export default function ResetPasswordScreen({ route, navigation }) {
           email: email.trim(),
           otpCode: otpCode.trim(),
           newPassword: newPassword.trim(),
+          role: role || 'seeker',
         }),
       });
 

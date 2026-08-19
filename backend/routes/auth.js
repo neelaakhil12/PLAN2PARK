@@ -53,8 +53,8 @@ router.post('/seeker/signup', async (req, res) => {
   const { name, email, password, contact } = req.body;
   try {
     const normalizedEmail = (email || '').trim().toLowerCase();
-    const userExists = await User.findOne({ email: normalizedEmail });
-    if (userExists) return res.status(400).json({ message: 'An account with this email already exists' });
+    const userExists = await User.findOne({ email: normalizedEmail, role: 'seeker' });
+    if (userExists) return res.status(400).json({ message: 'A seeker account with this email already exists' });
 
     const user = await User.create({
       name,
@@ -88,8 +88,8 @@ router.post('/owner/signup', async (req, res) => {
   const { name, email, password, contact } = req.body;
   try {
     const normalizedEmail = (email || '').trim().toLowerCase();
-    const userExists = await User.findOne({ email: normalizedEmail });
-    if (userExists) return res.status(400).json({ message: 'An account with this email already exists' });
+    const userExists = await User.findOne({ email: normalizedEmail, role: 'owner' });
+    if (userExists) return res.status(400).json({ message: 'An owner account with this email already exists' });
 
     const user = await User.create({
       name,
@@ -238,14 +238,24 @@ router.post('/forgot-password', async (req, res) => {
       return res.status(400).json({ message: 'Email address is required' });
     }
 
-    const user = await User.findOne({ email: email.trim().toLowerCase() });
+    const normalizedEmail = email.trim().toLowerCase();
+    const query = { email: normalizedEmail };
+    if (role) {
+      query.role = role;
+    }
+    
+    let user = await User.findOne(query);
+    if (!user && role) {
+      // Fallback in case role wasn't strictly matching
+      user = await User.findOne({ email: normalizedEmail });
+    }
     if (!user) {
       return res.status(404).json({ message: `No registered account found with email address: ${email}` });
     }
 
     // Generate 6-digit OTP code & JWT Token
     const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
-    const resetToken = jwt.sign({ id: user._id, email: user.email }, process.env.JWT_SECRET || 'plantoparksecretkey', { expiresIn: '15m' });
+    const resetToken = jwt.sign({ id: user._id, email: user.email, role: user.role }, process.env.JWT_SECRET || 'plantoparksecretkey', { expiresIn: '15m' });
 
     user.resetPasswordOtp = otpCode;
     user.resetPasswordToken = resetToken;
@@ -272,7 +282,7 @@ router.post('/forgot-password', async (req, res) => {
 // @desc    Reset Password using OTP or Reset Token
 // @route   POST /api/auth/reset-password
 router.post('/reset-password', async (req, res) => {
-  const { email, otpCode, token, newPassword } = req.body;
+  const { email, otpCode, token, newPassword, role } = req.body;
   try {
     if (!newPassword || newPassword.length < 4) {
       return res.status(400).json({ message: 'New password must be at least 4 characters' });
@@ -281,11 +291,23 @@ router.post('/reset-password', async (req, res) => {
     let user;
 
     if (email && otpCode) {
-      user = await User.findOne({
-        email: email.trim().toLowerCase(),
+      const normalizedEmail = email.trim().toLowerCase();
+      const query = {
+        email: normalizedEmail,
         resetPasswordOtp: otpCode.trim(),
         resetPasswordExpire: { $gt: Date.now() },
-      });
+      };
+      if (role) query.role = role;
+      
+      user = await User.findOne(query);
+      if (!user && role) {
+        // Fallback without role restriction if exact OTP matches
+        user = await User.findOne({
+          email: normalizedEmail,
+          resetPasswordOtp: otpCode.trim(),
+          resetPasswordExpire: { $gt: Date.now() },
+        });
+      }
     } else if (token) {
       try {
         const decoded = jwt.verify(token, process.env.JWT_SECRET || 'plantoparksecretkey');

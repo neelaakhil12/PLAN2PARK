@@ -1,17 +1,39 @@
-// PlanToPark Live API Configuration
-// Live backend: https://api.plantopark.com
+// PlanToPark Seeker App API Configuration
+// Live AWS EC2 backend: http://43.204.235.124:5000
 
-export const PUBLIC_ONLINE_URL = 'https://api.plantopark.com/api';
+import { Platform } from 'react-native';
+
+export const PUBLIC_ONLINE_URL = 'http://43.204.235.124:5000/api';
 
 export const COMMON_HEADERS = {
   'Content-Type': 'application/json',
 };
 
 export const getBaseApiUrl = async () => {
+  if (Platform.OS === 'web' && typeof window !== 'undefined' && window?.location && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+    try {
+      const testRes = await fetch('http://localhost:5000/', { method: 'GET' });
+      if (testRes.ok) return 'http://localhost:5000/api';
+    } catch (e) {
+      // Local backend port 5000 not reachable, fallback to AWS
+    }
+  }
   return PUBLIC_ONLINE_URL;
 };
 
 export let API_URL = PUBLIC_ONLINE_URL;
+
+export const getImageUrl = (url) => {
+  if (!url) return 'https://images.unsplash.com/photo-1506015391300-4802dc74de2e?w=1200&q=80';
+  if (url.startsWith('data:') || url.startsWith('http://') || url.startsWith('https://')) return url;
+  if (url.startsWith('/uploads/') || url.startsWith('uploads/')) {
+    const cleanPath = url.startsWith('/') ? url : `/${url}`;
+    const isLocal = Platform.OS === 'web' && typeof window !== 'undefined' && window?.location && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+    const baseUrl = isLocal ? 'http://localhost:5000' : 'http://43.204.235.124:5000';
+    return `${baseUrl}${cleanPath}`;
+  }
+  return url;
+};
 
 export const endpoints = {
   // Auth
@@ -48,4 +70,11 @@ export const endpoints = {
   createReview: `${API_URL}/reviews`,
   getSpaceReviews: (spaceId) => `${API_URL}/reviews/space/${spaceId}`,
   createComplaint: `${API_URL}/complaints`,
+
+  // Notifications & Promotional Offers
+  getNotifications: `${API_URL}/notifications`,
+  readAllNotifications: `${API_URL}/notifications/read-all`,
+  readNotification: (id) => `${API_URL}/notifications/read/${id}`,
+  deleteNotification: (id) => `${API_URL}/notifications/${id}`,
+  clearAllNotifications: `${API_URL}/notifications/user/clear-all`,
 };

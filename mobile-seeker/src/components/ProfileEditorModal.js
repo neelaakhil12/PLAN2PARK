@@ -9,6 +9,7 @@ import {
   ScrollView,
   Platform,
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { COLORS } from '../theme/colors';
 import Button from './Button';
 
@@ -121,22 +122,58 @@ export default function ProfileEditorModal({
                 paddingVertical: 3,
               }}
               onPress={() => {
-                if (typeof document !== 'undefined') {
-                  const input = document.createElement('input');
-                  input.type = 'file';
-                  input.accept = 'image/*';
-                  input.onchange = (e) => {
-                    const file = e.target.files && e.target.files[0];
-                    if (file) {
-                      const reader = new FileReader();
-                      reader.onload = () => {
-                        setSelectedAvatar(reader.result);
-                      };
-                      reader.readAsDataURL(file);
-                    }
-                  };
-                  input.click();
-                }
+                Alert.alert(
+                  'Upload Pass Photo',
+                  'Choose photo source:',
+                  [
+                    {
+                      text: '📷 Take Photo',
+                      onPress: async () => {
+                        try {
+                          const cameraPerm = await ImagePicker.requestCameraPermissionsAsync();
+                          if (!cameraPerm.granted) {
+                            Alert.alert('Camera Permission', 'Camera access is required.');
+                            return;
+                          }
+                          const result = await ImagePicker.launchCameraAsync({
+                            mediaTypes: ['images'],
+                            allowsEditing: false,
+                            quality: 0.6,
+                            base64: true,
+                          });
+                          if (!result.canceled && result.assets && result.assets.length > 0) {
+                            const asset = result.assets[0];
+                            const base64Data = asset.base64 ? `data:image/jpeg;base64,${asset.base64}` : asset.uri;
+                            setSelectedAvatar(base64Data);
+                          }
+                        } catch (err) {
+                          Alert.alert('Camera Issue', err.message);
+                        }
+                      },
+                    },
+                    {
+                      text: '🖼️ Choose from Gallery',
+                      onPress: async () => {
+                        try {
+                          const result = await ImagePicker.launchImageLibraryAsync({
+                            mediaTypes: ['images'],
+                            allowsEditing: false,
+                            quality: 0.6,
+                            base64: true,
+                          });
+                          if (!result.canceled && result.assets && result.assets.length > 0) {
+                            const asset = result.assets[0];
+                            const base64Data = asset.base64 ? `data:image/jpeg;base64,${asset.base64}` : asset.uri;
+                            setSelectedAvatar(base64Data);
+                          }
+                        } catch (err) {
+                          Alert.alert('Gallery Issue', err.message);
+                        }
+                      },
+                    },
+                    { text: 'Cancel', style: 'cancel' },
+                  ]
+                );
               }}
             >
               <Text style={{ color: '#10b981', fontSize: 11, fontWeight: '700' }}>📷 Upload Photo</Text>

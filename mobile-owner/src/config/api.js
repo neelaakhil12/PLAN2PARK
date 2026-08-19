@@ -1,6 +1,8 @@
 // PlanToPark Owner App API Configuration
 // Live AWS EC2 backend: http://43.204.235.124:5000
 
+import { Platform } from 'react-native';
+
 export const PUBLIC_ONLINE_URL = 'http://43.204.235.124:5000/api';
 
 export const COMMON_HEADERS = {
@@ -8,7 +10,7 @@ export const COMMON_HEADERS = {
 };
 
 export const getBaseApiUrl = async () => {
-  if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+  if (Platform.OS === 'web' && typeof window !== 'undefined' && window?.location && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
     try {
       const testRes = await fetch('http://localhost:5000/', { method: 'GET' });
       if (testRes.ok) return 'http://localhost:5000/api';
@@ -26,7 +28,7 @@ export const getImageUrl = (url) => {
   if (url.startsWith('data:') || url.startsWith('http://') || url.startsWith('https://')) return url;
   if (url.startsWith('/uploads/') || url.startsWith('uploads/')) {
     const cleanPath = url.startsWith('/') ? url : `/${url}`;
-    const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+    const isLocal = Platform.OS === 'web' && typeof window !== 'undefined' && window?.location && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
     const baseUrl = isLocal ? 'http://localhost:5000' : 'http://43.204.235.124:5000';
     return `${baseUrl}${cleanPath}`;
   }

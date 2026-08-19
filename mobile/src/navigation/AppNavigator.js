@@ -18,6 +18,7 @@ import SpotDetailsScreen from '../screens/Seeker/SpotDetailsScreen';
 import BookingsScreen from '../screens/Seeker/BookingsScreen';
 import WalletScreen from '../screens/Seeker/WalletScreen';
 import ProfileScreen from '../screens/Seeker/ProfileScreen';
+import NotificationsScreen from '../screens/Seeker/NotificationsScreen';
 
 // Owner Screens
 import OwnerHomeScreen from '../screens/Owner/OwnerHomeScreen';
@@ -39,8 +40,8 @@ function SeekerTabs() {
         tabBarStyle: [
           styles.tabBar,
           {
-            height: 60 + Math.max(insets.bottom, Platform.OS === 'android' ? 8 : 0),
-            paddingBottom: Math.max(insets.bottom, 8),
+            height: 68 + Math.max(insets.bottom, Platform.OS === 'android' ? 8 : 0),
+            paddingBottom: Math.max(insets.bottom, Platform.OS === 'web' ? 12 : 8),
           },
         ],
         tabBarActiveTintColor: COLORS.primary,
@@ -84,6 +85,7 @@ function SeekerStack() {
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="SeekerMain" component={SeekerTabs} />
       <Stack.Screen name="SpotDetails" component={SpotDetailsScreen} />
+      <Stack.Screen name="Notifications" component={NotificationsScreen} />
     </Stack.Navigator>
   );
 }

@@ -22,7 +22,14 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0f172a"
       },
-      "package": "com.plantopark.seeker"
+      "package": "com.plantopark.seeker",
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -36,12 +43,18 @@
             "usesCleartextTraffic": true
           }
         }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "PlanToPark needs access to your photo library to select profile and spot photos."
+        }
       ]
     ],
-    "owner": "sailaksh123",
+    "owner": "sathyam12",
     "extra": {
       "eas": {
-        "projectId": "df808d9c-6dcb-4ec9-8f74-55bcb0ba8068"
+        "projectId": "7f15fd13-3d57-4eff-8dce-d50b97f7db6a"
       }
     }
   }

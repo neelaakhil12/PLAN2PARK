@@ -20,6 +20,7 @@ import SpotDetailsScreen from '../screens/Seeker/SpotDetailsScreen';
 import BookingsScreen from '../screens/Seeker/BookingsScreen';
 import WalletScreen from '../screens/Seeker/WalletScreen';
 import ProfileScreen from '../screens/Seeker/ProfileScreen';
+import NotificationsScreen from '../screens/Seeker/NotificationsScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -79,6 +80,7 @@ function SeekerStack() {
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="SeekerMain" component={SeekerTabs} />
       <Stack.Screen name="SpotDetails" component={SpotDetailsScreen} />
+      <Stack.Screen name="Notifications" component={NotificationsScreen} />
     </Stack.Navigator>
   );
 }

@@ -18,6 +18,7 @@ const bookingRoutes = require('./routes/bookings');
 const analyticsRoutes = require('./routes/analytics');
 const reviewRoutes = require('./routes/reviews');
 const complaintRoutes = require('./routes/complaints');
+const notificationRoutes = require('./routes/notifications');
 
 // Connect to Database
 connectDB();
@@ -39,6 +40,7 @@ app.use('/api/bookings', bookingRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/reviews', reviewRoutes);
 app.use('/api/complaints', complaintRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 // Root health check
 app.get('/', (req, res) => {

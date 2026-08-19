@@ -314,7 +314,25 @@ const enrichSpaceWithSlotAvailability = async (spaces) => {
 // ─── GET /api/spaces  (Public / Seeker) ──────────────────────────────────────
 router.get('/', async (req, res) => {
   try {
-    const spaces = await ParkingSpace.find({ status: 'approved' });
+    const { includeInactive, search } = req.query;
+    const query = { status: 'approved' };
+
+    // Hide inactive / offline spaces from seekers unless explicitly requested
+    if (!includeInactive || includeInactive === 'false') {
+      query.isActive = { $ne: false };
+    }
+
+    if (search && search.trim()) {
+      const s = search.trim();
+      query.$or = [
+        { title: { $regex: s, $options: 'i' } },
+        { address: { $regex: s, $options: 'i' } },
+        { location: { $regex: s, $options: 'i' } },
+        { city: { $regex: s, $options: 'i' } },
+      ];
+    }
+
+    const spaces = await ParkingSpace.find(query);
     const enriched = await enrichSpaceWithSlotAvailability(spaces);
     res.json(enriched);
   } catch (error) {

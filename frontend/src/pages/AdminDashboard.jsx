@@ -6,7 +6,7 @@ import {
   UserX, CheckCircle, XCircle, Activity, Layers, BarChart3,
   Bell, ChevronDown, Calendar, Search, LogOut, Settings,
   AlertTriangle, ShieldAlert, Heart, ClipboardList, HelpCircle, Star, MessageSquare,
-  Menu, X
+  Menu, X, Send, Tag, Sparkles, Megaphone
 } from 'lucide-react';
 import Invoice from './Invoice';
 
@@ -46,6 +46,14 @@ const AdminDashboard = () => {
   const [bellOpen, setBellOpen] = useState(false);
   const [filterDate, setFilterDate] = useState('');
   const [filterSpaceId, setFilterSpaceId] = useState('');
+  const [promoBroadcasts, setPromoBroadcasts] = useState([]);
+  const [promoTitle, setPromoTitle] = useState('');
+  const [promoMessage, setPromoMessage] = useState('');
+  const [promoCode, setPromoCode] = useState('');
+  const [promoDiscount, setPromoDiscount] = useState('');
+  const [promoAudience, setPromoAudience] = useState('seeker');
+  const [promoValidUntil, setPromoValidUntil] = useState('');
+  const [broadcastingPromo, setBroadcastingPromo] = useState(false);
   const bellRef = useRef(null);
 
   const unreadCount = notifications.filter(n => !n.read).length;
@@ -183,6 +191,9 @@ const AdminDashboard = () => {
     if (currentView === 'revenue' && token) {
       fetchRevenueData();
     }
+    if (currentView === 'promotions' && token) {
+      fetchPromotions();
+    }
   }, [currentView, revenueStartDate, revenueEndDate, token]);
 
   const handlePayoutSubmit = async (e) => {
@@ -243,6 +254,74 @@ const AdminDashboard = () => {
       body: JSON.stringify({ reply: replyText, status: 'resolved' }),
     });
     if (res.ok) { alert('Complaint ticket marked resolved.'); setResolvingId(null); setReplyText(''); fetchData(); }
+  };
+
+  const fetchPromotions = async () => {
+    try {
+      const res = await fetch(`${API_URL}/notifications/admin/history`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setPromoBroadcasts(data.broadcasts || []);
+      }
+    } catch (e) {
+      console.log('Error loading promo broadcasts', e);
+    }
+  };
+
+  const handleBroadcastPromo = async (e) => {
+    e.preventDefault();
+    if (!promoTitle || !promoMessage) {
+      alert('Please provide Title and Message for the broadcast');
+      return;
+    }
+    setBroadcastingPromo(true);
+    try {
+      const res = await fetch(`${API_URL}/notifications/admin/broadcast`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          title: promoTitle,
+          message: promoMessage,
+          promoCode,
+          discountPercent: promoDiscount,
+          targetRole: promoAudience,
+          validUntil: promoValidUntil || 'Limited Time Offer',
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        alert('🎉 Promotional offer broadcasted successfully to all users!');
+        setPromoTitle('');
+        setPromoMessage('');
+        setPromoCode('');
+        setPromoDiscount('');
+        setPromoValidUntil('');
+        fetchPromotions();
+      } else {
+        alert(data.message || 'Failed to broadcast');
+      }
+    } catch (err) {
+      alert('Error broadcasting notification: ' + err.message);
+    } finally {
+      setBroadcastingPromo(false);
+    }
+  };
+
+  const handleDeletePromo = async (id) => {
+    if (!window.confirm('Delete this promotional broadcast?')) return;
+    try {
+      const res = await fetch(`${API_URL}/notifications/admin/${id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        setPromoBroadcasts(prev => prev.filter(p => p._id !== id));
+      }
+    } catch (e) {
+      console.log('Error deleting promo', e);
+    }
   };
 
   // SVG Line Chart builder for Bookings & Revenue
@@ -336,10 +415,12 @@ const AdminDashboard = () => {
     complaints: 'Complaints',
     reviews: 'Support Reviews',
     notifications: 'Notifications',
+    promotions: 'Promotional Offers & Push Broadcasts',
   };
 
   const menuItems = [
     { id: 'overview', path: '/admin/dashboard', label: 'Dashboard', icon: <Layers className="h-4.5 w-4.5" /> },
+    { id: 'promotions', path: '/admin/promotions', label: '📢 Promotional Offers', icon: <Megaphone className="h-4.5 w-4.5 text-amber-400" /> },
     { id: 'users', path: '/admin/users', label: 'Users Management', icon: <Users className="h-4.5 w-4.5" /> },
     { id: 'owners', path: '/admin/owners', label: 'Place Owners verifications', icon: <UserCheck className="h-4.5 w-4.5" /> },
     { id: 'spaces', path: '/admin/spaces', label: 'Parking Spaces', icon: <MapPin className="h-4.5 w-4.5" /> },
@@ -543,6 +624,171 @@ const AdminDashboard = () => {
           ) : (
             <div className="space-y-8">
               
+              {/* ── VIEW: PROMOTIONAL OFFERS & PUSH BROADCASTS ─────────────────── */}
+              {currentView === 'promotions' && (
+                <div className="space-y-8 animate-fadeIn">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div>
+                      <h2 className="text-xl font-black text-slate-900 flex items-center gap-2">
+                        <Megaphone className="h-6 w-6 text-amber-500" />
+                        Promotional Offers & Push Broadcasts
+                      </h2>
+                      <p className="text-xs text-slate-500 mt-1">Broadcast discounts, coupon codes, and special parking alerts directly to Seeker app users.</p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    {/* Compose Broadcast Form */}
+                    <div className="lg:col-span-1 bg-white rounded-3xl border border-slate-200 p-6 shadow-sm">
+                      <div className="flex items-center gap-2 mb-4">
+                        <div className="h-8 w-8 bg-amber-50 rounded-xl flex items-center justify-center text-amber-600 font-bold">
+                          <Sparkles className="h-4 w-4" />
+                        </div>
+                        <h3 className="text-sm font-black text-slate-900">Create New Offer Broadcast</h3>
+                      </div>
+
+                      <form onSubmit={handleBroadcastPromo} className="space-y-4">
+                        <div>
+                          <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">Campaign Title *</label>
+                          <input
+                            type="text"
+                            required
+                            placeholder="e.g. 🎉 Weekend 20% OFF Special!"
+                            value={promoTitle}
+                            onChange={(e) => setPromoTitle(e.target.value)}
+                            className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:border-amber-500"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">Message / Notification Text *</label>
+                          <textarea
+                            required
+                            rows={3}
+                            placeholder="e.g. Book your spot today and get an instant 20% discount on all Hyderabad parking spaces!"
+                            value={promoMessage}
+                            onChange={(e) => setPromoMessage(e.target.value)}
+                            className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:border-amber-500 resize-none"
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">Promo Code</label>
+                            <input
+                              type="text"
+                              placeholder="e.g. PARK20"
+                              value={promoCode}
+                              onChange={(e) => setPromoCode(e.target.value)}
+                              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold uppercase focus:outline-none focus:border-amber-500"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">Discount %</label>
+                            <input
+                              type="number"
+                              min="1"
+                              max="100"
+                              placeholder="e.g. 20"
+                              value={promoDiscount}
+                              onChange={(e) => setPromoDiscount(e.target.value)}
+                              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:border-amber-500"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">Target Audience</label>
+                            <select
+                              value={promoAudience}
+                              onChange={(e) => setPromoAudience(e.target.value)}
+                              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:border-amber-500"
+                            >
+                              <option value="seeker">Seeker App Users</option>
+                              <option value="owner">Space Owners</option>
+                              <option value="all">All Registered Users</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">Validity Text</label>
+                            <input
+                              type="text"
+                              placeholder="e.g. Valid this Sunday"
+                              value={promoValidUntil}
+                              onChange={(e) => setPromoValidUntil(e.target.value)}
+                              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:border-amber-500"
+                            />
+                          </div>
+                        </div>
+
+                        <button
+                          type="submit"
+                          disabled={broadcastingPromo}
+                          className="w-full bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white font-black py-3 rounded-xl text-xs shadow-lg shadow-amber-500/25 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                        >
+                          <Send className="h-4 w-4" />
+                          {broadcastingPromo ? 'Broadcasting Offer...' : '🚀 Broadcast to All Seeker Users'}
+                        </button>
+                      </form>
+                    </div>
+
+                    {/* Sent Broadcasts History */}
+                    <div className="lg:col-span-2 bg-white rounded-3xl border border-slate-200 p-6 shadow-sm flex flex-col">
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-2">
+                          <div className="h-8 w-8 bg-emerald-50 rounded-xl flex items-center justify-center text-emerald-600 font-bold">
+                            <Tag className="h-4 w-4" />
+                          </div>
+                          <h3 className="text-sm font-black text-slate-900">Active & Past Broadcast Offers</h3>
+                        </div>
+                        <span className="text-[11px] font-bold text-slate-400">{promoBroadcasts.length} Campaigns</span>
+                      </div>
+
+                      {promoBroadcasts.length === 0 ? (
+                        <div className="py-16 text-center">
+                          <Megaphone className="h-10 w-10 text-slate-200 mx-auto mb-3" />
+                          <p className="text-xs text-slate-400 font-bold">No promotional campaigns broadcasted yet.</p>
+                        </div>
+                      ) : (
+                        <div className="space-y-3 overflow-y-auto max-h-[500px] pr-1">
+                          {promoBroadcasts.map((promo) => (
+                            <div key={promo._id} className="p-4 rounded-2xl border border-slate-100 bg-slate-50/50 hover:bg-slate-50 transition-colors relative">
+                              <div className="flex items-start justify-between gap-3">
+                                <div>
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <span className="px-2 py-0.5 bg-amber-100 text-amber-800 rounded-full text-[9px] font-black uppercase">
+                                      {promo.targetRole}
+                                    </span>
+                                    {promo.promoCode && (
+                                      <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-full text-[9px] font-black">
+                                        🎟️ {promo.promoCode} {promo.discountPercent ? `(${promo.discountPercent}% OFF)` : ''}
+                                      </span>
+                                    )}
+                                    <span className="text-[10px] text-slate-400 font-medium">
+                                      {new Date(promo.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                                    </span>
+                                  </div>
+                                  <h4 className="text-xs font-black text-slate-800">{promo.title}</h4>
+                                  <p className="text-[11px] text-slate-600 mt-1 leading-relaxed">{promo.message}</p>
+                                </div>
+                                <button
+                                  onClick={() => handleDeletePromo(promo._id)}
+                                  className="text-slate-400 hover:text-rose-500 p-1.5 rounded-lg hover:bg-rose-50 transition-colors"
+                                  title="Delete campaign"
+                                >
+                                  <X className="h-4 w-4" />
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* ── VIEW: DASHBOARD OVERVIEW ────────────────────────────────────────── */}
               {currentView === 'overview' && analytics && (
                 <div className="space-y-8 animate-fadeIn">
