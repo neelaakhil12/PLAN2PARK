@@ -55,7 +55,7 @@ const StatusBadge = ({ status }) => {
 };
 
 const SeekerDashboard = () => {
-  const { token, user, API_URL, logout } = useContext(AuthContext);
+  const { token, user, setUser, API_URL, logout, getImageUrl } = useContext(AuthContext);
   const location = useLocation();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -88,6 +88,7 @@ const SeekerDashboard = () => {
   const [useWallet, setUseWallet] = useState(true);
   const [showEditProfileModal, setShowEditProfileModal] = useState(false);
   const [showAddVehicleForm, setShowAddVehicleForm] = useState(false);
+  const [profileImgError, setProfileImgError] = useState(false);
 
   // Transient UI states (overlays)
   const [selectedSpace, setSelectedSpace] = useState(null);
@@ -618,8 +619,18 @@ const SeekerDashboard = () => {
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify(profileForm),
     });
-    if (res.ok) alert('Profile updated successfully!');
-    else alert('Failed to update profile');
+    if (res.ok) {
+      const updated = await res.json();
+      if (setUser && updated) {
+        setUser(prev => ({ ...prev, ...updated }));
+      }
+      setProfileImgError(false);
+      alert('Profile updated successfully! 📸');
+      setShowEditProfileModal(false);
+      fetchData();
+    } else {
+      alert('Failed to update profile');
+    }
   };
 
   const handleAddVehicle = async (e) => {
@@ -1053,7 +1064,6 @@ const SeekerDashboard = () => {
                           {user?.vehicles?.map(v => (
                             <option key={v._id} value={v.plateNumber}>{v.plateNumber} ({v.model || v.vehicleType})</option>
                           ))}
-                          <option value="TS07AB1234">TS07AB1234 (Demo Car)</option>
                         </select>
                         <input
                           type="text"
@@ -1845,14 +1855,19 @@ const SeekerDashboard = () => {
             <div className="bg-white border border-slate-200 rounded-3xl p-8 shadow-sm flex flex-col items-center text-center space-y-4">
               {/* Avatar with Camera Badge */}
               <div className="relative group cursor-pointer" onClick={() => setShowEditProfileModal(true)}>
-                <div className="h-24 w-24 rounded-full bg-emerald-600 flex items-center justify-center text-white text-3xl font-black border-4 border-emerald-400 overflow-hidden shadow-lg shadow-emerald-600/20">
-                  {user?.profileImage ? (
-                    <img src={user.profileImage} alt={user.name} className="h-full w-full object-cover" />
+                <div className="h-28 w-28 rounded-full bg-gradient-to-br from-emerald-500 to-teal-700 flex items-center justify-center text-white text-4xl font-black border-4 border-emerald-400 overflow-hidden shadow-xl shadow-emerald-600/25">
+                  {user?.profileImage && user.profileImage.length > 5 && !profileImgError ? (
+                    <img
+                      src={user.profileImage.startsWith('data:') ? user.profileImage : (getImageUrl ? getImageUrl(user.profileImage) : user.profileImage)}
+                      alt=""
+                      className="h-full w-full object-cover"
+                      onError={() => setProfileImgError(true)}
+                    />
                   ) : (
-                    (user?.name || 'U').charAt(0).toUpperCase()
+                    <span>{(user?.name || 'A').trim().charAt(0).toUpperCase()}</span>
                   )}
                 </div>
-                <div className="absolute -bottom-1 -right-1 h-8 w-8 bg-emerald-500 rounded-full flex items-center justify-center text-white border-2 border-white shadow-md text-sm">
+                <div className="absolute bottom-0 right-0 h-9 w-9 bg-emerald-500 hover:bg-emerald-600 rounded-full flex items-center justify-center text-white border-2 border-white shadow-md text-sm transition-transform group-hover:scale-110">
                   📷
                 </div>
               </div>
