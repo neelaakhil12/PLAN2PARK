@@ -467,6 +467,158 @@ router.post('/:id/razorpay-order', protect, seekerOnly, async (req, res) => {
   }
 });
 
+// @desc    Render hosted Razorpay Checkout page for mobile WebView
+// @route   GET /api/bookings/:id/pay-webview
+// @access  Public / Token query param
+router.get('/:id/pay-webview', async (req, res) => {
+  try {
+    const { token } = req.query;
+    if (!token) {
+      return res.status(401).send('<h3>Unauthorized: Missing authentication token.</h3>');
+    }
+
+    let decoded;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET || 'plantopark_secret_key_2024');
+    } catch (e) {
+      return res.status(401).send('<h3>Unauthorized: Invalid or expired token.</h3>');
+    }
+
+    const booking = await Booking.findById(req.params.id).populate('spaceId').populate('seekerId');
+    if (!booking) {
+      return res.status(404).send('<h3>Booking not found.</h3>');
+    }
+
+    const keyId = process.env.RAZORPAY_KEY_ID || 'rzp_test_TRbpfgVeLqTOdb';
+    const keySecret = process.env.RAZORPAY_KEY_SECRET || '6hvk04JdO3lgV0j9DYXezC8R';
+
+    let orderId = '';
+    try {
+      const razorpay = new Razorpay({ key_id: keyId, key_secret: keySecret });
+      const order = await razorpay.orders.create({
+        amount: Math.round(booking.totalAmount * 100),
+        currency: 'INR',
+        receipt: `rcpt_${booking._id}`,
+      });
+      orderId = order.id;
+    } catch (ordErr) {
+      console.log('Order creation fallback:', ordErr.message);
+      orderId = 'order_' + crypto.randomBytes(8).toString('hex');
+    }
+
+    const html = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>PlanToPark - Secure Checkout</title>
+  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background-color: #ffffff;
+      color: #1e293b;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 20px;
+      text-align: center;
+    }
+    .spinner {
+      width: 42px;
+      height: 42px;
+      border: 3.5px solid #e2e8f0;
+      border-top: 3.5px solid #10b981;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin-bottom: 16px;
+    }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    .title { font-size: 16px; font-weight: 800; color: #0f172a; margin-bottom: 6px; }
+    .sub { font-size: 13px; color: #64748b; }
+    .amount { font-size: 20px; font-weight: 900; color: #10b981; margin: 12px 0; }
+  </style>
+</head>
+<body>
+  <div class="spinner"></div>
+  <div class="title">PlanToPark Secure Checkout</div>
+  <div class="amount">₹${booking.totalAmount}.00</div>
+  <div class="sub">Opening payment gateway...</div>
+
+  <script>
+    var options = {
+      key: "${keyId}",
+      order_id: "${orderId}",
+      amount: ${Math.round(booking.totalAmount * 100)},
+      currency: "INR",
+      name: "PlanToPark",
+      description: "Parking Reservation - ${booking.spaceId?.title || 'Parking Slot'}",
+      prefill: {
+        name: "${booking.seekerId?.name || 'Seeker'}",
+        email: "${booking.seekerId?.email || 'seeker@plantopark.com'}",
+        contact: "${booking.seekerId?.contact || booking.seekerId?.phone || '9876543210'}"
+      },
+      notes: {
+        bookingId: "${booking._id}",
+        vehicleNumber: "${booking.vehicleNumber || ''}"
+      },
+      theme: {
+        color: "#10b981"
+      },
+      modal: {
+        backdropclose: false,
+        escape: false,
+        handleback: false,
+        confirm_close: true,
+        ondismiss: function() {
+          if (window.ReactNativeWebView) {
+            window.ReactNativeWebView.postMessage(JSON.stringify({ event: 'PAYMENT_CANCELLED' }));
+          }
+        }
+      },
+      handler: function(response) {
+        if (window.ReactNativeWebView) {
+          window.ReactNativeWebView.postMessage(JSON.stringify({
+            event: 'PAYMENT_SUCCESS',
+            payment_id: response.razorpay_payment_id,
+            order_id: response.razorpay_order_id || "${orderId}",
+            signature: response.razorpay_signature || ''
+          }));
+        }
+      }
+    };
+
+    var rzp = new Razorpay(options);
+    rzp.on('payment.failed', function(resp) {
+      if (window.ReactNativeWebView) {
+        window.ReactNativeWebView.postMessage(JSON.stringify({
+          event: 'PAYMENT_FAILED',
+          error: resp.error?.description || 'Payment failed'
+        }));
+      }
+    });
+
+    window.onload = function() {
+      setTimeout(function() {
+        rzp.open();
+      }, 300);
+    };
+  </script>
+</body>
+</html>
+    `;
+
+    res.send(html);
+  } catch (err) {
+    console.error('pay-webview error:', err);
+    res.status(500).send('<h3>Error initializing payment page: ' + err.message + '</h3>');
+  }
+});
+
 // @desc    Verify Razorpay payment signature & credit to admin ledger
 // @route   POST /api/bookings/:id/verify-payment
 // @access  Private (Seeker only)
