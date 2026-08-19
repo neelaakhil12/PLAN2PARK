@@ -194,7 +194,10 @@ router.post('/', protect, seekerOnly, upload.single('driverImageFile'), async (r
 // @access  Private (Seeker only)
 router.get('/my-bookings', protect, seekerOnly, async (req, res) => {
   try {
-    const bookings = await Booking.find({ seekerId: req.user._id })
+    const bookings = await Booking.find({ 
+      seekerId: req.user._id,
+      status: { $in: ['paid', 'completed', 'cancelled'] }
+    })
       .populate({
         path: 'spaceId',
         populate: { path: 'ownerId', select: 'name contact email' },
