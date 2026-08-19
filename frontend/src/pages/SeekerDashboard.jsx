@@ -1212,6 +1212,7 @@ const SeekerDashboard = () => {
                       { label: '🎯 10 km', value: 10 },
                       { label: '🎯 15 km', value: 15 },
                       { label: '🎯 20 km', value: 20 },
+                      { label: '🎯 25 km', value: 25 },
                     ].map(r => (
                       <button
                         key={r.label}
@@ -1750,6 +1751,7 @@ const SeekerDashboard = () => {
                     { label: '🎯 10 km', value: 10 },
                     { label: '🎯 15 km', value: 15 },
                     { label: '🎯 20 km', value: 20 },
+                    { label: '🎯 25 km', value: 25 },
                   ].map(r => (
                     <button
                       key={r.label}

@@ -46,6 +46,7 @@ const RADIUS_OPTIONS = [
   { label: '10 km', value: 10, icon: '🎯' },
   { label: '15 km', value: 15, icon: '🎯' },
   { label: '20 km', value: 20, icon: '🎯' },
+  { label: '25 km', value: 25, icon: '🎯' },
 ];
 
 export default function SeekerHomeScreen({ navigation }) {
