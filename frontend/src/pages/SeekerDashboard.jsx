@@ -2044,10 +2044,10 @@ const SeekerDashboard = () => {
                               </>
                             )}
 
-                            {b.status === 'pending_approval' && (
+                            {['allotted', 'paid', 'pending_approval'].includes(b.status) && (
                               <button 
                                 onClick={() => handleCancel(b._id)} 
-                                className="bg-rose-50 border border-rose-200 text-rose-600 hover:bg-rose-100 font-bold px-3 py-2 rounded-xl text-xs transition-all hover:-translate-y-0.5"
+                                className="bg-rose-50 border border-rose-200 text-rose-600 hover:bg-rose-100 font-bold px-3 py-2 rounded-xl text-xs transition-all hover:-translate-y-0.5 cursor-pointer"
                               >
                                 Cancel
                               </button>
