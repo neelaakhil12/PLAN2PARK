@@ -86,6 +86,8 @@ const SeekerDashboard = () => {
   const [payLoading, setPayLoading] = useState(false);
   const [walletBalance, setWalletBalance] = useState(150);
   const [useWallet, setUseWallet] = useState(true);
+  const [showEditProfileModal, setShowEditProfileModal] = useState(false);
+  const [showAddVehicleForm, setShowAddVehicleForm] = useState(false);
 
   // Transient UI states (overlays)
   const [selectedSpace, setSelectedSpace] = useState(null);
@@ -1830,117 +1832,304 @@ const SeekerDashboard = () => {
           </div>
         )}
 
-        {/* ── VIEW: PROFILE ────────────────────────────────────────────────── */}
+        {/* ── VIEW: PROFILE (MATCHING SEEKER MOBILE APP 1:1) ─────────────── */}
         {currentView === 'profile' && (
-          <div className="space-y-5 max-w-4xl mx-auto animate-fadeIn">
+          <div className="space-y-6 max-w-3xl mx-auto animate-fadeIn pb-16">
+            {/* Header */}
             <div>
-              <h1 className="text-2xl font-extrabold text-slate-900">My Profile</h1>
-              <p className="text-slate-500 text-sm mt-0.5">Manage your account details and registered vehicles.</p>
+              <h1 className="text-2xl font-black text-slate-900 tracking-tight">My Profile</h1>
+              <p className="text-slate-500 text-sm mt-0.5">Account Settings &amp; Vehicle Info</p>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Account settings */}
-              <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
-                <h3 className="font-bold text-slate-800 mb-1">Account Settings</h3>
-                <p className="text-xs text-slate-400 mb-5">Update name, contact or password.</p>
-                <form onSubmit={handleProfileSubmit} className="space-y-4">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Full Name</label>
-                    <input type="text" required value={profileForm.name} onChange={e => setProfileForm(p => ({ ...p, name: e.target.value }))}
-                      className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-emerald-400" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Phone</label>
-                    <input type="text" value={profileForm.contact} onChange={e => setProfileForm(p => ({ ...p, contact: e.target.value }))}
-                      className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-emerald-400" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Profile Image</label>
-                    <div className="flex items-center gap-4">
-                      {profileForm.profileImage && <img src={profileForm.profileImage} alt="Profile" className="h-10 w-10 rounded-full object-cover border border-slate-200" />}
-                      <input type="file" accept="image/*" onChange={e => {
-                        const file = e.target.files[0];
-                        if (file) {
-                          const reader = new FileReader();
-                          reader.onloadend = () => setProfileForm(p => ({ ...p, profileImage: reader.result }));
-                          reader.readAsDataURL(file);
-                        }
-                      }} className="w-full px-4 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-emerald-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-bold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100" />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Driver License #</label>
-                      <input type="text" value={profileForm.driverLicenseNumber} onChange={e => setProfileForm(p => ({ ...p, driverLicenseNumber: e.target.value }))} placeholder="DL..."
-                        className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-emerald-400" />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">License Image</label>
-                      <input type="file" accept="image/*" onChange={e => {
-                        const file = e.target.files[0];
-                        if (file) {
-                          const reader = new FileReader();
-                          reader.onloadend = () => setProfileForm(p => ({ ...p, driverLicenseImage: reader.result }));
-                          reader.readAsDataURL(file);
-                        }
-                      }} className="w-full px-4 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-emerald-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-bold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100" />
-                      {profileForm.driverLicenseImage && <p className="text-[10px] text-emerald-600 font-semibold mt-1">Image uploaded ✓</p>}
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">New Password <span className="text-slate-300 normal-case">(leave blank to keep)</span></label>
-                    <input type="password" value={profileForm.password} onChange={e => setProfileForm(p => ({ ...p, password: e.target.value }))} placeholder="••••••••"
-                      className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-emerald-400" />
-                  </div>
-                  <button type="submit" className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 rounded-xl text-sm transition-colors shadow-sm">
-                    Save Changes
-                  </button>
-                </form>
+
+            {/* 1. Main Profile Hero Card */}
+            <div className="bg-white border border-slate-200 rounded-3xl p-8 shadow-sm flex flex-col items-center text-center space-y-4">
+              {/* Avatar with Camera Badge */}
+              <div className="relative group cursor-pointer" onClick={() => setShowEditProfileModal(true)}>
+                <div className="h-24 w-24 rounded-full bg-emerald-600 flex items-center justify-center text-white text-3xl font-black border-4 border-emerald-400 overflow-hidden shadow-lg shadow-emerald-600/20">
+                  {user?.profileImage ? (
+                    <img src={user.profileImage} alt={user.name} className="h-full w-full object-cover" />
+                  ) : (
+                    (user?.name || 'U').charAt(0).toUpperCase()
+                  )}
+                </div>
+                <div className="absolute -bottom-1 -right-1 h-8 w-8 bg-emerald-500 rounded-full flex items-center justify-center text-white border-2 border-white shadow-md text-sm">
+                  📷
+                </div>
               </div>
 
-              {/* Vehicle registration */}
-              <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
-                <h3 className="font-bold text-slate-800 mb-1">Registered Vehicles</h3>
-                <p className="text-xs text-slate-400 mb-5">Save your vehicle plates for faster booking.</p>
-                <form onSubmit={handleAddVehicle} className="space-y-3 bg-slate-50 p-4 rounded-xl border border-slate-200 mb-5">
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">License Plate</label>
-                      <input type="text" required value={newPlate} onChange={e => setNewPlate(e.target.value)} placeholder="TS 09 AB 1234"
-                        className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-emerald-400 uppercase bg-white" />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Model</label>
-                      <input type="text" required value={newModel} onChange={e => setNewModel(e.target.value)} placeholder="Hyundai i20"
-                        className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-emerald-400 bg-white" />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Type</label>
-                    <select value={newType} onChange={e => setNewType(e.target.value)} className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:outline-none bg-white">
-                      <option value="2-wheeler">2-Wheelers (Bike / Scooter)</option>
-                      <option value="4-wheeler">4-Wheelers / Standard Cars (Sedan/Hatchback)</option>
-                      <option value="large-car">Large Cars (SUV / MUV)</option>
-                      <option value="heavy-vehicle">Heavy Vehicles (Truck / Van)</option>
-                    </select>
-                  </div>
-                  <button type="submit" className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-2 rounded-xl text-xs transition-colors">
-                    Add Vehicle +
-                  </button>
-                </form>
-                <div className="space-y-2 max-h-52 overflow-y-auto">
-                  {!user?.vehicles?.length ? (
-                    <p className="text-slate-400 text-xs text-center py-4">No registered vehicles yet.</p>
-                  ) : user.vehicles.map(veh => (
-                    <div key={veh._id} className="flex justify-between items-center p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs">
-                      <div>
-                        <p className="font-mono font-bold text-slate-800 uppercase">{veh.plateNumber}</p>
-                        <p className="text-slate-400 text-[10px]">{veh.model} · {getVehicleTypeLabel(veh.vehicleType)}</p>
+              <div>
+                <h2 className="text-2xl font-black text-slate-900 capitalize tracking-tight">
+                  {user?.name || 'Parking Seeker'}
+                </h2>
+                <p className="text-slate-400 text-sm font-medium mt-0.5">{user?.email || 'seeker@example.com'}</p>
+                <p className="text-slate-600 text-xs font-bold mt-1">📞 {user?.contact || user?.phone || '9989551305'}</p>
+              </div>
+
+              {/* Role Tag */}
+              <div className="inline-flex items-center gap-1.5 bg-emerald-50 text-emerald-700 font-black text-[11px] px-4 py-1.5 rounded-full border border-emerald-200 tracking-wider uppercase">
+                PARKING SEEKER
+              </div>
+
+              {/* Edit Profile Button */}
+              <button
+                type="button"
+                onClick={() => setShowEditProfileModal(true)}
+                className="w-full sm:w-auto px-8 py-3 bg-slate-900 hover:bg-slate-800 text-white font-extrabold text-xs rounded-2xl transition-all shadow-md flex items-center justify-center gap-2"
+              >
+                ✏️ Edit Profile Details
+              </button>
+            </div>
+
+            {/* 2. Saved Vehicle Details Card */}
+            <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-7 shadow-sm space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-base font-black text-slate-900">Saved Vehicle Details</h3>
+                <button
+                  type="button"
+                  onClick={() => setShowAddVehicleForm(p => !p)}
+                  className="text-xs font-black text-emerald-600 hover:text-emerald-700 bg-emerald-50 px-3.5 py-1.5 rounded-xl border border-emerald-200"
+                >
+                  {showAddVehicleForm ? 'Cancel' : '+ Add Vehicle'}
+                </button>
+              </div>
+
+              {/* Primary Vehicle Item */}
+              {user?.vehicles && user.vehicles.length > 0 ? (
+                <div className="space-y-3">
+                  {user.vehicles.map((v, idx) => (
+                    <div
+                      key={v._id || idx}
+                      className={`p-4 rounded-2xl border transition-all flex items-center justify-between ${
+                        idx === 0 ? 'bg-slate-50 border-emerald-200' : 'bg-slate-50/60 border-slate-200'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3.5">
+                        <div className="h-10 w-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-xl shadow-xs">
+                          {v.vehicleType === '2-wheeler' ? '🏍️' : '🚗'}
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono font-black text-slate-900 text-sm uppercase tracking-wider">{v.plateNumber}</span>
+                            {idx === 0 && (
+                              <span className="bg-emerald-500 text-white text-[9px] font-black px-2 py-0.5 rounded-md uppercase tracking-wider">
+                                PRIMARY
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[11px] text-slate-400 font-medium mt-0.5">
+                            {v.model || 'Standard'} • {getVehicleTypeLabel(v.vehicleType)} • Active Parking License
+                          </p>
+                        </div>
                       </div>
-                      <button onClick={() => handleDeleteVehicle(veh._id)} className="text-rose-500 hover:text-rose-700 font-semibold hover:underline">Remove</button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteVehicle(v._id)}
+                        className="text-xs font-extrabold text-rose-500 hover:text-rose-700 px-2 py-1"
+                      >
+                        Remove
+                      </button>
                     </div>
                   ))}
                 </div>
+              ) : (
+                <div className="p-4 rounded-2xl border bg-slate-50 border-emerald-200 flex items-center justify-between">
+                  <div className="flex items-center gap-3.5">
+                    <div className="h-10 w-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-xl">
+                      🚗
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono font-black text-slate-900 text-sm uppercase">TS 07 AB 1234</span>
+                        <span className="bg-emerald-500 text-white text-[9px] font-black px-2 py-0.5 rounded-md uppercase">
+                          PRIMARY
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-400 font-medium mt-0.5">Car • Active Parking License</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Expandable Add Vehicle Form */}
+              {showAddVehicleForm && (
+                <form onSubmit={handleAddVehicle} className="p-4 bg-emerald-50/50 border border-emerald-200 rounded-2xl space-y-3 mt-4">
+                  <h4 className="text-xs font-black text-emerald-900 uppercase">Register New Vehicle</h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <input
+                      type="text"
+                      required
+                      placeholder="License Plate (e.g. TS 08 EA 5678)"
+                      value={newPlate}
+                      onChange={e => setNewPlate(e.target.value.toUpperCase())}
+                      className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 uppercase focus:outline-none focus:border-emerald-500"
+                    />
+                    <input
+                      type="text"
+                      required
+                      placeholder="Model (e.g. Hyundai i20)"
+                      value={newModel}
+                      onChange={e => setNewModel(e.target.value)}
+                      className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+                  <select
+                    value={newType}
+                    onChange={e => setNewType(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:border-emerald-500"
+                  >
+                    <option value="4-wheeler">4-Wheelers / Standard Cars (Sedan/Hatchback)</option>
+                    <option value="2-wheeler">2-Wheelers (Bike / Scooter)</option>
+                    <option value="large-car">Large Cars (SUV / MUV)</option>
+                    <option value="heavy-vehicle">Heavy Vehicles (Truck / Van)</option>
+                  </select>
+                  <button
+                    type="submit"
+                    className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-black py-2.5 rounded-xl text-xs shadow-md transition-colors"
+                  >
+                    Save Vehicle
+                  </button>
+                </form>
+              )}
+            </div>
+
+            {/* 3. Account Overview Stats Grid */}
+            <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-7 shadow-sm space-y-4">
+              <h3 className="text-base font-black text-slate-900">Account Overview</h3>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 text-center">
+                  <p className="text-sm font-black text-emerald-600">Active</p>
+                  <p className="text-[11px] text-slate-400 font-bold uppercase mt-0.5">Status</p>
+                </div>
+                <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 text-center">
+                  <p className="text-sm font-black text-blue-600">Verified</p>
+                  <p className="text-[11px] text-slate-400 font-bold uppercase mt-0.5">Account</p>
+                </div>
+                <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 text-center">
+                  <p className="text-sm font-black text-emerald-600">₹{walletBalance || 150}.00</p>
+                  <p className="text-[11px] text-slate-400 font-bold uppercase mt-0.5">Wallet</p>
+                </div>
+                <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 text-center">
+                  <p className="text-sm font-black text-slate-900">{bookings.length}</p>
+                  <p className="text-[11px] text-slate-400 font-bold uppercase mt-0.5">Bookings</p>
+                </div>
               </div>
+            </div>
+
+            {/* 4. Support & Legal */}
+            <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-7 shadow-sm space-y-3">
+              <h3 className="text-base font-black text-slate-900">Support &amp; Legal</h3>
+              <button
+                type="button"
+                onClick={() => setCurrentView('complaints')}
+                className="w-full text-left p-4 bg-slate-50 hover:bg-slate-100 border border-slate-200/80 rounded-2xl text-xs font-bold text-slate-700 flex items-center justify-between transition-colors"
+              >
+                <span>📞 24/7 Customer Support Desk</span>
+                <span>→</span>
+              </button>
+              <div className="p-4 bg-slate-50 border border-slate-200/80 rounded-2xl text-xs font-bold text-slate-700 flex items-center justify-between">
+                <span>📜 Terms of Service &amp; Privacy Policy</span>
+                <span className="text-emerald-600 font-extrabold">Standard</span>
+              </div>
+            </div>
+
+            {/* 5. Sign Out Button */}
+            <button
+              type="button"
+              onClick={logout}
+              className="w-full bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 font-black py-4 rounded-2xl text-sm transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-xs"
+            >
+              Sign Out
+            </button>
+          </div>
+        )}
+
+        {/* ── EDIT PROFILE MODAL ───────────────────────────────────────────── */}
+        {showEditProfileModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-fadeIn">
+            <div className="w-full max-w-lg bg-white rounded-3xl shadow-2xl p-7 relative max-h-[90vh] overflow-y-auto">
+              <button
+                onClick={() => setShowEditProfileModal(false)}
+                className="absolute top-5 right-5 text-slate-400 hover:text-slate-700"
+              >
+                <XCircle className="h-6 w-6" />
+              </button>
+
+              <h3 className="text-xl font-black text-slate-900 mb-1">Edit Profile Details</h3>
+              <p className="text-slate-400 text-xs mb-6">Update your account information, contact, and security settings.</p>
+
+              <form onSubmit={async (e) => {
+                await handleProfileSubmit(e);
+                setShowEditProfileModal(false);
+                fetchData();
+              }} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 uppercase mb-1.5">Full Name</label>
+                  <input
+                    type="text"
+                    required
+                    value={profileForm.name}
+                    onChange={e => setProfileForm(p => ({ ...p, name: e.target.value }))}
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 uppercase mb-1.5">Phone Number</label>
+                  <input
+                    type="text"
+                    required
+                    value={profileForm.contact}
+                    onChange={e => setProfileForm(p => ({ ...p, contact: e.target.value }))}
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 uppercase mb-1.5">Profile Photo (Base64 / File)</label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={e => {
+                      const file = e.target.files[0];
+                      if (file) {
+                        const reader = new FileReader();
+                        reader.onloadend = () => setProfileForm(p => ({ ...p, profileImage: reader.result }));
+                        reader.readAsDataURL(file);
+                      }
+                    }}
+                    className="w-full px-4 py-2 border border-slate-200 rounded-xl text-xs bg-slate-50"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 uppercase mb-1.5">
+                    New Password <span className="text-slate-400 normal-case font-normal">(leave blank to keep unchanged)</span>
+                  </label>
+                  <input
+                    type="password"
+                    placeholder="••••••••"
+                    value={profileForm.password}
+                    onChange={e => setProfileForm(p => ({ ...p, password: e.target.value }))}
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+
+                <div className="flex gap-3 pt-3">
+                  <button
+                    type="submit"
+                    className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white font-black py-3.5 rounded-xl text-sm shadow-md transition-colors"
+                  >
+                    Save Changes
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowEditProfileModal(false)}
+                    className="px-5 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold rounded-xl text-sm transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         )}
