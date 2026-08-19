@@ -752,34 +752,15 @@ const OwnerDashboard = () => {
                       </div>
 
                       {/* Action Buttons */}
-                      <div className="pt-2 flex flex-wrap items-center gap-2">
-                        {item.seekerContact && (
+                      <div className="pt-2 flex flex-wrap items-center justify-between gap-2">
+                        {item.seekerContact ? (
                           <a
                             href={`tel:${item.seekerContact}`}
                             className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 font-bold text-xs px-3.5 py-2 rounded-xl transition-colors flex items-center gap-1.5"
                           >
                             <Phone className="h-3.5 w-3.5" /> Call Driver ({item.seekerContact})
                           </a>
-                        )}
-
-                        <button
-                          onClick={() => navigate(`/invoice/${item._id}`)}
-                          className="bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 font-bold text-xs px-3.5 py-2 rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer"
-                        >
-                          <FileText className="h-3.5 w-3.5" /> Invoice
-                        </button>
-
-                        {space?.coordinates && (
-                          <button
-                            onClick={() => {
-                              const dest = `${space.coordinates.lat},${space.coordinates.lng}`;
-                              window.open(`https://www.google.com/maps/dir/?api=1&destination=${dest}`, '_blank');
-                            }}
-                            className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs px-3.5 py-2 rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer"
-                          >
-                            <Navigation className="h-3.5 w-3.5" /> Navigation
-                          </button>
-                        )}
+                        ) : <div />}
 
                         <button
                           onClick={() => handleDeleteBooking(item._id)}
