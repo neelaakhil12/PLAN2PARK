@@ -72,9 +72,31 @@ const seedAdmin = async () => {
   } catch (error) {
     console.error('Error seeding admin:', error.message);
   }
+// Auto-complete expired bookings every 60 seconds
+const autoCompleteExpiredBookings = async () => {
+  try {
+    const Booking = require('./models/Booking');
+    const now = new Date();
+    const result = await Booking.updateMany(
+      {
+        status: 'paid',
+        endTime: { $lt: now }
+      },
+      {
+        $set: { status: 'completed' }
+      }
+    );
+    if (result.modifiedCount > 0) {
+      console.log(`[Auto-Complete] Automatically completed ${result.modifiedCount} expired parking sessions.`);
+    }
+  } catch (err) {
+    console.error('[Auto-Complete Error]:', err.message);
+  }
 };
 
 setTimeout(seedAdmin, 3000);
+setTimeout(autoCompleteExpiredBookings, 5000);
+setInterval(autoCompleteExpiredBookings, 60000);
 
 // Global error handler
 app.use((err, req, res, next) => {
