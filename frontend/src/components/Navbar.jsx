@@ -50,11 +50,12 @@ const Navbar = () => {
 
   const isSeeker = user?.role === 'seeker';
 
-  // Seeker-specific navigation links that appear in the top bar
+  // Seeker-specific navigation links that appear in the top bar (Matches Seeker App)
   const seekerLinks = [
-    { label: 'Dashboard', view: null, icon: <LayoutDashboard className="h-4 w-4" /> },
-    { label: 'Find Parking', view: 'find_parking', icon: <Search className="h-4 w-4" /> },
+    { label: 'Discover', view: null, icon: <Search className="h-4 w-4" /> },
     { label: 'Bookings', view: 'bookings', icon: <BookOpen className="h-4 w-4" /> },
+    { label: 'Wallet', view: 'wallet', icon: <Wallet className="h-4 w-4" /> },
+    { label: 'Profile', view: 'profile', icon: <User className="h-4 w-4" /> },
   ];
 
   // Build URL for seeker tab link
@@ -65,7 +66,7 @@ const Navbar = () => {
   const isSeekerLinkActive = (view) => {
     if (!location.pathname.startsWith('/seeker/dashboard')) return false;
     const currentView = searchParams.get('view');
-    if (view === null) return !currentView; // Dashboard is active when no view param
+    if (view === null) return !currentView || currentView === 'discover' || currentView === 'find_parking' || currentView === 'dashboard';
     return currentView === view;
   };
 

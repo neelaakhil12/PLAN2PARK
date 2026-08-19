@@ -1749,9 +1749,85 @@ const SeekerDashboard = () => {
           </div>
         )}
 
+        {/* ── VIEW: WALLET ─────────────────────────────────────────────────── */}
+        {currentView === 'wallet' && (
+          <div className="space-y-6 max-w-4xl mx-auto animate-fadeIn">
+            <div>
+              <h1 className="text-2xl font-black text-slate-900 tracking-tight">PlanToPark Wallet</h1>
+              <p className="text-slate-500 text-sm mt-0.5">Manage your digital balance, auto-discounts, and instant checkout credits.</p>
+            </div>
+
+            {/* Wallet Balance Hero Card */}
+            <div className="bg-gradient-to-br from-emerald-600 via-emerald-700 to-teal-800 rounded-3xl p-6 sm:p-8 text-white shadow-xl shadow-emerald-600/20 relative overflow-hidden">
+              <div className="relative z-10 space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-black uppercase tracking-widest text-emerald-200 bg-white/10 px-3 py-1 rounded-full border border-white/20">
+                    ⚡ Instant Booking Credits
+                  </span>
+                  <div className="h-10 w-10 bg-white/10 rounded-2xl flex items-center justify-center text-xl">
+                    💳
+                  </div>
+                </div>
+                <div>
+                  <p className="text-emerald-100 text-xs font-bold uppercase tracking-wider">Available Balance</p>
+                  <h2 className="text-4xl sm:text-5xl font-black mt-1">₹{walletBalance || 150}.00</h2>
+                  <p className="text-xs text-emerald-200 mt-2 font-medium">
+                    ✓ Automatically applicable on all parking spots up to host-configured limit (e.g. ₹10 off).
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Wallet Key Perks */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+                <div className="h-10 w-10 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center text-lg mb-3">
+                  ⚡
+                </div>
+                <h4 className="font-extrabold text-slate-900 text-sm">Instant 1-Click Pay</h4>
+                <p className="text-xs text-slate-400 mt-1">No OTP delays or gateway redirect wait times when paying full amount.</p>
+              </div>
+              <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+                <div className="h-10 w-10 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center text-lg mb-3">
+                  🛡️
+                </div>
+                <h4 className="font-extrabold text-slate-900 text-sm">Auto Discount</h4>
+                <p className="text-xs text-slate-400 mt-1">Automatically knocks off fees on verified parking host properties.</p>
+              </div>
+              <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+                <div className="h-10 w-10 bg-amber-50 text-amber-600 rounded-xl flex items-center justify-center text-lg mb-3">
+                  🔄
+                </div>
+                <h4 className="font-extrabold text-slate-900 text-sm">Direct Refunds</h4>
+                <p className="text-xs text-slate-400 mt-1">Immediate credit restoration back to your balance on booking cancellations.</p>
+              </div>
+            </div>
+
+            {/* Wallet Activity History */}
+            <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+              <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+                <h3 className="font-bold text-slate-800">Wallet Transactions</h3>
+                <span className="text-xs font-bold text-emerald-600">Active</span>
+              </div>
+              <div className="p-6">
+                <div className="flex items-start gap-3 p-3.5 bg-slate-50 border border-slate-100 rounded-xl">
+                  <div className="h-8 w-8 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-sm shrink-0">
+                    +
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-extrabold text-slate-800">Welcome Signup Credit</p>
+                    <p className="text-[10px] text-slate-400 mt-0.5">Automated registration welcome bonus</p>
+                  </div>
+                  <span className="font-mono font-black text-emerald-600 text-sm">+₹150.00</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* ── VIEW: PROFILE ────────────────────────────────────────────────── */}
         {currentView === 'profile' && (
-          <div className="space-y-5 max-w-4xl mx-auto">
+          <div className="space-y-5 max-w-4xl mx-auto animate-fadeIn">
             <div>
               <h1 className="text-2xl font-extrabold text-slate-900">My Profile</h1>
               <p className="text-slate-500 text-sm mt-0.5">Manage your account details and registered vehicles.</p>
