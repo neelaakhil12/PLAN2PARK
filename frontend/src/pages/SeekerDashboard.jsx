@@ -84,7 +84,7 @@ const SeekerDashboard = () => {
   const [favorites, setFavorites] = useState([]);
   const [loading, setLoading] = useState(true);
   const [payLoading, setPayLoading] = useState(false);
-  const [walletBalance, setWalletBalance] = useState(150);
+  const [walletBalance, setWalletBalance] = useState(0);
   const [walletTransactions, setWalletTransactions] = useState([]);
   const [useWallet, setUseWallet] = useState(true);
   const [showEditProfileModal, setShowEditProfileModal] = useState(false);
@@ -2332,10 +2332,10 @@ const SeekerDashboard = () => {
                   </div>
                 </div>
                 <div>
-                  <p className="text-emerald-100 text-xs font-bold uppercase tracking-wider">Available Balance</p>
-                  <h2 className="text-4xl sm:text-5xl font-black mt-1">₹{walletBalance || 150}.00</h2>
+                  <p className="text-emerald-100 text-xs font-bold uppercase tracking-wider">Available Refund &amp; Wallet Balance</p>
+                  <h2 className="text-4xl sm:text-5xl font-black mt-1">₹{walletBalance || 0}.00</h2>
                   <p className="text-xs text-emerald-200 mt-2 font-medium">
-                    ✓ Automatically applicable on all parking spots up to host-configured limit (e.g. ₹10 off).
+                    ✓ Auto-credited upon reservation cancellation &amp; usable for future parking bookings.
                   </p>
                 </div>
               </div>
@@ -2348,21 +2348,21 @@ const SeekerDashboard = () => {
                   ⚡
                 </div>
                 <h4 className="font-extrabold text-slate-900 text-sm">Instant 1-Click Pay</h4>
-                <p className="text-xs text-slate-400 mt-1">No OTP delays or gateway redirect wait times when paying full amount.</p>
+                <p className="text-xs text-slate-400 mt-1">Pay using your refund credits directly without payment gateway redirection.</p>
               </div>
               <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
                 <div className="h-10 w-10 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center text-lg mb-3">
                   🛡️
                 </div>
                 <h4 className="font-extrabold text-slate-900 text-sm">Auto Discount</h4>
-                <p className="text-xs text-slate-400 mt-1">Automatically knocks off fees on verified parking host properties.</p>
+                <p className="text-xs text-slate-400 mt-1">Automatically applies your refund credits toward any parking reservation.</p>
               </div>
               <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
                 <div className="h-10 w-10 bg-amber-50 text-amber-600 rounded-xl flex items-center justify-center text-lg mb-3">
                   🔄
                 </div>
-                <h4 className="font-extrabold text-slate-900 text-sm">Direct Refunds</h4>
-                <p className="text-xs text-slate-400 mt-1">Immediate credit restoration back to your balance on booking cancellations.</p>
+                <h4 className="font-extrabold text-slate-900 text-sm">Direct Cancellation Refunds</h4>
+                <p className="text-xs text-slate-400 mt-1">Immediate credit restoration back to your balance when you cancel a booking.</p>
               </div>
             </div>
 
@@ -2370,50 +2370,47 @@ const SeekerDashboard = () => {
             <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
               <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
                 <div>
-                  <h3 className="font-bold text-slate-800">Wallet Transactions &amp; Refunds</h3>
-                  <p className="text-xs text-slate-400">Complete record of deductions, instant discounts, and cancellation credits.</p>
+                  <h3 className="font-bold text-slate-800">Wallet Ledger &amp; Cancellation Refunds</h3>
+                  <p className="text-xs text-slate-400">Complete record of deductions and cancellation credits.</p>
                 </div>
                 <span className="text-xs font-bold bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-full border border-emerald-200">
-                  {walletTransactions.length > 0 ? walletTransactions.length + 1 : 1} Records
+                  {walletTransactions.length} Records
                 </span>
               </div>
               <div className="p-6 space-y-3">
-                {/* Dynamically Render All Wallet Transactions */}
-                {walletTransactions.map((tx, idx) => {
-                  const isCredit = tx.type === 'credit';
-                  return (
-                    <div key={tx._id || idx} className="flex items-start gap-3.5 p-3.5 bg-slate-50 border border-slate-100 rounded-2xl hover:bg-slate-100/70 transition-colors">
-                      <div className={`h-9 w-9 rounded-full flex items-center justify-center font-black text-sm shrink-0 shadow-xs ${
-                        isCredit ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' : 'bg-rose-100 text-rose-700 border border-rose-200'
-                      }`}>
-                        {isCredit ? '+' : '−'}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-black text-slate-900 leading-snug">{tx.description || (isCredit ? 'Wallet Credit / Refund' : 'Parking Wallet Deduction')}</p>
-                        <p className="text-[10px] text-slate-400 font-medium mt-0.5">
-                          {tx.date ? new Date(tx.date).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : 'Recent transaction'}
-                        </p>
-                      </div>
-                      <span className={`font-mono font-black text-sm shrink-0 ${
-                        isCredit ? 'text-emerald-600' : 'text-rose-600'
-                      }`}>
-                        {isCredit ? `+₹${Number(tx.amount).toFixed(2)}` : `−₹${Number(tx.amount).toFixed(2)}`}
-                      </span>
-                    </div>
-                  );
-                })}
-
-                {/* Base Welcome Signup Credit */}
-                <div className="flex items-start gap-3.5 p-3.5 bg-emerald-50/40 border border-emerald-100 rounded-2xl">
-                  <div className="h-9 w-9 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-black text-sm shrink-0 border border-emerald-200 shadow-xs">
-                    +
+                {walletTransactions.length === 0 ? (
+                  <div className="text-center py-12 text-slate-400">
+                    <p className="text-3xl mb-2">💳</p>
+                    <p className="text-sm font-bold text-slate-700">No Wallet Transactions Yet</p>
+                    <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
+                      When you cancel a reservation, your refunded amount will automatically be credited here to use for future bookings.
+                    </p>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-black text-slate-900">Welcome Registration Signup Credit</p>
-                    <p className="text-[10px] text-emerald-600 font-medium mt-0.5">Automated registration welcome bonus</p>
-                  </div>
-                  <span className="font-mono font-black text-emerald-600 text-sm shrink-0">+₹150.00</span>
-                </div>
+                ) : (
+                  walletTransactions.map((tx, idx) => {
+                    const isCredit = tx.type === 'credit';
+                    return (
+                      <div key={tx._id || idx} className="flex items-start gap-3.5 p-3.5 bg-slate-50 border border-slate-100 rounded-2xl hover:bg-slate-100/70 transition-colors">
+                        <div className={`h-9 w-9 rounded-full flex items-center justify-center font-black text-sm shrink-0 shadow-xs ${
+                          isCredit ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' : 'bg-rose-100 text-rose-700 border border-rose-200'
+                        }`}>
+                          {isCredit ? '+' : '−'}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-black text-slate-900 leading-snug">{tx.description || (isCredit ? 'Cancellation Refund Credit' : 'Parking Wallet Deduction')}</p>
+                          <p className="text-[10px] text-slate-400 font-medium mt-0.5">
+                            {tx.date ? new Date(tx.date).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : 'Recent transaction'}
+                          </p>
+                        </div>
+                        <span className={`font-mono font-black text-sm shrink-0 ${
+                          isCredit ? 'text-emerald-600' : 'text-rose-600'
+                        }`}>
+                          {isCredit ? `+₹${Number(tx.amount).toFixed(2)}` : `−₹${Number(tx.amount).toFixed(2)}`}
+                        </span>
+                      </div>
+                    );
+                  })
+                )}
               </div>
             </div>
           </div>
