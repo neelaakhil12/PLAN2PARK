@@ -72,6 +72,8 @@ const seedAdmin = async () => {
   } catch (error) {
     console.error('Error seeding admin:', error.message);
   }
+};
+
 // Auto-complete expired bookings every 60 seconds
 const autoCompleteExpiredBookings = async () => {
   try {
@@ -97,6 +99,7 @@ const autoCompleteExpiredBookings = async () => {
 setTimeout(seedAdmin, 3000);
 setTimeout(autoCompleteExpiredBookings, 5000);
 setInterval(autoCompleteExpiredBookings, 60000);
+
 
 // Global error handler
 app.use((err, req, res, next) => {
