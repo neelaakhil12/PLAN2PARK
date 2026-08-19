@@ -1289,68 +1289,71 @@ const SeekerDashboard = () => {
                         return (
                           <div
                             key={space._id}
-                            className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm hover:shadow-md transition-all flex flex-col justify-between group"
+                            className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm hover:shadow-md transition-all flex flex-col justify-between group p-5 space-y-4"
                           >
                             <div>
-                              {/* Photo & Badges */}
-                              <div className="relative aspect-[16/10] bg-slate-100 overflow-hidden">
+                              {/* Photo */}
+                              <div className="relative aspect-[16/10] bg-slate-100 rounded-2xl overflow-hidden mb-4">
                                 <img
                                   src={spotImg}
                                   alt={space.title || space.address}
                                   className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-300"
                                 />
                                 <div className="absolute top-3 left-3 flex flex-wrap gap-1.5">
-                                  <span className="bg-emerald-600/95 text-white font-black text-[9px] px-2.5 py-1 rounded-full uppercase tracking-wider shadow">
+                                  <span className="bg-emerald-600 text-white font-black text-[9px] px-2.5 py-1 rounded-full uppercase tracking-wider shadow">
                                     VERIFIED OWNER SPOT
                                   </span>
                                   {space.hasEvCharger && (
-                                    <span className="bg-blue-600/95 text-white font-black text-[9px] px-2 py-1 rounded-full uppercase tracking-wider shadow">
-                                      ⚡ EV
+                                    <span className="bg-blue-600 text-white font-black text-[9px] px-2.5 py-1 rounded-full uppercase tracking-wider shadow">
+                                      ⚡ EV CHARGING
                                     </span>
                                   )}
                                 </div>
-                                <div className="absolute bottom-3 right-3 bg-slate-900/85 backdrop-blur-md text-white font-black text-xs px-3 py-1.5 rounded-xl">
-                                  ₹{space.pricePerHour || 50}/hr
+                                <div className="absolute top-3 right-3 bg-slate-900/90 backdrop-blur-md text-emerald-400 font-black text-sm px-3 py-1 rounded-xl shadow">
+                                  ₹{space.pricePerHour || 50}<span className="text-[10px] text-slate-300 font-normal">/hr</span>
                                 </div>
                               </div>
 
-                              {/* Content */}
-                              <div className="p-5 space-y-2.5">
-                                <h4 className="font-extrabold text-slate-900 text-base leading-snug truncate">
+                              {/* Title & Address */}
+                              <div className="space-y-1">
+                                <h4 className="font-black text-slate-900 text-lg leading-snug truncate">
                                   {space.title || space.address}
                                 </h4>
                                 <p className="text-xs text-slate-500 font-medium flex items-center gap-1.5 truncate">
-                                  <MapPin className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                                  <MapPin className="h-3.5 w-3.5 text-rose-500 shrink-0" />
                                   {space.address || space.location}
                                 </p>
-
-                                <div className="flex items-center gap-2 pt-1 flex-wrap">
-                                  <span className={`text-[10px] font-black px-2.5 py-1 rounded-lg uppercase tracking-wider ${
-                                    !isFull ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-rose-50 text-rose-600 border border-rose-200'
-                                  }`}>
-                                    {!isFull ? `🟢 ${freeSlots} of ${space.totalSlots || 5} Free` : '🚫 Full'}
-                                  </span>
-                                  <span className="text-[10px] font-extrabold text-slate-600 bg-slate-100 px-2 py-1 rounded-lg">
-                                    🎯 {space.distBadge || 'Nearby'}
-                                  </span>
-                                  {sLat && (
-                                    <a
-                                      href={`https://www.google.com/maps/dir/?api=1&destination=${sLat},${sLng}`}
-                                      target="_blank"
-                                      rel="noreferrer"
-                                      onClick={e => e.stopPropagation()}
-                                      className="text-[10px] font-black bg-blue-50 hover:bg-blue-100 text-blue-600 px-2 py-1 rounded-lg flex items-center gap-1"
-                                      title="Open GPS Navigation"
-                                    >
-                                      🧭 Directions
-                                    </a>
-                                  )}
-                                </div>
                               </div>
+
+                              {/* Pills Row (Matching Mobile App 1:1) */}
+                              <div className="flex items-center gap-2 pt-3 flex-wrap">
+                                <span className="bg-emerald-50 border border-emerald-200 text-emerald-700 font-black text-[11px] px-2.5 py-1 rounded-xl flex items-center gap-1">
+                                  🎯 {space.calculatedDist} km away
+                                </span>
+                                <span className="bg-slate-100 text-slate-600 font-bold text-[11px] px-2.5 py-1 rounded-xl">
+                                  🚗 4-wheeler
+                                </span>
+                                <span className={`font-bold text-[11px] px-2.5 py-1 rounded-xl ${
+                                  !isFull ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
+                                }`}>
+                                  {!isFull ? '🟢 Easy Availability' : '🔴 Full'}
+                                </span>
+                              </div>
+
+                              <p className="text-[11px] text-slate-400 italic pt-2">
+                                Helps users decide before traveling.
+                              </p>
                             </div>
 
-                            {/* Book Button */}
-                            <div className="p-5 pt-0">
+                            {/* Footer (Real-Time Capacity & Book Button) */}
+                            <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-3">
+                              <div>
+                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Real-Time Capacity</p>
+                                <p className={`text-xs font-black mt-0.5 ${!isFull ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                  {!isFull ? `🟢 ${freeSlots} of ${space.totalSlots || 5} Slots Free` : '🚫 Full'}
+                                </p>
+                              </div>
+
                               <button
                                 type="button"
                                 onClick={() => {
@@ -1359,13 +1362,13 @@ const SeekerDashboard = () => {
                                   setForm(p => ({ ...p, seekerName: user?.name || '', seekerContact: user?.contact || '', startTime: now, bookingType: 'hourly', hours: '1' }));
                                 }}
                                 disabled={isFull}
-                                className={`w-full py-3.5 rounded-2xl text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-xs ${
+                                className={`px-5 py-3 rounded-2xl text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-xs ${
                                   !isFull
-                                    ? 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-emerald-500/20'
+                                    ? 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-emerald-500/25'
                                     : 'bg-slate-100 text-slate-400 cursor-not-allowed'
                                 }`}
                               >
-                                {!isFull ? 'Book This Spot →' : 'Slot Currently Occupied'}
+                                {!isFull ? 'Book Spot →' : 'Full'}
                               </button>
                             </div>
                           </div>
