@@ -11,12 +11,13 @@ import {
   Platform,
   StatusBar,
   ScrollView,
+  Image,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AuthContext } from '../../context/AuthContext';
-import { getBaseApiUrl, endpoints, COMMON_HEADERS } from '../../config/api';
+import { getBaseApiUrl, endpoints, COMMON_HEADERS, getImageUrl } from '../../config/api';
 import { COLORS } from '../../theme/colors';
 import PinLocationModal from '../../components/PinLocationModal';
 import ProfileEditorModal from '../../components/ProfileEditorModal';
@@ -289,6 +290,14 @@ export default function SeekerHomeScreen({ navigation }) {
           <Text style={[styles.spotTitle, { fontSize: 17 }]}>{item.title || 'Bank Vehicle Stockyard'}</Text>
           <Text style={styles.spotAddress}>📍 {item.address || item.location || ''}</Text>
 
+          {(item.image || item.imageUrl) ? (
+            <Image
+              source={{ uri: getImageUrl(item.image || item.imageUrl) }}
+              style={{ width: '100%', height: 135, borderRadius: 10, marginTop: 8 }}
+              resizeMode="cover"
+            />
+          ) : null}
+
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginVertical: 8 }}>
             <View style={{ backgroundColor: '#1e293b', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 }}>
               <Text style={{ color: '#e2e8f0', fontSize: 11, fontWeight: '700' }}>👮 24/7 Guards</Text>
@@ -351,6 +360,14 @@ export default function SeekerHomeScreen({ navigation }) {
 
         <Text style={styles.spotTitle}>{item.title || item.location || 'Owner Parking Space'}</Text>
         <Text style={styles.spotAddress}>📍 {item.address || item.location || ''}</Text>
+
+        {(item.image || item.imageUrl) ? (
+          <Image
+            source={{ uri: getImageUrl(item.image || item.imageUrl) }}
+            style={{ width: '100%', height: 130, borderRadius: 10, marginTop: 8 }}
+            resizeMode="cover"
+          />
+        ) : null}
 
         {/* Distance + Live Demand Badges Row */}
         <View style={styles.distanceRow}>

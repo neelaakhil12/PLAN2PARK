@@ -11,7 +11,9 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Platform,
+  Image,
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { AuthContext } from '../../context/AuthContext';
 import { endpoints, getBaseApiUrl } from '../../config/api';
 import { COLORS } from '../../theme/colors';
@@ -22,6 +24,7 @@ export default function AddSpotScreen({ route, navigation }) {
   const { token, user } = useContext(AuthContext);
   const editingSpot = route?.params?.spot || null;
 
+  const [spotImage, setSpotImage] = useState(editingSpot?.image || editingSpot?.imageUrl || '');
   const [title, setTitle] = useState(editingSpot?.title || '');
   const [plotNo, setPlotNo] = useState('');
   const [colonyArea, setColonyArea] = useState('');
@@ -72,12 +75,45 @@ export default function AddSpotScreen({ route, navigation }) {
       setHasEvCharger(Boolean(s.hasEvCharger));
       setIsActive(s.isActive !== false);
       setCancellationPolicy(s.cancellationPolicy || 'full');
-      setMaxWalletDiscount(String(s.maxWalletDiscount !== undefined ? s.maxWalletDiscount : '10'));
+      if (s.image || s.imageUrl) {
+        setSpotImage(s.image || s.imageUrl);
+      }
       if (s.suitableVehicles && s.suitableVehicles.length > 0) {
         setSuitableVehicles(s.suitableVehicles);
       }
     }
   }, [route?.params?.spot]);
+
+  const handlePickImage = async () => {
+    try {
+      try {
+        const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (perm.status === 'denied' && !perm.canAskAgain && Platform.OS === 'ios') {
+          showAlert('Permission Required', 'Please enable photo library access in device settings.');
+          return;
+        }
+      } catch (pErr) {
+        console.warn('Permission request error:', pErr);
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.7,
+        base64: true,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const asset = result.assets[0];
+        const base64Data = asset.base64 ? `data:image/jpeg;base64,${asset.base64}` : asset.uri;
+        setSpotImage(base64Data);
+      }
+    } catch (err) {
+      console.error('Image picker error:', err);
+      showAlert('Error', 'Could not select photo: ' + (err.message || 'Error'));
+    }
+  };
 
   const toggleVehicleType = (typeId) => {
     if (suitableVehicles.includes(typeId)) {
@@ -541,6 +577,8 @@ export default function AddSpotScreen({ route, navigation }) {
           locationLink: googleMapsLink,
           lat,
           lng,
+          image: spotImage,
+          imageUrl: spotImage,
           hourlyRate: Number(hourlyRate),
           pricePerHour: Number(hourlyRate),
           totalSpots: Number(totalSpots),
@@ -968,11 +1006,110 @@ export default function AddSpotScreen({ route, navigation }) {
             </View>
           )}
 
+          {/* Photo Upload Section */}
+          <View style={{
+            marginBottom: 20,
+            marginTop: 10,
+            backgroundColor: '#1e293b',
+            padding: 16,
+            borderRadius: 14,
+            borderWidth: 1.5,
+            borderColor: isVehicleStorageYard ? 'rgba(245, 158, 11, 0.4)' : 'rgba(124, 58, 237, 0.4)',
+          }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+              <Text style={{ fontSize: 15, fontWeight: '800', color: COLORS.white }}>
+                {isVehicleStorageYard ? '📸 1+ Acre Land & Yard Photos' : '📸 Parking Spot Photos'}
+              </Text>
+              {spotImage ? (
+                <View style={{ backgroundColor: '#10b981', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 }}>
+                  <Text style={{ color: '#ffffff', fontSize: 11, fontWeight: '800' }}>✓ Photo Added</Text>
+                </View>
+              ) : null}
+            </View>
+            <Text style={{ fontSize: 12, color: '#94a3b8', lineHeight: 18, marginBottom: 12 }}>
+              {isVehicleStorageYard
+                ? 'Upload clear photos of your 1+ Acre land, boundary wall, security cabin, or gate so banks & auto finance companies can verify your yard easily.'
+                : 'Upload clear photos of your parking spot, driveway, or garage so drivers and seekers can easily identify and navigate to it.'}
+            </Text>
+
+            {spotImage ? (
+              <View style={{ marginBottom: 8, borderRadius: 12, overflow: 'hidden' }}>
+                <Image
+                  source={{ uri: spotImage }}
+                  style={{ width: '100%', height: 180, borderRadius: 12 }}
+                  resizeMode="cover"
+                />
+                <View style={{ flexDirection: 'row', gap: 10, marginTop: 10 }}>
+                  <TouchableOpacity
+                    style={{
+                      flex: 1,
+                      backgroundColor: 'rgba(56, 189, 248, 0.15)',
+                      borderWidth: 1,
+                      borderColor: '#38bdf8',
+                      paddingVertical: 10,
+                      borderRadius: 10,
+                      alignItems: 'center',
+                    }}
+                    onPress={handlePickImage}
+                  >
+                    <Text style={{ color: '#38bdf8', fontWeight: '800', fontSize: 13 }}>🔄 Change Photo</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={{
+                      flex: 1,
+                      backgroundColor: 'rgba(239, 68, 68, 0.15)',
+                      borderWidth: 1,
+                      borderColor: '#ef4444',
+                      paddingVertical: 10,
+                      borderRadius: 10,
+                      alignItems: 'center',
+                    }}
+                    onPress={() => setSpotImage('')}
+                  >
+                    <Text style={{ color: '#ef4444', fontWeight: '800', fontSize: 13 }}>🗑️ Remove Photo</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ) : (
+              <TouchableOpacity
+                style={{
+                  borderWidth: 2,
+                  borderStyle: 'dashed',
+                  borderColor: isVehicleStorageYard ? COLORS.storageAccent : COLORS.ownerAccent,
+                  borderRadius: 12,
+                  paddingVertical: 20,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: 'rgba(15, 23, 42, 0.6)',
+                }}
+                onPress={handlePickImage}
+                activeOpacity={0.8}
+              >
+                <Text style={{ fontSize: 32, marginBottom: 6 }}>
+                  {isVehicleStorageYard ? '🏢' : '📷'}
+                </Text>
+                <Text style={{ color: isVehicleStorageYard ? COLORS.storageAccent : COLORS.ownerAccent, fontWeight: '800', fontSize: 14 }}>
+                  {isVehicleStorageYard ? '+ Upload 1+ Acre Land / Yard Photo' : '+ Upload Parking Spot Photo'}
+                </Text>
+                <Text style={{ color: '#64748b', fontSize: 11, marginTop: 4 }}>
+                  Tap to select from device gallery
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
           <Button
-            title={editingSpot ? "Save Changes & Update Spot" : "Publish Parking Listing"}
+            title={
+              editingSpot
+                ? (isVehicleStorageYard ? "Save Changes & Update Yard" : "Save Changes & Update Spot")
+                : (isVehicleStorageYard ? "Publish 1+ Acre Vehicle Storage Yard" : "Publish Parking Listing")
+            }
             onPress={handleCreateSpot}
             loading={loading}
-            style={{ backgroundColor: COLORS.ownerAccent, marginTop: 20 }}
+            style={{
+              backgroundColor: isVehicleStorageYard ? COLORS.storageAccent : COLORS.ownerAccent,
+              marginTop: 10,
+            }}
           />
         </View>
       </ScrollView>

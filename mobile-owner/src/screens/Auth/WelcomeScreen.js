@@ -37,24 +37,39 @@ export default function WelcomeScreen({ navigation }) {
         </View>
 
         <View style={styles.buttonContainer}>
+          {/* 1. Login as Space Owner */}
           <Button
-            title="Login into Plan2Park Owner App"
-            onPress={() => navigation.navigate('Login', { role: 'owner' })}
+            title="Login as Space Owner"
+            onPress={() => navigation.navigate('Login', { role: 'owner', category: 'standard' })}
             style={styles.loginBtn}
           />
 
           <TouchableOpacity
-            style={styles.registerBtn}
+            style={styles.registerLink}
             onPress={() => navigation.navigate('Register', { role: 'owner', category: 'standard' })}
           >
-            <Text style={styles.registerTxt}>Don't have an account? Register as Owner</Text>
+            <Text style={styles.registerLinkTxt}>Don't have an account? Register as Space Owner</Text>
           </TouchableOpacity>
 
+          {/* Divider */}
+          <View style={styles.dividerRow}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerTxt}>OR FOR LANDOWNERS (1+ ACRE)</Text>
+            <View style={styles.dividerLine} />
+          </View>
+
+          {/* 2. Login as Vehicle Storage Land Owner in the same button color and style */}
+          <Button
+            title="Login as Vehicle Storage Land Owner"
+            onPress={() => navigation.navigate('Login', { role: 'owner', category: 'vehicle_storage_owner' })}
+            style={styles.loginBtn}
+          />
+
           <TouchableOpacity
-            style={styles.storageLandBtn}
+            style={styles.registerLink}
             onPress={() => navigation.navigate('Register', { role: 'owner', category: 'vehicle_storage_owner' })}
           >
-            <Text style={styles.storageLandTxt}>🏢 Register 1+ Acre Land for Bank Vehicle Storage →</Text>
+            <Text style={styles.registerLinkTxt}>Don't have an account? Register as Vehicle Storage Land Owner</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -75,24 +90,24 @@ const styles = StyleSheet.create({
   },
   logoContainer: {
     alignItems: 'center',
-    marginTop: 40,
-    marginBottom: 16,
+    marginTop: 30,
+    marginBottom: 12,
   },
   logoImage: {
-    width: 130,
-    height: 130,
+    width: 125,
+    height: 125,
     borderRadius: 26,
-    marginBottom: 16,
+    marginBottom: 14,
   },
   brandTitle: {
     fontSize: 28,
     fontWeight: '900',
     color: COLORS.white,
     letterSpacing: 0.5,
-    marginBottom: 8,
+    marginBottom: 6,
   },
   tagline: {
-    fontSize: 14.5,
+    fontSize: 14,
     color: COLORS.textMuted,
     textAlign: 'center',
     paddingHorizontal: 20,
@@ -104,13 +119,13 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: '#f59e0b',
     borderRadius: 14,
-    padding: 14,
-    marginVertical: 18,
+    padding: 13,
+    marginVertical: 16,
   },
   noteHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 6,
+    marginBottom: 5,
   },
   noteIcon: {
     fontSize: 16,
@@ -140,28 +155,32 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
     borderRadius: 14,
   },
-  registerBtn: {
-    marginTop: 14,
+  registerLink: {
+    marginTop: 10,
+    marginBottom: 6,
     alignItems: 'center',
   },
-  registerTxt: {
+  registerLinkTxt: {
     color: COLORS.ownerAccent,
-    fontSize: 14.5,
+    fontSize: 13.5,
     fontWeight: '700',
+    textAlign: 'center',
   },
-  storageLandBtn: {
-    marginTop: 14,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 10,
-    backgroundColor: 'rgba(245, 158, 11, 0.1)',
-    borderWidth: 1,
-    borderColor: 'rgba(245, 158, 11, 0.3)',
+  dividerRow: {
+    flexDirection: 'row',
     alignItems: 'center',
+    marginVertical: 18,
   },
-  storageLandTxt: {
-    color: '#f59e0b',
-    fontSize: 12.5,
-    fontWeight: '700',
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#334155',
+  },
+  dividerTxt: {
+    color: '#64748b',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+    marginHorizontal: 12,
   },
 });

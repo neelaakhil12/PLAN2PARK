@@ -16,12 +16,9 @@ import Button from '../../components/Button';
 import Header from '../../components/Header';
 
 export default function RegisterScreen({ route, navigation }) {
-  const initialCategory = route.params?.category === 'bank_finance_seeker' ? 'bank_finance_seeker' : 'standard';
-  const [currentCategory, setCurrentCategory] = useState(initialCategory);
+  const isBankSeeker = route.params?.category === 'bank_finance_seeker';
 
   const { signupForRole } = useContext(AuthContext);
-
-  const isBankSeeker = currentCategory === 'bank_finance_seeker';
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -53,11 +50,10 @@ export default function RegisterScreen({ route, navigation }) {
     setLoading(true);
     try {
       const extraData = {
-        accountCategory: currentCategory,
+        accountCategory: isBankSeeker ? 'bank_finance_seeker' : 'standard',
         ...(isBankSeeker ? { organizationName: organizationName.trim() } : {}),
       };
 
-      // Always register as role 'seeker' in seeker app
       await signupForRole('seeker', name.trim(), email.trim(), password.trim(), contact.trim(), extraData);
       Alert.alert('🎉 Welcome!', 'Account registered successfully!');
     } catch (err) {
@@ -75,31 +71,12 @@ export default function RegisterScreen({ route, navigation }) {
       <Header title={roleTitle} subtitle="PlanToPark Seeker" onBack={() => navigation.goBack()} />
 
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        {/* Portal Switcher */}
-        <View style={styles.tabContainer}>
-          <TouchableOpacity
-            style={[
-              styles.tabBtn,
-              !isBankSeeker && { backgroundColor: COLORS.seekerAccent },
-            ]}
-            onPress={() => setCurrentCategory('standard')}
-          >
-            <Text style={[styles.tabTxt, !isBankSeeker && { color: '#ffffff', fontWeight: '800' }]}>
-              🚗 Parking Seeker
+        <View style={styles.badgeRow}>
+          <View style={[styles.roleBadge, { backgroundColor: themeColor }]}>
+            <Text style={styles.roleBadgeTxt}>
+              {isBankSeeker ? '🏦 BANK & AUTO FINANCE REGISTRATION' : '🚗 PARKING SEEKER REGISTRATION'}
             </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[
-              styles.tabBtn,
-              isBankSeeker && { backgroundColor: COLORS.bankAccent },
-            ]}
-            onPress={() => setCurrentCategory('bank_finance_seeker')}
-          >
-            <Text style={[styles.tabTxt, isBankSeeker && { color: '#ffffff', fontWeight: '800' }]}>
-              🏦 Banks & Auto Finance
-            </Text>
-          </TouchableOpacity>
+          </View>
         </View>
 
         <Text style={styles.heading}>
@@ -198,11 +175,13 @@ export default function RegisterScreen({ route, navigation }) {
             onPress={() =>
               navigation.navigate('Login', {
                 role: 'seeker',
-                category: currentCategory,
+                category: isBankSeeker ? 'bank_finance_seeker' : 'standard',
               })
             }
           >
-            <Text style={[styles.footerLink, { color: themeColor }]}>Log In</Text>
+            <Text style={[styles.footerLink, { color: themeColor }]}>
+              {isBankSeeker ? 'Bank & Auto Finance Login' : 'Log In as Seeker'}
+            </Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -217,27 +196,22 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 24,
-    paddingTop: 10,
+    paddingTop: 14,
   },
-  tabContainer: {
+  badgeRow: {
     flexDirection: 'row',
-    gap: 8,
-    marginBottom: 16,
-    backgroundColor: '#0f172a',
-    padding: 4,
-    borderRadius: 12,
+    marginBottom: 12,
   },
-  tabBtn: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: 10,
-    alignItems: 'center',
-    backgroundColor: '#1e293b',
+  roleBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 8,
   },
-  tabTxt: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#94a3b8',
+  roleBadgeTxt: {
+    color: '#ffffff',
+    fontWeight: '800',
+    fontSize: 11,
+    letterSpacing: 0.5,
   },
   heading: {
     fontSize: 26,

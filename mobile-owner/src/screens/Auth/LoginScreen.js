@@ -16,6 +16,9 @@ import Button from '../../components/Button';
 import Header from '../../components/Header';
 
 export default function LoginScreen({ route, navigation }) {
+  const category = route.params?.category === 'vehicle_storage_owner' ? 'vehicle_storage_owner' : 'standard';
+  const isStorage = category === 'vehicle_storage_owner';
+
   const { loginForRole } = useContext(AuthContext);
 
   const [email, setEmail] = useState('');
@@ -23,6 +26,8 @@ export default function LoginScreen({ route, navigation }) {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+
+  const themeColor = isStorage ? COLORS.storageAccent : COLORS.ownerAccent;
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -47,27 +52,39 @@ export default function LoginScreen({ route, navigation }) {
 
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
-      <Header title="Owner Login" subtitle="PlanToPark Owner" onBack={() => navigation.goBack()} />
+      <Header
+        title={isStorage ? 'Vehicle Storage Land Owner Login' : 'Space Owner Login'}
+        subtitle="PlanToPark Owner"
+        onBack={() => navigation.goBack()}
+      />
 
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <View style={styles.badgeRow}>
-          <View style={[styles.roleBadge, { backgroundColor: COLORS.ownerAccent }]}>
-            <Text style={styles.roleBadgeTxt}>🅿️ OWNER DASHBOARD LOGIN</Text>
+          <View style={[styles.roleBadge, { backgroundColor: themeColor }]}>
+            <Text style={[styles.roleBadgeTxt, isStorage && { color: '#000000' }]}>
+              {isStorage ? '🏢 VEHICLE STORAGE LAND OWNER (1+ ACRE)' : '🅿️ SPACE OWNER LOGIN'}
+            </Text>
           </View>
         </View>
 
-        <Text style={styles.heading}>Welcome Back 👋</Text>
+        <Text style={styles.heading}>
+          {isStorage ? 'Vehicle Storage Partner 🏢' : 'Welcome Back 👋'}
+        </Text>
         <Text style={styles.subheading}>
-          Enter your owner credentials to manage your listed parking spots and vehicle storage yards
+          {isStorage
+            ? 'Enter your credentials to manage your 1+ Acre vehicle storage yards for banks & auto finance'
+            : 'Enter your credentials to manage your listed parking spaces, driveways & garages'}
         </Text>
 
-        {/* ℹ️ Mandatory 1 Acre Land Requirement Note before Login */}
-        <View style={styles.noteBox}>
-          <Text style={styles.noteTitle}>ℹ️ VEHICLE STORAGE NOTICE</Text>
-          <Text style={styles.noteText}>
-            Listing land for Commercial Vehicle Storage (for banks & auto finance seized vehicles) requires a minimum of <Text style={{ fontWeight: '800', color: '#fbbf24' }}>1.0 Acre land</Text>.
-          </Text>
-        </View>
+        {/* ℹ️ Mandatory 1 Acre Land Requirement Note for Vehicle Storage */}
+        {isStorage && (
+          <View style={styles.noteBox}>
+            <Text style={styles.noteTitle}>⚠️ MANDATORY 1 ACRE LAND REQUIREMENT</Text>
+            <Text style={styles.noteText}>
+              A minimum of <Text style={{ fontWeight: '800', color: '#fbbf24' }}>1.0 Acre (43,560 sq ft)</Text> of secure, gated/fenced land is strictly required for listing Commercial Vehicle Storage / Bank Seized Vehicle Stockyards.
+            </Text>
+          </View>
+        )}
 
         {!!errorMsg && (
           <View style={styles.errorBox}>
@@ -116,15 +133,21 @@ export default function LoginScreen({ route, navigation }) {
             style={{ alignSelf: 'flex-end', marginTop: 8 }}
             onPress={() => navigation.navigate('ForgotPassword', { role: 'owner', email })}
           >
-            <Text style={{ color: COLORS.ownerAccent, fontSize: 13, fontWeight: '600' }}>Forgot Password?</Text>
+            <Text style={{ color: themeColor, fontSize: 13, fontWeight: '600' }}>Forgot Password?</Text>
           </TouchableOpacity>
         </View>
 
         <Button
-          title={loading ? 'Signing in...' : 'Sign In as Owner'}
+          title={
+            loading
+              ? 'Signing in...'
+              : isStorage
+              ? 'Sign In as Vehicle Storage Land Owner'
+              : 'Sign In as Space Owner'
+          }
           onPress={handleLogin}
           disabled={loading}
-          style={[styles.submitBtn, { backgroundColor: COLORS.ownerAccent }]}
+          style={[styles.submitBtn, { backgroundColor: themeColor }]}
         />
 
         <View style={styles.footerRow}>
@@ -133,10 +156,13 @@ export default function LoginScreen({ route, navigation }) {
             onPress={() =>
               navigation.navigate('Register', {
                 role: 'owner',
+                category,
               })
             }
           >
-            <Text style={[styles.footerLink, { color: COLORS.ownerAccent }]}>Register as Owner</Text>
+            <Text style={[styles.footerLink, { color: themeColor }]}>
+              {isStorage ? 'Register as Vehicle Storage Land Owner' : 'Register as Space Owner'}
+            </Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -181,9 +207,9 @@ const styles = StyleSheet.create({
     lineHeight: 19,
   },
   noteBox: {
-    backgroundColor: 'rgba(245, 158, 11, 0.1)',
-    borderWidth: 1,
-    borderColor: 'rgba(245, 158, 11, 0.4)',
+    backgroundColor: 'rgba(245, 158, 11, 0.12)',
+    borderWidth: 1.5,
+    borderColor: '#f59e0b',
     borderRadius: 12,
     padding: 12,
     marginBottom: 18,
@@ -261,10 +287,10 @@ const styles = StyleSheet.create({
   },
   footerTxt: {
     color: COLORS.textMuted,
-    fontSize: 14,
+    fontSize: 13.5,
   },
   footerLink: {
     fontWeight: '700',
-    fontSize: 14,
+    fontSize: 13.5,
   },
 });

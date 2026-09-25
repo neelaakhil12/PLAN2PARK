@@ -21,12 +21,44 @@ const diskStorage = multer.diskStorage({
 });
 const upload = multer({ storage: diskStorage });
 
+// Helper to save base64 data image to local disk
+const saveBase64Image = (base64Str) => {
+  try {
+    if (!base64Str || typeof base64Str !== 'string' || !base64Str.startsWith('data:image/')) {
+      return base64Str;
+    }
+    const commaIdx = base64Str.indexOf(',');
+    if (commaIdx === -1) return base64Str;
+    const header = base64Str.slice(0, commaIdx);
+    const rawData = base64Str.slice(commaIdx + 1);
+    const extMatch = header.match(/image\/([a-zA-Z0-9+]+)/);
+    let ext = extMatch && extMatch[1] ? extMatch[1].toLowerCase() : 'png';
+    if (ext === 'jpeg') ext = 'jpg';
+    if (ext === 'svg+xml') ext = 'svg';
+
+    const buffer = Buffer.from(rawData, 'base64');
+    const filename = `space-${Date.now()}-${Math.round(Math.random() * 1e9)}.${ext}`;
+    const filePath = path.join(uploadsDir, filename);
+    fs.writeFileSync(filePath, buffer);
+    return `/uploads/${filename}`;
+  } catch (err) {
+    console.error('Error saving space base64 image:', err);
+    return base64Str;
+  }
+};
+
 // Helper to format image URL
 const formatImageUrl = (req, file, fallbackUrl) => {
   if (file) {
     return `/uploads/${file.filename}`;
   }
-  if (fallbackUrl && fallbackUrl.trim()) return fallbackUrl.trim();
+  if (fallbackUrl && typeof fallbackUrl === 'string' && fallbackUrl.trim()) {
+    const trimmed = fallbackUrl.trim();
+    if (trimmed.startsWith('data:image/')) {
+      return saveBase64Image(trimmed);
+    }
+    return trimmed;
+  }
   return 'https://images.unsplash.com/photo-1506015391300-4802dc74de2e?w=1200&q=80';
 };
 
@@ -199,6 +231,7 @@ router.post('/', protect, ownerOnly, upload.single('imageFile'), async (req, res
     landAcres,
     securityFacilities,
     imageUrl,
+    image,
     lat,
     lng,
     suitableVehicles,
@@ -214,7 +247,7 @@ router.post('/', protect, ownerOnly, upload.single('imageFile'), async (req, res
       });
     }
 
-    const finalImageUrl = formatImageUrl(req, req.file, imageUrl);
+    const finalImageUrl = formatImageUrl(req, req.file, image || imageUrl);
     const finalTotalSlots = Number(totalSlots || totalSpots || (isCommercial ? 100 : 5));
     const finalRate = Number(pricePerHour || hourlyRate || 50);
     const finalAddress = address || location || 'Hyderabad';
@@ -540,8 +573,8 @@ router.put('/:id', protect, ownerOnly, upload.single('imageFile'), async (req, r
         }
       }
       space.image = `/uploads/${req.file.filename}`;
-    } else if (req.body.imageUrl && req.body.imageUrl.trim()) {
-      space.image = req.body.imageUrl.trim();
+    } else if (req.body.image || req.body.imageUrl) {
+      space.image = formatImageUrl(req, null, req.body.image || req.body.imageUrl);
     }
 
     // ── Other field updates ──────────────────────────────────────────────────

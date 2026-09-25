@@ -16,8 +16,7 @@ import Button from '../../components/Button';
 import Header from '../../components/Header';
 
 export default function LoginScreen({ route, navigation }) {
-  const initialCategory = route.params?.category === 'bank_finance_seeker' ? 'bank_finance_seeker' : 'standard';
-  const [currentCategory, setCurrentCategory] = useState(initialCategory);
+  const isBankSeeker = route.params?.category === 'bank_finance_seeker';
 
   const { loginForRole } = useContext(AuthContext);
 
@@ -26,8 +25,6 @@ export default function LoginScreen({ route, navigation }) {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
-
-  const isBankSeeker = currentCategory === 'bank_finance_seeker';
 
   const roleTitle = isBankSeeker ? 'Banks & Finance Login' : 'Seeker Login';
   const themeColor = isBankSeeker ? COLORS.bankAccent : COLORS.seekerAccent;
@@ -42,7 +39,6 @@ export default function LoginScreen({ route, navigation }) {
     setLoading(true);
     setErrorMsg('');
     try {
-      // Seeker app always logs in with role 'seeker'
       await loginForRole('seeker', email.trim(), password);
     } catch (err) {
       const msg = err.message || 'Invalid credentials';
@@ -58,37 +54,10 @@ export default function LoginScreen({ route, navigation }) {
       <Header title={roleTitle} subtitle="PlanToPark Seeker" onBack={() => navigation.goBack()} />
 
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        {/* Toggle between Seeker and Bank & Auto Finance */}
-        <View style={styles.tabContainer}>
-          <TouchableOpacity
-            style={[
-              styles.tabBtn,
-              !isBankSeeker && { backgroundColor: COLORS.seekerAccent },
-            ]}
-            onPress={() => setCurrentCategory('standard')}
-          >
-            <Text style={[styles.tabTxt, !isBankSeeker && { color: '#ffffff', fontWeight: '800' }]}>
-              🚗 Parking Seeker
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[
-              styles.tabBtn,
-              isBankSeeker && { backgroundColor: COLORS.bankAccent },
-            ]}
-            onPress={() => setCurrentCategory('bank_finance_seeker')}
-          >
-            <Text style={[styles.tabTxt, isBankSeeker && { color: '#ffffff', fontWeight: '800' }]}>
-              🏦 Banks & Auto Finance
-            </Text>
-          </TouchableOpacity>
-        </View>
-
         <View style={styles.badgeRow}>
           <View style={[styles.roleBadge, { backgroundColor: themeColor }]}>
             <Text style={styles.roleBadgeTxt}>
-              {isBankSeeker ? '🏦 BANKS & AUTO FINANCE' : '🚗 PARKING SEEKER'}
+              {isBankSeeker ? '🏦 BANKS & AUTO FINANCE LOGIN' : '🚗 PARKING SEEKER LOGIN'}
             </Text>
           </View>
         </View>
@@ -113,7 +82,7 @@ export default function LoginScreen({ route, navigation }) {
           <Text style={styles.label}>Email Address</Text>
           <TextInput
             style={styles.input}
-            placeholder="e.g. name@example.com"
+            placeholder={isBankSeeker ? 'e.g. recovery@bank.com' : 'e.g. name@example.com'}
             placeholderTextColor={COLORS.textMuted}
             value={email}
             onChangeText={setEmail}
@@ -166,12 +135,12 @@ export default function LoginScreen({ route, navigation }) {
             onPress={() =>
               navigation.navigate('Register', {
                 role: 'seeker',
-                category: currentCategory,
+                category: isBankSeeker ? 'bank_finance_seeker' : 'standard',
               })
             }
           >
             <Text style={[styles.footerLink, { color: themeColor }]}>
-              {isBankSeeker ? 'Register Bank / Repo Dept' : 'Sign Up'}
+              {isBankSeeker ? 'Register Bank / Repo Dept' : 'Sign Up as Seeker'}
             </Text>
           </TouchableOpacity>
         </View>
@@ -187,27 +156,7 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 24,
-    paddingTop: 10,
-  },
-  tabContainer: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 16,
-    backgroundColor: '#0f172a',
-    padding: 4,
-    borderRadius: 12,
-  },
-  tabBtn: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: 10,
-    alignItems: 'center',
-    backgroundColor: '#1e293b',
-  },
-  tabTxt: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#94a3b8',
+    paddingTop: 14,
   },
   badgeRow: {
     flexDirection: 'row',

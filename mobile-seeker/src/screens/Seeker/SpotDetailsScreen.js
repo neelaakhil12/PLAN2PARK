@@ -11,10 +11,11 @@ import {
   Linking,
   Platform,
   ActivityIndicator,
+  Image,
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { AuthContext } from '../../context/AuthContext';
-import { endpoints, getBaseApiUrl } from '../../config/api';
+import { endpoints, getBaseApiUrl, getImageUrl } from '../../config/api';
 import { COLORS } from '../../theme/colors';
 import Button from '../../components/Button';
 import Header from '../../components/Header';
@@ -270,9 +271,19 @@ export default function SpotDetailsScreen({ route, navigation }) {
         {/* Banner Card */}
         <View style={styles.spotCard}>
           <View style={styles.badgeRow}>
-            <Text style={styles.verifiedBadge}>VERIFIED PARKING</Text>
+            <Text style={styles.verifiedBadge}>
+              {space.spaceCategory === 'commercial_vehicle_storage' ? '🏢 1+ ACRE REPO STOCKYARD' : 'VERIFIED PARKING'}
+            </Text>
             {space.hasEvCharger && <Text style={styles.evBadge}>⚡ EV CHARGING</Text>}
           </View>
+
+          {(space.image || space.imageUrl) ? (
+            <Image
+              source={{ uri: getImageUrl(space.image || space.imageUrl) }}
+              style={{ width: '100%', height: 190, borderRadius: 12, marginVertical: 10 }}
+              resizeMode="cover"
+            />
+          ) : null}
 
           <Text style={styles.spotTitle}>{space.title || 'Central Safe Parking'}</Text>
           <Text style={styles.spotAddress}>📍 {space.address || 'Hitech City Road'}, {space.city || 'Hyderabad'}</Text>

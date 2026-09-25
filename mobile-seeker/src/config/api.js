@@ -28,8 +28,7 @@ export const getImageUrl = (url) => {
   if (url.startsWith('data:') || url.startsWith('http://') || url.startsWith('https://')) return url;
   if (url.startsWith('/uploads/') || url.startsWith('uploads/')) {
     const cleanPath = url.startsWith('/') ? url : `/${url}`;
-    const isLocal = Platform.OS === 'web' && typeof window !== 'undefined' && window?.location && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
-    const baseUrl = isLocal ? 'http://localhost:5000' : 'http://43.204.235.124:5000';
+    const baseUrl = isLocal ? 'http://localhost:5000' : 'https://api.plantopark.com';
     return `${baseUrl}${cleanPath}`;
   }
   return url;

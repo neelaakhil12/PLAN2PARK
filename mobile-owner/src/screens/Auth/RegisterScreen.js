@@ -17,12 +17,10 @@ import Button from '../../components/Button';
 import Header from '../../components/Header';
 
 export default function RegisterScreen({ route, navigation }) {
-  const initialCategory = route.params?.category === 'vehicle_storage_owner' ? 'vehicle_storage_owner' : 'standard';
-  const [currentCategory, setCurrentCategory] = useState(initialCategory);
+  const category = route.params?.category === 'vehicle_storage_owner' ? 'vehicle_storage_owner' : 'standard';
+  const isStorageOwner = category === 'vehicle_storage_owner';
 
   const { signupForRole } = useContext(AuthContext);
-
-  const isStorageOwner = currentCategory === 'vehicle_storage_owner';
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -36,7 +34,7 @@ export default function RegisterScreen({ route, navigation }) {
   const [fencingType, setFencingType] = useState('Compound Wall');
   const [hasSecurityGuards, setHasSecurityGuards] = useState(true);
 
-  const roleTitle = isStorageOwner ? 'Register 1+ Acre Stockyard' : 'Register Space Owner';
+  const roleTitle = isStorageOwner ? 'Register Vehicle Storage Land Owner' : 'Register Space Owner';
   const themeColor = isStorageOwner ? COLORS.storageAccent : COLORS.ownerAccent;
 
   const handleRegister = async () => {
@@ -64,7 +62,7 @@ export default function RegisterScreen({ route, navigation }) {
     setLoading(true);
     try {
       const extraData = {
-        accountCategory: currentCategory,
+        accountCategory: category,
         ...(isStorageOwner ? { landAcres: parseFloat(landAcres), fencingType, hasSecurityGuards } : {}),
       };
 
@@ -86,31 +84,12 @@ export default function RegisterScreen({ route, navigation }) {
       <Header title={roleTitle} subtitle="PlanToPark Owner" onBack={() => navigation.goBack()} />
 
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        {/* Toggle between Standard Space Owner and 1+ Acre Landowner */}
-        <View style={styles.tabContainer}>
-          <TouchableOpacity
-            style={[
-              styles.tabBtn,
-              !isStorageOwner && { backgroundColor: COLORS.ownerAccent },
-            ]}
-            onPress={() => setCurrentCategory('standard')}
-          >
-            <Text style={[styles.tabTxt, !isStorageOwner && { color: '#ffffff', fontWeight: '800' }]}>
-              🅿️ Space Owner
+        <View style={styles.badgeRow}>
+          <View style={[styles.roleBadge, { backgroundColor: themeColor }]}>
+            <Text style={[styles.roleBadgeTxt, isStorageOwner && { color: '#000000' }]}>
+              {isStorageOwner ? '🏢 VEHICLE STORAGE (1+ ACRE)' : '🅿️ SPACE OWNER REGISTRATION'}
             </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[
-              styles.tabBtn,
-              isStorageOwner && { backgroundColor: COLORS.storageAccent },
-            ]}
-            onPress={() => setCurrentCategory('vehicle_storage_owner')}
-          >
-            <Text style={[styles.tabTxt, isStorageOwner && { color: '#000000', fontWeight: '800' }]}>
-              🏢 Storage (1+ Ac)
-            </Text>
-          </TouchableOpacity>
+          </View>
         </View>
 
         <Text style={styles.heading}>
@@ -243,7 +222,13 @@ export default function RegisterScreen({ route, navigation }) {
         </View>
 
         <Button
-          title={loading ? 'Registering...' : isStorageOwner ? 'Register 1+ Acre Stockyard' : 'Register Space Owner'}
+          title={
+            loading
+              ? 'Registering...'
+              : isStorageOwner
+              ? 'Register as Vehicle Storage Land Owner'
+              : 'Register as Space Owner'
+          }
           onPress={handleRegister}
           disabled={loading}
           style={[styles.submitBtn, { backgroundColor: themeColor }]}
@@ -255,10 +240,13 @@ export default function RegisterScreen({ route, navigation }) {
             onPress={() =>
               navigation.navigate('Login', {
                 role: 'owner',
+                category,
               })
             }
           >
-            <Text style={[styles.footerLink, { color: themeColor }]}>Log In</Text>
+            <Text style={[styles.footerLink, { color: themeColor }]}>
+              {isStorageOwner ? 'Login as Vehicle Storage Land Owner' : 'Login as Space Owner'}
+            </Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -275,25 +263,20 @@ const styles = StyleSheet.create({
     padding: 24,
     paddingTop: 10,
   },
-  tabContainer: {
+  badgeRow: {
     flexDirection: 'row',
-    gap: 8,
-    marginBottom: 16,
-    backgroundColor: '#0f172a',
-    padding: 4,
-    borderRadius: 12,
+    marginBottom: 12,
   },
-  tabBtn: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: 10,
-    alignItems: 'center',
-    backgroundColor: '#1e293b',
+  roleBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 8,
   },
-  tabTxt: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#94a3b8',
+  roleBadgeTxt: {
+    color: '#ffffff',
+    fontWeight: '800',
+    fontSize: 11,
+    letterSpacing: 0.5,
   },
   heading: {
     fontSize: 26,
@@ -404,10 +387,10 @@ const styles = StyleSheet.create({
   },
   footerTxt: {
     color: COLORS.textMuted,
-    fontSize: 14,
+    fontSize: 13.5,
   },
   footerLink: {
     fontWeight: '700',
-    fontSize: 14,
+    fontSize: 13.5,
   },
 });
