@@ -90,7 +90,7 @@ export const AuthProvider = ({ children }) => {
     return userData;
   };
 
-  const signupForRole = async (role, name, email, password, contact) => {
+  const signupForRole = async (role, name, email, password, contact, extraData = {}) => {
     const baseUrl = await getBaseApiUrl();
     const endpoint = `${baseUrl}/auth/${role}/signup`;
 
@@ -99,7 +99,7 @@ export const AuthProvider = ({ children }) => {
       res = await fetch(endpoint, {
         method: 'POST',
         headers: COMMON_HEADERS,
-        body: JSON.stringify({ name, email, password, contact }),
+        body: JSON.stringify({ name, email, password, contact, ...extraData }),
       });
     } catch (netErr) {
       throw new Error(`Cannot connect to server. Please check your internet connection.`);

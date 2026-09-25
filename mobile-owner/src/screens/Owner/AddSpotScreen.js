@@ -19,7 +19,7 @@ import Header from '../../components/Header';
 import Button from '../../components/Button';
 
 export default function AddSpotScreen({ route, navigation }) {
-  const { token } = useContext(AuthContext);
+  const { token, user } = useContext(AuthContext);
   const editingSpot = route?.params?.spot || null;
 
   const [title, setTitle] = useState(editingSpot?.title || '');
@@ -38,6 +38,23 @@ export default function AddSpotScreen({ route, navigation }) {
   const [isActive, setIsActive] = useState(editingSpot?.isActive !== false);
   const [cancellationPolicy, setCancellationPolicy] = useState(editingSpot?.cancellationPolicy || 'full');
   const [maxWalletDiscount, setMaxWalletDiscount] = useState(String(editingSpot?.maxWalletDiscount !== undefined ? editingSpot.maxWalletDiscount : '10'));
+  const [suitableVehicles, setSuitableVehicles] = useState(
+    editingSpot?.suitableVehicles && editingSpot.suitableVehicles.length > 0
+      ? editingSpot.suitableVehicles
+      : ['hatchback', 'sedan', 'suv']
+  );
+
+  // Commercial Vehicle Storage Yard (Banks & Auto Finance) fields
+  const [isVehicleStorageYard, setIsVehicleStorageYard] = useState(
+    editingSpot?.spaceCategory === 'commercial_vehicle_storage' || user?.accountCategory === 'vehicle_storage_owner'
+  );
+  const [landAcres, setLandAcres] = useState(String(editingSpot?.landAcres || user?.landAcres || '1.0'));
+  const [monthlyStorageRate, setMonthlyStorageRate] = useState(String(editingSpot?.monthlyStorageRate || '1500'));
+  const [hasCompoundWall, setHasCompoundWall] = useState(editingSpot?.securityFacilities?.hasCompoundWall !== false);
+  const [has24x7Guards, setHas24x7Guards] = useState(editingSpot?.securityFacilities?.has24x7Guards !== false);
+  const [hasCctv, setHasCctv] = useState(editingSpot?.securityFacilities?.hasCctv !== false);
+  const [hasFloodLights, setHasFloodLights] = useState(editingSpot?.securityFacilities?.hasFloodLights !== false);
+
   const [loading, setLoading] = useState(false);
   const [locating, setLocating] = useState(false);
 
@@ -56,8 +73,23 @@ export default function AddSpotScreen({ route, navigation }) {
       setIsActive(s.isActive !== false);
       setCancellationPolicy(s.cancellationPolicy || 'full');
       setMaxWalletDiscount(String(s.maxWalletDiscount !== undefined ? s.maxWalletDiscount : '10'));
+      if (s.suitableVehicles && s.suitableVehicles.length > 0) {
+        setSuitableVehicles(s.suitableVehicles);
+      }
     }
   }, [route?.params?.spot]);
+
+  const toggleVehicleType = (typeId) => {
+    if (suitableVehicles.includes(typeId)) {
+      if (suitableVehicles.length === 1) {
+        showAlert('Vehicle Fit', 'Please select at least one vehicle size that fits in this parking spot.');
+        return;
+      }
+      setSuitableVehicles(suitableVehicles.filter((t) => t !== typeId));
+    } else {
+      setSuitableVehicles([...suitableVehicles, typeId]);
+    }
+  };
 
   const [showLocationModal, setShowLocationModal] = useState(false);
   const [nearbyPlaces, setNearbyPlaces] = useState([]);
@@ -477,6 +509,17 @@ export default function AddSpotScreen({ route, navigation }) {
       return;
     }
 
+    if (isVehicleStorageYard) {
+      const acres = parseFloat(landAcres);
+      if (isNaN(acres) || acres < 1.0) {
+        showAlert(
+          '1 Acre Minimum Required',
+          'A minimum of 1.0 Acre of secure contiguous land is strictly required to list a Vehicle Storage Yard for Banks & Auto Finance companies.'
+        );
+        return;
+      }
+    }
+
     setLoading(true);
     try {
       const baseUrl = await getBaseApiUrl();
@@ -506,6 +549,17 @@ export default function AddSpotScreen({ route, navigation }) {
           isActive,
           cancellationPolicy,
           maxWalletDiscount: Number(maxWalletDiscount || 0),
+          suitableVehicles,
+          spaceCategory: isVehicleStorageYard ? 'commercial_vehicle_storage' : 'standard',
+          landAcres: isVehicleStorageYard ? Number(landAcres) : 0,
+          monthlyStorageRate: isVehicleStorageYard ? Number(monthlyStorageRate) : 0,
+          securityFacilities: {
+            hasCompoundWall,
+            has24x7Guards,
+            hasCctv,
+            hasFloodLights,
+            isGated: true,
+          },
         }),
       });
 
@@ -528,11 +582,82 @@ export default function AddSpotScreen({ route, navigation }) {
       <Header title={editingSpot ? "Edit Parking Spot" : "List New Parking Spot"} onBack={() => navigation.goBack()} />
 
       <ScrollView contentContainerStyle={styles.content}>
+        {/* Category Switcher: Standard Parking vs 1+ Acre Vehicle Storage Yard */}
+        <View style={{ marginBottom: 18 }}>
+          <Text style={styles.label}>Listing Category</Text>
+          <View style={{ flexDirection: 'row', gap: 10, marginTop: 4 }}>
+            <TouchableOpacity
+              style={{
+                flex: 1,
+                padding: 12,
+                borderRadius: 12,
+                borderWidth: 1.5,
+                borderColor: !isVehicleStorageYard ? COLORS.ownerAccent : '#334155',
+                backgroundColor: !isVehicleStorageYard ? 'rgba(124, 58, 237, 0.15)' : COLORS.darkBg,
+                alignItems: 'center',
+              }}
+              onPress={() => setIsVehicleStorageYard(false)}
+              activeOpacity={0.8}
+            >
+              <Text style={{ fontSize: 22, marginBottom: 4 }}>🅿️</Text>
+              <Text style={{ color: !isVehicleStorageYard ? COLORS.white : '#94a3b8', fontSize: 13, fontWeight: '800' }}>
+                Standard Parking
+              </Text>
+              <Text style={{ color: COLORS.textMuted, fontSize: 10, marginTop: 2, textAlign: 'center' }}>
+                Daily commuter parking slots
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={{
+                flex: 1.2,
+                padding: 12,
+                borderRadius: 12,
+                borderWidth: 1.5,
+                borderColor: isVehicleStorageYard ? COLORS.storageAccent : '#334155',
+                backgroundColor: isVehicleStorageYard ? 'rgba(245, 158, 11, 0.15)' : COLORS.darkBg,
+                alignItems: 'center',
+              }}
+              onPress={() => setIsVehicleStorageYard(true)}
+              activeOpacity={0.8}
+            >
+              <Text style={{ fontSize: 22, marginBottom: 4 }}>🏢</Text>
+              <Text style={{ color: isVehicleStorageYard ? COLORS.white : '#94a3b8', fontSize: 13, fontWeight: '800' }}>
+                Vehicle Storage Yard
+              </Text>
+              <Text style={{ color: COLORS.storageAccent, fontSize: 10, marginTop: 2, fontWeight: '700', textAlign: 'center' }}>
+                Banks & Repo (Min 1 Acre)
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* ⚠️ Mandatory 1 Acre Policy Warning for Vehicle Storage */}
+        {isVehicleStorageYard && (
+          <View style={{
+            backgroundColor: 'rgba(245, 158, 11, 0.12)',
+            borderWidth: 1.5,
+            borderColor: COLORS.storageAccent,
+            borderRadius: 14,
+            padding: 14,
+            marginBottom: 16,
+          }}>
+            <Text style={{ color: COLORS.storageAccent, fontWeight: '900', fontSize: 13, marginBottom: 4 }}>
+              ⚠️ MANDATORY 1 ACRE REQUIREMENT FOR BANKS
+            </Text>
+            <Text style={{ color: '#cbd5e1', fontSize: 12, lineHeight: 18 }}>
+              Banks and Auto Finance companies require large, secure facilities to store seized and repossessed vehicles. A minimum of 1.0 contiguous Acre of land is strictly enforced.
+            </Text>
+          </View>
+        )}
+
         <View style={styles.formCard}>
-          <Text style={styles.label}>Spot Name / Title</Text>
+          <Text style={styles.label}>
+            {isVehicleStorageYard ? 'Yard / Stockyard Title' : 'Spot Name / Title'}
+          </Text>
           <TextInput
             style={styles.input}
-            placeholder="e.g. Covered Driveway near Metro"
+            placeholder={isVehicleStorageYard ? "e.g. Hyderabad South 2-Acre Secured Auto Stockyard" : "e.g. Covered Driveway near Metro"}
             placeholderTextColor={COLORS.textMuted}
             value={title}
             onChangeText={setTitle}
@@ -630,7 +755,7 @@ export default function AddSpotScreen({ route, navigation }) {
           {/* Cancellation & Refund Policy Options (Owner Choice) */}
           <View style={{ marginTop: 14, marginBottom: 14 }}>
             <Text style={styles.switchTitle}>🛡️ Cancellation & Refund Policy</Text>
-            <Text style={styles.switchSub}>Select refund amount driver receives if they cancel:</Text>
+            <Text style={styles.switchSub}>Select refund amount seeker receives if they cancel:</Text>
 
             <View style={{ gap: 8, marginTop: 10 }}>
               {[
@@ -681,6 +806,96 @@ export default function AddSpotScreen({ route, navigation }) {
             </View>
           </View>
 
+          {/* Supported Vehicle Sizes & Types */}
+          <View style={{ marginBottom: 18 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+              <Text style={styles.label}>🚗 Vehicles Fit in this Spot (Select all that fit)</Text>
+              <Text style={{ fontSize: 11, color: COLORS.ownerAccent, fontWeight: '700' }}>
+                {suitableVehicles.length} of 3 Selected
+              </Text>
+            </View>
+            <Text style={{ fontSize: 12, color: COLORS.textMuted, marginBottom: 10 }}>
+              Check which car sizes can comfortably enter and park in your space:
+            </Text>
+
+            <View style={{ gap: 10 }}>
+              {[
+                {
+                  id: 'hatchback',
+                  title: 'Hatchback',
+                  icon: '🚗',
+                  subtitle: 'Small cars, usually 4–5 seats',
+                  examples: 'Swift, i20, Baleno',
+                },
+                {
+                  id: 'sedan',
+                  title: 'Sedan',
+                  icon: '🚘',
+                  subtitle: 'Separate boot/trunk, usually 4–5 seats',
+                  examples: 'Dzire, Honda City, Verna',
+                },
+                {
+                  id: 'suv',
+                  title: 'SUV',
+                  icon: '🚙',
+                  subtitle: 'Taller, larger body, usually 5–7 seats',
+                  examples: 'Creta, Seltos, XUV700',
+                },
+              ].map((vehicle) => {
+                const isChecked = suitableVehicles.includes(vehicle.id);
+                return (
+                  <TouchableOpacity
+                    key={vehicle.id}
+                    style={{
+                      backgroundColor: isChecked ? 'rgba(56, 189, 248, 0.12)' : COLORS.darkBg,
+                      borderWidth: 1.5,
+                      borderColor: isChecked ? COLORS.ownerAccent : '#334155',
+                      borderRadius: 14,
+                      padding: 12,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                    }}
+                    onPress={() => toggleVehicleType(vehicle.id)}
+                    activeOpacity={0.8}
+                  >
+                    <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, gap: 12, marginRight: 10 }}>
+                      <Text style={{ fontSize: 24 }}>{vehicle.icon}</Text>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ color: isChecked ? COLORS.white : '#94a3b8', fontSize: 14, fontWeight: '800' }}>
+                          {vehicle.title}
+                        </Text>
+                        <Text style={{ color: COLORS.textMuted, fontSize: 11, marginTop: 1 }}>
+                          {vehicle.subtitle}
+                        </Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
+                          <Text style={{ fontSize: 10, color: COLORS.ownerAccent, fontWeight: '700' }}>Examples:</Text>
+                          <Text style={{ fontSize: 10, color: '#94a3b8' }}>{vehicle.examples}</Text>
+                        </View>
+                      </View>
+                    </View>
+
+                    {/* Checkbox box with checkmark */}
+                    <View style={{
+                      width: 24,
+                      height: 24,
+                      borderRadius: 6,
+                      borderWidth: 2,
+                      borderColor: isChecked ? COLORS.ownerAccent : '#475569',
+                      backgroundColor: isChecked ? COLORS.ownerAccent : 'transparent',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}>
+                      {isChecked && (
+                        <Text style={{ color: COLORS.white, fontSize: 13, fontWeight: '900' }}>✓</Text>
+                      )}
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+
           {/* Max Wallet Discount Option (Owner Control) */}
           <View style={{ marginBottom: 14 }}>
             <Text style={styles.label}>⚡ Max Wallet Money Usable per Booking (₹)</Text>
@@ -693,7 +908,7 @@ export default function AddSpotScreen({ route, navigation }) {
               onChangeText={setMaxWalletDiscount}
             />
             <Text style={{ fontSize: 11, color: COLORS.textMuted, marginTop: 4 }}>
-              Drivers can deduct up to ₹{maxWalletDiscount || 0} from their PlanToPark Wallet balance on each booking.
+              Seekers can deduct up to ₹{maxWalletDiscount || 0} from their PlanToPark Wallet balance on each booking.
             </Text>
           </View>
 
@@ -728,7 +943,7 @@ export default function AddSpotScreen({ route, navigation }) {
             <View style={styles.switchRow}>
               <View style={{ flex: 1 }}>
                 <Text style={styles.switchTitle}>🟢 Spot Availability Status</Text>
-                <Text style={styles.switchSub}>Is this spot open & accepting driver bookings?</Text>
+                <Text style={styles.switchSub}>Is this spot open & accepting seeker bookings?</Text>
               </View>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                 <TouchableOpacity

@@ -5,6 +5,7 @@ const bcrypt = require('bcryptjs');
 const User = require('../models/User');
 const { protect, adminOnly } = require('../middleware/auth');
 const { sendVerificationEmail, sendPasswordResetEmail } = require('../utils/mailer');
+const { generateUniqueId } = require('../utils/generateId');
 const path = require('path');
 const fs = require('fs');
 
@@ -47,29 +48,37 @@ const generateToken = (id) => {
 
 // ─── ROLE-SPECIFIC REGISTRATION & AUTHENTICATION ENDPOINTS ───────────────────
 
-// @desc    Register a new parking seeker
+// @desc    Register a new parking seeker (or Bank / Auto Finance Repossession Department)
 // @route   POST /api/auth/seeker/signup
 router.post('/seeker/signup', async (req, res) => {
-  const { name, email, password, contact } = req.body;
+  const { name, email, password, contact, accountCategory, organizationName } = req.body;
   try {
     const normalizedEmail = (email || '').trim().toLowerCase();
     const userExists = await User.findOne({ email: normalizedEmail, role: 'seeker' });
     if (userExists) return res.status(400).json({ message: 'A seeker account with this email already exists' });
 
+    const uniqueId = await generateUniqueId('seeker');
+
     const user = await User.create({
+      uniqueId,
       name,
       email: normalizedEmail,
       password,
       role: 'seeker',
+      accountCategory: accountCategory || 'standard',
+      organizationName: organizationName || '',
       contact,
       status: 'verified',
     });
 
     res.status(201).json({
       _id: user._id,
+      uniqueId: user.uniqueId,
       name: user.name,
       email: user.email,
       role: user.role,
+      accountCategory: user.accountCategory,
+      organizationName: user.organizationName,
       status: user.status,
       contact: user.contact,
       profileImage: user.profileImage || '',
@@ -82,29 +91,48 @@ router.post('/seeker/signup', async (req, res) => {
   }
 });
 
-// @desc    Register a new parking owner
+// @desc    Register a new parking owner (or Vehicle Storage Landowner - min 1 Acre)
 // @route   POST /api/auth/owner/signup
 router.post('/owner/signup', async (req, res) => {
-  const { name, email, password, contact } = req.body;
+  const { name, email, password, contact, accountCategory, landAcres, fencingType, hasSecurityGuards } = req.body;
   try {
     const normalizedEmail = (email || '').trim().toLowerCase();
     const userExists = await User.findOne({ email: normalizedEmail, role: 'owner' });
     if (userExists) return res.status(400).json({ message: 'An owner account with this email already exists' });
 
+    // Validate 1 Acre minimum requirement for Vehicle Storage Landowners
+    if (accountCategory === 'vehicle_storage_owner' && (!landAcres || Number(landAcres) < 1)) {
+      return res.status(400).json({
+        message: 'Minimum 1.0 Acre of secure land is strictly required to register as a Vehicle Storage Yard partner for Banks and Auto Finance companies.',
+      });
+    }
+
+    const uniqueId = await generateUniqueId('owner');
+
     const user = await User.create({
+      uniqueId,
       name,
       email: normalizedEmail,
       password,
       role: 'owner',
+      accountCategory: accountCategory || 'standard',
+      landAcres: landAcres ? Number(landAcres) : 0,
+      fencingType: fencingType || '',
+      hasSecurityGuards: Boolean(hasSecurityGuards),
       contact,
       status: 'verified',
     });
 
     res.status(201).json({
       _id: user._id,
+      uniqueId: user.uniqueId,
       name: user.name,
       email: user.email,
       role: user.role,
+      accountCategory: user.accountCategory,
+      landAcres: user.landAcres,
+      fencingType: user.fencingType,
+      hasSecurityGuards: user.hasSecurityGuards,
       status: user.status,
       contact: user.contact,
       profileImage: user.profileImage || '',
@@ -138,8 +166,14 @@ router.post('/seeker/login', async (req, res) => {
       return res.status(401).json({ message: 'Invalid email or password' });
     }
 
+    if (!user.uniqueId) {
+      user.uniqueId = await generateUniqueId('seeker');
+      await user.save();
+    }
+
     res.json({
       _id: user._id,
+      uniqueId: user.uniqueId,
       name: user.name,
       email: user.email,
       role: user.role,
@@ -175,8 +209,14 @@ router.post('/owner/login', async (req, res) => {
       return res.status(401).json({ message: 'Invalid email or password' });
     }
 
+    if (!user.uniqueId) {
+      user.uniqueId = await generateUniqueId('owner');
+      await user.save();
+    }
+
     res.json({
       _id: user._id,
+      uniqueId: user.uniqueId,
       name: user.name,
       email: user.email,
       role: user.role,
@@ -356,6 +396,10 @@ router.get('/profile', async (req, res) => {
       const decoded = jwt.verify(token, process.env.JWT_SECRET || 'plantoparksecretkey');
       const user = await User.findById(decoded.id).select('-password');
       if (user) {
+        if (!user.uniqueId && (user.role === 'owner' || user.role === 'seeker')) {
+          user.uniqueId = await generateUniqueId(user.role);
+          await user.save();
+        }
         return res.json(user);
       }
       return res.status(404).json({ message: 'User not found' });

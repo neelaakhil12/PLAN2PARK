@@ -2,7 +2,8 @@ import React, { useState, useEffect, useContext } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import {
-  Search, MapPin, Clock, ShieldCheck, Car, CheckCircle
+  Search, MapPin, Clock, ShieldCheck, Car, CheckCircle,
+  Building2, Shield, Lock, AlertTriangle
 } from 'lucide-react';
 import Typewriter from '../components/Typewriter';
 import ScrollReveal from '../components/ScrollReveal';
@@ -217,6 +218,105 @@ const Home = () => {
                 </div>
               ))}
             </ScrollReveal>
+          </div>
+        </div>
+      </section>
+
+      {/* ── COMMERCIAL VEHICLE STORAGE: BANKS & AUTO FINANCE ECOSYSTEM ── */}
+      <section className="py-14 sm:py-20 px-4 sm:px-6 bg-gradient-to-br from-slate-900 via-slate-950 to-indigo-950 text-white relative overflow-hidden border-t border-slate-800">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_20%,rgba(245,158,11,0.08),transparent_50%)] pointer-events-none" />
+        <div className="max-w-6xl mx-auto relative z-10 space-y-10">
+          <div className="text-center space-y-3 max-w-3xl mx-auto">
+            <span className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full text-xs font-black bg-amber-500/20 text-amber-300 border border-amber-400/40 uppercase tracking-widest">
+              🏢 COMMERCIAL ENTERPRISE SOLUTION
+            </span>
+            <h2 className="text-3xl sm:text-4xl font-black tracking-tight text-white">
+              Vehicle Storage for <span className="text-amber-400">Banks &amp; Auto Finance</span> Companies
+            </h2>
+            <p className="text-slate-300 text-sm sm:text-base leading-relaxed">
+              When financed vehicles face EMI defaults, banking &amp; lending recovery teams seize assets and require secure, centralized stockyards. Plan2Park delivers an enterprise-grade platform connecting verified 1+ Acre landowners with financial institutions.
+            </p>
+
+            {/* Strict 1 Acre Minimum Requirement Banner */}
+            <div className="inline-flex items-center gap-2 bg-amber-500/10 border border-amber-400/30 text-amber-200 text-xs font-bold px-4 py-2 rounded-2xl">
+              <AlertTriangle className="h-4 w-4 text-amber-400 shrink-0" />
+              <span><strong>Strict Policy:</strong> Minimum 1.0 Contiguous Acre of land is required for commercial vehicle storage listings.</span>
+            </div>
+          </div>
+
+          {/* Two Commercial Pillars */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8">
+            {/* Landowner Card */}
+            <div className="bg-slate-800/80 backdrop-blur-md rounded-3xl p-7 border border-amber-400/30 flex flex-col justify-between space-y-6 shadow-xl relative overflow-hidden group hover:border-amber-400 transition-all">
+              <div className="space-y-4">
+                <div className="h-12 w-12 rounded-2xl bg-amber-500/20 border border-amber-400/30 flex items-center justify-center text-2xl">
+                  🚜
+                </div>
+                <div>
+                  <span className="text-[10px] font-black uppercase text-amber-400 tracking-wider">For Landowners</span>
+                  <h3 className="text-xl font-black text-white mt-1">List 1+ Acre Land for Commercial Storage</h3>
+                  <p className="text-xs text-slate-300 mt-2 leading-relaxed">
+                    Monetize your vacant or semi-commercial land parcels. Host repossessed bank fleets with high corporate monthly yields, guaranteed long-term lease retainers, and enterprise legal backing.
+                  </p>
+                </div>
+                <div className="space-y-2 pt-2 text-xs text-slate-300">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className="h-4 w-4 text-amber-400 shrink-0" />
+                    <span>Minimum 1.0 Contiguous Acre land size verified</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className="h-4 w-4 text-amber-400 shrink-0" />
+                    <span>Fenced / Compound wall perimeter with gate clearance</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className="h-4 w-4 text-amber-400 shrink-0" />
+                    <span>Guaranteed recurring monthly corporate payouts</span>
+                  </div>
+                </div>
+              </div>
+              <Link
+                to="/owner/register?category=vehicle_storage_owner"
+                className="w-full py-3.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-black rounded-2xl text-center text-sm shadow-lg shadow-amber-500/25 transition-all flex items-center justify-center gap-2"
+              >
+                List 1+ Acre Vehicle Storage Yard →
+              </Link>
+            </div>
+
+            {/* Banks & Finance Institutions Card */}
+            <div className="bg-slate-800/80 backdrop-blur-md rounded-3xl p-7 border border-cyan-400/30 flex flex-col justify-between space-y-6 shadow-xl relative overflow-hidden group hover:border-cyan-400 transition-all">
+              <div className="space-y-4">
+                <div className="h-12 w-12 rounded-2xl bg-cyan-500/20 border border-cyan-400/30 flex items-center justify-center text-2xl">
+                  🏦
+                </div>
+                <div>
+                  <span className="text-[10px] font-black uppercase text-cyan-400 tracking-wider">For Banks &amp; Finance Companies</span>
+                  <h3 className="text-xl font-black text-white mt-1">Book Secured Repossession Stockyards</h3>
+                  <p className="text-xs text-slate-300 mt-2 leading-relaxed">
+                    Protect repossessed automobiles, commercial carriers, and two-wheelers in high-security, perimeter-walled stockyards equipped with 24/7 security guards, CCTV surveillance, and floodlights.
+                  </p>
+                </div>
+                <div className="space-y-2 pt-2 text-xs text-slate-300">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className="h-4 w-4 text-cyan-400 shrink-0" />
+                    <span>24/7 on-site physical security guards &amp; gated entry</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className="h-4 w-4 text-cyan-400 shrink-0" />
+                    <span>CCTV surveillance &amp; perimeter high-mast floodlights</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className="h-4 w-4 text-cyan-400 shrink-0" />
+                    <span>Digital bay allocation &amp; instant inventory logs</span>
+                  </div>
+                </div>
+              </div>
+              <Link
+                to="/seeker/login?category=bank_finance_seeker"
+                className="w-full py-3.5 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white font-black rounded-2xl text-center text-sm shadow-lg shadow-cyan-500/25 transition-all flex items-center justify-center gap-2"
+              >
+                Access Bank Repossession Portal →
+              </Link>
+            </div>
           </div>
         </div>
       </section>

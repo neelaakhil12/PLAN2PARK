@@ -141,7 +141,7 @@ export default function OwnerHomeScreen({ navigation }) {
       {/* Header with notch padding */}
       <View style={[styles.header, { paddingTop: topPadding + 10 }]}>
         <View>
-          <Text style={styles.headerTitle}>Space Owner Hub 🅿️</Text>
+          <Text style={styles.headerTitle}>Owner Dashboard 🅿️</Text>
           <Text style={styles.headerSub}>Welcome, {user?.name || 'Owner'}</Text>
         </View>
         <TouchableOpacity onPress={logout} style={styles.logoutBtn}>
@@ -192,7 +192,7 @@ export default function OwnerHomeScreen({ navigation }) {
             activeOpacity={0.85}
           >
             <View style={{ flex: 1 }}>
-              <Text style={styles.ordersAlertTitle}>📑 {recentBookings.length} Driver Booking(s) Received</Text>
+              <Text style={styles.ordersAlertTitle}>📑 {recentBookings.length} Seeker Booking(s) Received</Text>
               <Text style={styles.ordersAlertSub}>
                 Latest: {recentBookings[0]?.vehicleNumber || 'Vehicle'} • Slot {recentBookings[0]?.slotId || '1'} • ₹{recentBookings[0]?.totalAmount || 0}
               </Text>
@@ -201,41 +201,81 @@ export default function OwnerHomeScreen({ navigation }) {
           </TouchableOpacity>
         )}
 
-        {/* Add Spot Banner */}
-        <TouchableOpacity
-          style={styles.addBanner}
-          onPress={() => navigation.navigate('AddSpot')}
-          activeOpacity={0.85}
-        >
-          <View style={styles.addBannerCol}>
-            <Text style={styles.addBannerTitle}>+ List New Parking Space</Text>
-            <Text style={styles.addBannerSub}>Turn your driveways into recurring income</Text>
-          </View>
-          <Text style={styles.addBannerArrow}>→</Text>
-        </TouchableOpacity>
+        {/* Add Spot & Storage Yard Banners */}
+        <View style={{ gap: 10, marginBottom: 16 }}>
+          <TouchableOpacity
+            style={styles.addBanner}
+            onPress={() => navigation.navigate('AddSpot')}
+            activeOpacity={0.85}
+          >
+            <View style={styles.addBannerCol}>
+              <Text style={styles.addBannerTitle}>+ List New Parking Space</Text>
+              <Text style={styles.addBannerSub}>Turn your driveways into recurring income</Text>
+            </View>
+            <Text style={styles.addBannerArrow}>→</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.addBanner, { borderColor: '#f59e0b', backgroundColor: 'rgba(245, 158, 11, 0.08)' }]}
+            onPress={() => navigation.navigate('AddSpot')}
+            activeOpacity={0.85}
+          >
+            <View style={styles.addBannerCol}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+                <Text style={[styles.addBannerTitle, { color: '#fbbf24' }]}>🏢 List Vehicle Storage Yard</Text>
+                <View style={{ backgroundColor: '#f59e0b', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                  <Text style={{ color: '#000', fontSize: 9, fontWeight: '900' }}>MIN 1 ACRE</Text>
+                </View>
+              </View>
+              <Text style={[styles.addBannerSub, { color: '#fef3c7' }]}>
+                Monetize 1+ Acre land for Banks & Auto Finance repossession yards
+              </Text>
+            </View>
+            <Text style={[styles.addBannerArrow, { color: '#fbbf24' }]}>→</Text>
+          </TouchableOpacity>
+        </View>
 
         {/* Manage Spots Section */}
-        <Text style={styles.sectionTitle}>My Parking Spots</Text>
+        <Text style={styles.sectionTitle}>My Parking & Storage Listings</Text>
 
         {loading ? (
           <ActivityIndicator size="large" color={COLORS.ownerAccent} style={{ marginTop: 20 }} />
         ) : spots.length === 0 ? (
           <View style={styles.emptyCard}>
-            <Text style={styles.emptyTxt}>No parking spots added yet</Text>
+            <Text style={styles.emptyTxt}>No parking or storage spots added yet</Text>
           </View>
         ) : (
           spots.map((spot) => {
             const isActive = spot.isActive !== false;
+            const isCommercial = spot.spaceCategory === 'commercial_vehicle_storage';
             const spotRate = spot.pricePerHour !== undefined ? spot.pricePerHour : (spot.hourlyRate || 40);
             const spotSlots = spot.totalSlots || (spot.slots ? spot.slots.length : null) || spot.totalSpots || 1;
 
             return (
-              <View key={spot._id} style={styles.spotItem}>
+              <View key={spot._id} style={[styles.spotItem, isCommercial && { borderColor: 'rgba(245, 158, 11, 0.4)', borderWidth: 1.5 }]}>
+                {isCommercial && (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                    <View style={{ backgroundColor: '#f59e0b', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 4 }}>
+                      <Text style={{ color: '#000', fontSize: 10, fontWeight: '900' }}>🏢 1+ ACRE REPO STOCKYARD</Text>
+                    </View>
+                    <View style={{ backgroundColor: 'rgba(56, 189, 248, 0.15)', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 4 }}>
+                      <Text style={{ color: '#38bdf8', fontSize: 10, fontWeight: '800' }}>📐 {spot.landAcres || 1.0} Acres</Text>
+                    </View>
+                  </View>
+                )}
                 <View style={styles.spotHeaderRow}>
                   <View style={styles.spotInfo}>
-                    <Text style={styles.spotTitle}>{spot.title || 'Parking Spot'}</Text>
+                    <Text style={styles.spotTitle}>{spot.title || (isCommercial ? 'Vehicle Storage Yard' : 'Parking Spot')}</Text>
                     <Text style={styles.spotAddress}>📍 {spot.address || 'Address'}, {spot.city || 'Hyderabad'}</Text>
-                    <Text style={styles.spotPrice}>Rate: ₹{spotRate}/hr • {spotSlots} slots {spot.hasEvCharger ? '• ⚡ EV Available' : ''}</Text>
+                    {isCommercial ? (
+                      <Text style={[styles.spotPrice, { color: '#fbbf24', fontWeight: '700' }]}>
+                        Monthly Fee: ₹{spot.monthlyStorageRate || 1500}/car • ~{spotSlots} Staging Bays
+                      </Text>
+                    ) : (
+                      <Text style={styles.spotPrice}>
+                        Rate: ₹{spotRate}/hr • {spotSlots} slots {spot.hasEvCharger ? '• ⚡ EV Available' : ''}
+                      </Text>
+                    )}
                   </View>
                   <TouchableOpacity
                     style={styles.toggleCol}

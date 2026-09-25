@@ -77,4 +77,12 @@ export const endpoints = {
   readNotification: (id) => `${API_URL}/notifications/read/${id}`,
   deleteNotification: (id) => `${API_URL}/notifications/${id}`,
   clearAllNotifications: `${API_URL}/notifications/user/clear-all`,
+
+  // Terms & Conditions
+  getTerms: (type) => `${API_URL}/terms/${type}`,
+
+  // FAQs / Chatbot Help Assistant
+  getFaqs: `${API_URL}/faqs`,
+  getFaqCategories: `${API_URL}/faqs/categories`,
 };
+

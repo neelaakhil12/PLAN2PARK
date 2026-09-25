@@ -68,4 +68,8 @@ export const endpoints = {
   createReview: `${API_URL}/reviews`,
   getSpaceReviews: (spaceId) => `${API_URL}/reviews/space/${spaceId}`,
   createComplaint: `${API_URL}/complaints`,
+
+  // Terms & Conditions
+  getTerms: (type) => `${API_URL}/terms/${type}`,
 };
+

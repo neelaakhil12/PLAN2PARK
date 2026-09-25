@@ -71,6 +71,26 @@ const parkingSpaceSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    monthlyStorageRate: {
+      type: Number,
+      default: 0,
+    },
+    spaceCategory: {
+      type: String,
+      enum: ['standard', 'commercial_vehicle_storage'],
+      default: 'standard',
+    },
+    landAcres: {
+      type: Number,
+      default: 0,
+    },
+    securityFacilities: {
+      hasCompoundWall: { type: Boolean, default: false },
+      has24x7Guards: { type: Boolean, default: false },
+      hasCctv: { type: Boolean, default: true },
+      hasFloodLights: { type: Boolean, default: false },
+      isGated: { type: Boolean, default: true },
+    },
     image: {
       type: String, // Stores Cloudinary URL or placeholder URL
       default: '',
@@ -95,8 +115,8 @@ const parkingSpaceSchema = new mongoose.Schema(
     },
     suitableVehicles: {
       type: [String],
-      enum: ['2-wheeler', '4-wheeler', 'large-car', 'heavy-vehicle'],
-      default: ['4-wheeler'],
+      enum: ['hatchback', 'sedan', 'suv', '2-wheeler', '4-wheeler', 'large-car', 'heavy-vehicle'],
+      default: ['hatchback', 'sedan', 'suv'],
     },
     slots: [slotSchema], // Populated on creation/approval
   },

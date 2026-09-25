@@ -138,6 +138,9 @@ const SeekerDashboard = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterEv, setFilterEv] = useState(false);
   const [selectedRadius, setSelectedRadius] = useState(null); // null (All), 1, 5, 10, 15, 20 km
+  const [spaceCategoryFilter, setSpaceCategoryFilter] = useState(
+    user?.accountCategory === 'bank_finance_seeker' ? 'commercial_vehicle_storage' : 'all'
+  );
   const [viewMode, setViewMode] = useState('map'); // 'map' or 'list'
   const [mapView, setMapView] = useState(false);
   const [userLat, setUserLat] = useState(17.313);
@@ -207,6 +210,9 @@ const SeekerDashboard = () => {
         seekerContact: prev.seekerContact || user.contact || user.phone || '',
         vehicleNumber: prev.vehicleNumber || user.vehicles?.[0]?.plateNumber || '',
       }));
+      if (user.accountCategory === 'bank_finance_seeker') {
+        setSpaceCategoryFilter('commercial_vehicle_storage');
+      }
     }
   }, [user, selectedSpace]);
 
@@ -829,7 +835,11 @@ const SeekerDashboard = () => {
         (item.city && item.city.toLowerCase().includes(q));
 
       const matchesEv = filterEv ? item.hasEvCharger : true;
-      return matchesSearch && matchesEv;
+      const matchesCategory =
+        spaceCategoryFilter === 'all'
+          ? true
+          : (item.spaceCategory || 'standard') === spaceCategoryFilter;
+      return matchesSearch && matchesEv && matchesCategory;
     });
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -906,13 +916,26 @@ const SeekerDashboard = () => {
                       className="h-full w-full object-cover"
                     />
                     <div className="absolute top-3 left-3 flex flex-wrap gap-1.5">
-                      <span className="bg-emerald-600/95 text-white font-extrabold text-[10px] px-2.5 py-1 rounded-full backdrop-blur-md shadow uppercase tracking-wider">
-                        🛡️ VERIFIED PARKING
-                      </span>
-                      {selectedSpace.hasEvCharger && (
-                        <span className="bg-blue-600/95 text-white font-extrabold text-[10px] px-2.5 py-1 rounded-full backdrop-blur-md shadow uppercase tracking-wider">
-                          ⚡ EV CHARGING
-                        </span>
+                      {selectedSpace.spaceCategory === 'commercial_vehicle_storage' ? (
+                        <>
+                          <span className="bg-amber-500 text-slate-950 font-black text-[10px] px-2.5 py-1 rounded-full backdrop-blur-md shadow uppercase tracking-wider">
+                            🏢 1+ ACRE REPO STOCKYARD
+                          </span>
+                          <span className="bg-slate-900/90 text-amber-300 font-black text-[10px] px-2.5 py-1 rounded-full backdrop-blur-md shadow uppercase tracking-wider">
+                            📐 {selectedSpace.landAcres || 1.0} Contiguous Acres
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          <span className="bg-emerald-600/95 text-white font-extrabold text-[10px] px-2.5 py-1 rounded-full backdrop-blur-md shadow uppercase tracking-wider">
+                            🛡️ VERIFIED PARKING
+                          </span>
+                          {selectedSpace.hasEvCharger && (
+                            <span className="bg-blue-600/95 text-white font-extrabold text-[10px] px-2.5 py-1 rounded-full backdrop-blur-md shadow uppercase tracking-wider">
+                              ⚡ EV CHARGING
+                            </span>
+                          )}
+                        </>
                       )}
                     </div>
                   </div>
@@ -929,14 +952,50 @@ const SeekerDashboard = () => {
                       </p>
                     </div>
                     <div className="sm:text-right shrink-0">
-                      <p className="text-2xl font-black text-emerald-600">
-                        ₹{selectedSpace.pricePerHour || 50}<span className="text-xs font-bold text-slate-400">/hr</span>
-                      </p>
-                      <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full mt-1 border border-emerald-200">
-                        🟢 {bookingAvailableSlots.filter(s => s.isAvailable).length} of {bookingAvailableSlots.length || selectedSpace.totalSlots || 5} Slots Free
-                      </span>
+                      {selectedSpace.spaceCategory === 'commercial_vehicle_storage' ? (
+                        <>
+                          <p className="text-2xl font-black text-amber-600">
+                            ₹{selectedSpace.monthlyStorageRate || 2500}<span className="text-xs font-bold text-slate-400">/car/mo</span>
+                          </p>
+                          <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-800 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full mt-1 border border-amber-200">
+                            🟢 {bookingAvailableSlots.filter(s => s.isAvailable).length} of {bookingAvailableSlots.length || selectedSpace.totalSlots || 5} Repo Bays Free
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          <p className="text-2xl font-black text-emerald-600">
+                            ₹{selectedSpace.pricePerHour || 50}<span className="text-xs font-bold text-slate-400">/hr</span>
+                          </p>
+                          <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full mt-1 border border-emerald-200">
+                            🟢 {bookingAvailableSlots.filter(s => s.isAvailable).length} of {bookingAvailableSlots.length || selectedSpace.totalSlots || 5} Slots Free
+                          </span>
+                        </>
+                      )}
                     </div>
                   </div>
+
+                  {/* Stockyard Security Checklist if commercial */}
+                  {selectedSpace.spaceCategory === 'commercial_vehicle_storage' && (
+                    <div className="p-4 bg-amber-50/70 border border-amber-200 rounded-2xl space-y-2">
+                      <p className="text-xs font-black text-amber-900 uppercase tracking-wider flex items-center gap-1.5">
+                        🛡️ Stockyard Security &amp; Repossession Infrastructure (Min 1+ Acre)
+                      </p>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                        <div className={`p-2 rounded-xl border font-bold text-center ${selectedSpace.securityFacilities?.hasCompoundWall ? 'bg-white border-amber-300 text-amber-900' : 'bg-slate-100 border-slate-200 text-slate-400'}`}>
+                          🧱 {selectedSpace.securityFacilities?.hasCompoundWall ? 'Compound Wall' : 'No Wall'}
+                        </div>
+                        <div className={`p-2 rounded-xl border font-bold text-center ${selectedSpace.securityFacilities?.has24x7Guards ? 'bg-white border-amber-300 text-amber-900' : 'bg-slate-100 border-slate-200 text-slate-400'}`}>
+                          👮 {selectedSpace.securityFacilities?.has24x7Guards ? '24/7 Guards' : 'No Guards'}
+                        </div>
+                        <div className={`p-2 rounded-xl border font-bold text-center ${selectedSpace.securityFacilities?.hasCctv ? 'bg-white border-amber-300 text-amber-900' : 'bg-slate-100 border-slate-200 text-slate-400'}`}>
+                          📹 {selectedSpace.securityFacilities?.hasCctv ? 'CCTV Network' : 'No CCTV'}
+                        </div>
+                        <div className={`p-2 rounded-xl border font-bold text-center ${selectedSpace.securityFacilities?.hasFloodLights ? 'bg-white border-amber-300 text-amber-900' : 'bg-slate-100 border-slate-200 text-slate-400'}`}>
+                          💡 {selectedSpace.securityFacilities?.hasFloodLights ? 'Floodlights' : 'No Floodlights'}
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Navigation Button */}
                   <div className="pt-2 border-t border-slate-100 flex gap-2">
@@ -1273,6 +1332,51 @@ const SeekerDashboard = () => {
                     </div>
                   </div>
 
+                  {/* Space Category Tabs (Standard vs Commercial Repo Stockyards) */}
+                  <div className="flex items-center gap-2 overflow-x-auto pb-1 pt-1 border-t border-slate-100">
+                    <span className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider shrink-0">Category:</span>
+                    {[
+                      { id: 'all', label: '🌐 All Spaces' },
+                      { id: 'standard', label: '🅿️ Standard Parking' },
+                      { id: 'commercial_vehicle_storage', label: '🏢 Bank Repo Stockyards (1+ Acre)' },
+                    ].map(cat => (
+                      <button
+                        key={cat.id}
+                        type="button"
+                        onClick={() => setSpaceCategoryFilter(cat.id)}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all border shrink-0 cursor-pointer ${
+                          spaceCategoryFilter === cat.id
+                            ? cat.id === 'commercial_vehicle_storage'
+                              ? 'bg-amber-500 text-white border-amber-500 shadow-md shadow-amber-500/20'
+                              : 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
+                            : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                        }`}
+                      >
+                        {cat.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Bank & Auto Finance Banner if applicable */}
+                  {user?.accountCategory === 'bank_finance_seeker' && (
+                    <div className="bg-gradient-to-r from-slate-900 via-cyan-950 to-slate-900 text-white p-3.5 rounded-2xl border border-cyan-500/30 flex items-center justify-between gap-3 text-xs">
+                      <div className="flex items-center gap-2.5">
+                        <span className="text-xl">🏦</span>
+                        <div>
+                          <p className="font-black text-cyan-200">
+                            Bank &amp; Auto Finance Repossession Portal ({user.organizationName || 'Fleet Operations'})
+                          </p>
+                          <p className="text-[11px] text-slate-300">
+                            Filtering for secured vehicle stockyards with <strong>minimum 1.0 contiguous acre</strong>, compound walls, 24/7 armed guards, and floodlights.
+                          </p>
+                        </div>
+                      </div>
+                      <span className="bg-cyan-500/20 text-cyan-300 border border-cyan-400/40 text-[9px] font-black uppercase px-2 py-0.5 rounded-full shrink-0">
+                        1+ Acre Yards Only
+                      </span>
+                    </div>
+                  )}
+
                   {/* Radius Distance Filter Chips */}
                   <div className="flex items-center gap-2 overflow-x-auto pb-1">
                     <span className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider shrink-0">Radius:</span>
@@ -1356,11 +1460,15 @@ const SeekerDashboard = () => {
                         const spotImg = getImageUrl ? getImageUrl(space.images?.[0] || space.image || space.photoUrl) : (space.image || space.photoUrl);
                         const sLat = space.coordinates?.lat || space.lat;
                         const sLng = space.coordinates?.lng || space.lng;
-
+                        const isStorage = space.spaceCategory === 'commercial_vehicle_storage';
                         return (
                           <div
                             key={space._id}
-                            className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm hover:shadow-md transition-all flex flex-col justify-between group p-5 space-y-4"
+                            className={`rounded-3xl overflow-hidden shadow-sm hover:shadow-md transition-all flex flex-col justify-between group p-5 space-y-4 ${
+                              isStorage
+                                ? 'bg-gradient-to-b from-amber-50/50 via-white to-white border-2 border-amber-300/80 shadow-amber-500/10 ring-1 ring-amber-200'
+                                : 'bg-white border border-slate-200'
+                            }`}
                           >
                             <div>
                               {/* Photo */}
@@ -1371,17 +1479,39 @@ const SeekerDashboard = () => {
                                   className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-300"
                                 />
                                 <div className="absolute top-3 left-3 flex flex-wrap gap-1.5">
-                                  <span className="bg-emerald-600 text-white font-black text-[9px] px-2.5 py-1 rounded-full uppercase tracking-wider shadow">
-                                    VERIFIED OWNER SPOT
-                                  </span>
-                                  {space.hasEvCharger && (
-                                    <span className="bg-blue-600 text-white font-black text-[9px] px-2.5 py-1 rounded-full uppercase tracking-wider shadow">
-                                      ⚡ EV CHARGING
-                                    </span>
+                                  {isStorage ? (
+                                    <>
+                                      <span className="bg-amber-500 text-slate-950 font-black text-[9px] px-2.5 py-1 rounded-full uppercase tracking-wider shadow">
+                                        🏢 1+ ACRE REPO STOCKYARD
+                                      </span>
+                                      <span className="bg-slate-900/90 text-amber-300 font-black text-[9px] px-2 py-1 rounded-full uppercase tracking-wider shadow">
+                                        📐 {space.landAcres || 1.0} ACRES
+                                      </span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <span className="bg-emerald-600 text-white font-black text-[9px] px-2.5 py-1 rounded-full uppercase tracking-wider shadow">
+                                        VERIFIED OWNER SPOT
+                                      </span>
+                                      {space.hasEvCharger && (
+                                        <span className="bg-blue-600 text-white font-black text-[9px] px-2.5 py-1 rounded-full uppercase tracking-wider shadow">
+                                          ⚡ EV CHARGING
+                                        </span>
+                                      )}
+                                    </>
                                   )}
                                 </div>
                                 <div className="absolute top-3 right-3 bg-slate-900/90 backdrop-blur-md text-emerald-400 font-black text-sm px-3 py-1 rounded-xl shadow">
-                                  ₹{space.pricePerHour || 50}<span className="text-[10px] text-slate-300 font-normal">/hr</span>
+                                  {isStorage ? (
+                                    <>
+                                      <span className="text-amber-400">₹{space.monthlyStorageRate || 2500}</span>
+                                      <span className="text-[10px] text-slate-300 font-normal">/car/mo</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      ₹{space.pricePerHour || 50}<span className="text-[10px] text-slate-300 font-normal">/hr</span>
+                                    </>
+                                  )}
                                 </div>
                               </div>
 
@@ -1396,32 +1526,65 @@ const SeekerDashboard = () => {
                                 </p>
                               </div>
 
-                              {/* Pills Row (Matching Mobile App 1:1) */}
-                              <div className="flex items-center gap-2 pt-3 flex-wrap">
-                                <span className="bg-emerald-50 border border-emerald-200 text-emerald-700 font-black text-[11px] px-2.5 py-1 rounded-xl flex items-center gap-1">
-                                  🎯 {space.calculatedDist} km away
-                                </span>
-                                <span className="bg-slate-100 text-slate-600 font-bold text-[11px] px-2.5 py-1 rounded-xl">
-                                  🚗 4-wheeler
-                                </span>
-                                <span className={`font-bold text-[11px] px-2.5 py-1 rounded-xl ${
-                                  !isFull ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
-                                }`}>
-                                  {!isFull ? '🟢 Easy Availability' : '🔴 Full'}
-                                </span>
-                              </div>
+                              {/* Security & Commercial Facilities */}
+                              {isStorage ? (
+                                <div className="space-y-2 pt-3">
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <span className="bg-amber-100 text-amber-900 border border-amber-300 font-black text-[10px] px-2.5 py-0.5 rounded-lg">
+                                      📐 {space.landAcres || 1.0} Contiguous Acres
+                                    </span>
+                                    {space.securityFacilities?.hasCompoundWall && (
+                                      <span className="bg-slate-100 text-slate-700 font-bold text-[10px] px-2 py-0.5 rounded-lg">
+                                        🧱 Compound Wall
+                                      </span>
+                                    )}
+                                    {space.securityFacilities?.has24x7Guards && (
+                                      <span className="bg-emerald-100 text-emerald-800 font-bold text-[10px] px-2 py-0.5 rounded-lg">
+                                        👮 24/7 Security
+                                      </span>
+                                    )}
+                                    {space.securityFacilities?.hasCctv && (
+                                      <span className="bg-blue-100 text-blue-800 font-bold text-[10px] px-2 py-0.5 rounded-lg">
+                                        📹 CCTV
+                                      </span>
+                                    )}
+                                  </div>
+                                  <p className="text-[11px] text-amber-800 font-semibold bg-amber-50/80 p-2 rounded-xl border border-amber-200">
+                                    🏦 Dedicated secured stockyard for bank repossession fleets &amp; asset storage.
+                                  </p>
+                                </div>
+                              ) : (
+                                <>
+                                  {/* Pills Row (Matching Mobile App 1:1) */}
+                                  <div className="flex items-center gap-2 pt-3 flex-wrap">
+                                    <span className="bg-emerald-50 border border-emerald-200 text-emerald-700 font-black text-[11px] px-2.5 py-1 rounded-xl flex items-center gap-1">
+                                      🎯 {space.calculatedDist} km away
+                                    </span>
+                                    <span className="bg-slate-100 text-slate-600 font-bold text-[11px] px-2.5 py-1 rounded-xl">
+                                      🚗 4-wheeler
+                                    </span>
+                                    <span className={`font-bold text-[11px] px-2.5 py-1 rounded-xl ${
+                                      !isFull ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
+                                    }`}>
+                                      {!isFull ? '🟢 Easy Availability' : '🔴 Full'}
+                                    </span>
+                                  </div>
 
-                              <p className="text-[11px] text-slate-400 italic pt-2">
-                                Helps users decide before traveling.
-                              </p>
+                                  <p className="text-[11px] text-slate-400 italic pt-2">
+                                    Helps users decide before traveling.
+                                  </p>
+                                </>
+                              )}
                             </div>
 
                             {/* Footer (Real-Time Capacity & Book Button) */}
                             <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-3">
                               <div>
-                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Real-Time Capacity</p>
+                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                                  {isStorage ? 'Repossession Capacity' : 'Real-Time Capacity'}
+                                </p>
                                 <p className={`text-xs font-black mt-0.5 ${!isFull ? 'text-emerald-600' : 'text-rose-600'}`}>
-                                  {!isFull ? `🟢 ${freeSlots} of ${space.totalSlots || 5} Slots Free` : '🚫 Full'}
+                                  {!isFull ? `🟢 ${freeSlots} of ${space.totalSlots || 5} Bays Free` : '🚫 Full'}
                                 </p>
                               </div>
 
@@ -1430,16 +1593,18 @@ const SeekerDashboard = () => {
                                 onClick={() => {
                                   setSelectedSpace(space);
                                   const now = new Date().toISOString().slice(0, 16);
-                                  setForm(p => ({ ...p, seekerName: user?.name || '', seekerContact: user?.contact || '', startTime: now, bookingType: 'hourly', hours: '1' }));
+                                  setForm(p => ({ ...p, seekerName: user?.name || '', seekerContact: user?.contact || '', startTime: now, bookingType: isStorage ? 'monthly' : 'hourly', hours: '1' }));
                                 }}
                                 disabled={isFull}
                                 className={`px-5 py-3 rounded-2xl text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-xs ${
                                   !isFull
-                                    ? 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-emerald-500/25'
+                                    ? isStorage
+                                      ? 'bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 shadow-amber-500/25'
+                                      : 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-emerald-500/25'
                                     : 'bg-slate-100 text-slate-400 cursor-not-allowed'
                                 }`}
                               >
-                                {!isFull ? 'Book Spot →' : 'Full'}
+                                {!isFull ? (isStorage ? 'Reserve Yard Bay →' : 'Book Spot →') : 'Full'}
                               </button>
                             </div>
                           </div>
@@ -1811,6 +1976,48 @@ const SeekerDashboard = () => {
                   </button>
                 </div>
 
+                {/* Category Switcher Tabs */}
+                <div className="flex items-center gap-2 overflow-x-auto pb-1">
+                  <span className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider shrink-0">Category:</span>
+                  {[
+                    { id: 'all', label: '🌐 All Spaces' },
+                    { id: 'standard', label: '🅿️ Standard Parking' },
+                    { id: 'commercial_vehicle_storage', label: '🏢 Bank Repo Stockyards (1+ Acre)' },
+                  ].map(cat => (
+                    <button
+                      key={cat.id}
+                      type="button"
+                      onClick={() => setSpaceCategoryFilter(cat.id)}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all border shrink-0 cursor-pointer ${
+                        spaceCategoryFilter === cat.id
+                          ? cat.id === 'commercial_vehicle_storage'
+                            ? 'bg-amber-500 text-white border-amber-500 shadow-md shadow-amber-500/20'
+                            : 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
+                          : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                      }`}
+                    >
+                      {cat.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Bank Banner */}
+                {user?.accountCategory === 'bank_finance_seeker' && (
+                  <div className="bg-gradient-to-r from-slate-900 via-cyan-950 to-slate-900 text-white p-3.5 rounded-2xl border border-cyan-500/30 flex items-center justify-between gap-3 text-xs">
+                    <div className="flex items-center gap-2.5">
+                      <span className="text-xl">🏦</span>
+                      <div>
+                        <p className="font-black text-cyan-200">
+                          Bank &amp; Auto Finance Repossession Fleet Access
+                        </p>
+                        <p className="text-[11px] text-slate-300">
+                          Showing certified 1+ Acre commercial stockyards with security guards, high perimeter compound walls &amp; 24/7 CCTV surveillance.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Radius Distance Filter Chips */}
                 <div className="flex items-center gap-2 overflow-x-auto pb-1">
                   <span className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider shrink-0">Radius:</span>
@@ -1866,28 +2073,36 @@ const SeekerDashboard = () => {
                       const spotImg   = getImageUrl ? getImageUrl(space.images?.[0] || space.image || space.photoUrl) : (space.image || space.photoUrl);
                       const sLat      = space.coordinates?.lat || space.lat;
                       const sLng      = space.coordinates?.lng || space.lng;
-
+                      const isStorage = space.spaceCategory === 'commercial_vehicle_storage';
                       return (
                         <div
                           key={space._id}
                           onMouseEnter={() => setActiveSpaceId(space._id)}
                           onMouseLeave={() => setActiveSpaceId(null)}
                           onClick={() => sLat && setActiveSpaceId(space._id)}
-                          className={`bg-white border rounded-2xl overflow-hidden shadow-sm cursor-pointer transition-all duration-200 ${
+                          className={`rounded-2xl overflow-hidden shadow-sm cursor-pointer transition-all duration-200 ${
                             isActive
-                              ? 'border-emerald-400 shadow-emerald-100 shadow-md ring-2 ring-emerald-200'
-                              : 'border-slate-200 hover:shadow-md hover:border-slate-300'
+                              ? isStorage
+                                ? 'border-amber-400 shadow-amber-100 shadow-md ring-2 ring-amber-300'
+                                : 'border-emerald-400 shadow-emerald-100 shadow-md ring-2 ring-emerald-200'
+                              : isStorage
+                              ? 'border-2 border-amber-300/80 bg-gradient-to-b from-amber-50/40 via-white to-white hover:border-amber-400 hover:shadow-md'
+                              : 'bg-white border border-slate-200 hover:shadow-md hover:border-slate-300'
                           }`}
                         >
                           <div className="flex gap-0">
                             {/* Image */}
                             <div className="relative shrink-0 w-32 sm:w-36">
                               <img src={spotImg} alt={space.title || 'Parking Spot'} className="h-full w-full object-cover min-h-[110px]" />
-                              {freeSlots > 0 && (
+                              {isStorage ? (
+                                <span className="absolute top-2 left-2 bg-amber-500 text-slate-950 text-[8px] font-black px-1.5 py-0.5 rounded-md shadow">
+                                  🏢 1+ ACRE YARD
+                                </span>
+                              ) : freeSlots > 0 ? (
                                 <span className="absolute top-2 left-2 bg-emerald-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded-md shadow">
                                   AVAILABLE
                                 </span>
-                              )}
+                              ) : null}
                               <button
                                 onClick={e => { e.stopPropagation(); handleToggleFavorite(space._id); }}
                                 className="absolute top-2 right-2 h-7 w-7 bg-white/90 backdrop-blur rounded-full flex items-center justify-center shadow text-rose-500 hover:scale-110 transition-transform cursor-pointer"
@@ -1905,12 +2120,25 @@ const SeekerDashboard = () => {
                                   <span className="truncate">{space.address || space.location}</span>
                                 </p>
                                 <div className="flex items-center gap-2 flex-wrap mt-1">
-                                  <span className={`text-[9px] font-black px-2 py-0.5 rounded-md ${freeSlots > 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-600'}`}>
-                                    {freeSlots > 0 ? `${freeSlots} Free` : 'Full'}
-                                  </span>
-                                  <span className="text-[9px] font-extrabold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md">
-                                    {space.distBadge || 'Nearby'}
-                                  </span>
+                                  {isStorage ? (
+                                    <>
+                                      <span className="text-[9px] font-black px-2 py-0.5 rounded-md bg-amber-100 text-amber-900 border border-amber-300">
+                                        📐 {space.landAcres || 1.0} Acres
+                                      </span>
+                                      <span className="text-[9px] font-extrabold bg-slate-100 text-slate-700 px-2 py-0.5 rounded-md">
+                                        {space.distBadge || 'Nearby'}
+                                      </span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <span className={`text-[9px] font-black px-2 py-0.5 rounded-md ${freeSlots > 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-600'}`}>
+                                        {freeSlots > 0 ? `${freeSlots} Free` : 'Full'}
+                                      </span>
+                                      <span className="text-[9px] font-extrabold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md">
+                                        {space.distBadge || 'Nearby'}
+                                      </span>
+                                    </>
+                                  )}
                                   {sLat && (
                                     <a
                                       href={`https://www.google.com/maps/dir/?api=1&destination=${sLat},${sLng}`}
@@ -1928,24 +2156,35 @@ const SeekerDashboard = () => {
 
                               <div className="flex items-center justify-between mt-3">
                                 <div>
-                                  <span className="text-base font-black text-emerald-600">₹{space.pricePerHour || 50}</span>
-                                  <span className="text-xs text-slate-400 font-semibold">/hr</span>
+                                  {isStorage ? (
+                                    <>
+                                      <span className="text-base font-black text-amber-600">₹{space.monthlyStorageRate || 2500}</span>
+                                      <span className="text-xs text-slate-400 font-semibold">/car/mo</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <span className="text-base font-black text-emerald-600">₹{space.pricePerHour || 50}</span>
+                                      <span className="text-xs text-slate-400 font-semibold">/hr</span>
+                                    </>
+                                  )}
                                 </div>
                                 <button
                                   onClick={e => {
                                     e.stopPropagation();
                                     setSelectedSpace(space);
                                     const now = new Date().toISOString().slice(0,16);
-                                    setForm(p => ({ ...p, seekerName: user?.name||'', seekerContact: user?.contact||'', startTime: now, bookingType: 'hourly', hours: '1' }));
+                                    setForm(p => ({ ...p, seekerName: user?.name||'', seekerContact: user?.contact||'', startTime: now, bookingType: isStorage ? 'monthly' : 'hourly', hours: '1' }));
                                   }}
                                   disabled={freeSlots === 0}
                                   className={`px-4 py-2 rounded-xl font-black text-xs transition-all cursor-pointer ${
                                     freeSlots > 0
-                                      ? 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-xs'
+                                      ? isStorage
+                                        ? 'bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 shadow-xs'
+                                        : 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-xs'
                                       : 'bg-slate-100 text-slate-400 cursor-not-allowed'
                                   }`}
                                 >
-                                  {freeSlots > 0 ? 'Book Now →' : 'Full'}
+                                  {freeSlots > 0 ? (isStorage ? 'Reserve Bay →' : 'Book Now →') : 'Full'}
                                 </button>
                               </div>
                             </div>

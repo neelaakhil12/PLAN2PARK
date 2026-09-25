@@ -105,18 +105,15 @@ const Navbar = () => {
         {/* ── LOGO ──────────────────────────────────────────────────────── */}
         <Link
           to={user ? `/${user.role}/dashboard` : '/'}
-          className="flex items-center gap-2 pr-5 mr-2 border-r border-slate-100 shrink-0"
+          className="flex items-center gap-2.5 pr-5 mr-2 border-r border-slate-100 shrink-0"
         >
-          {/* Icon badge */}
-          <div className="h-8 w-8 rounded-lg bg-emerald-500 flex items-center justify-center shadow-sm shrink-0">
-            <span className="text-white font-black text-base leading-none">P</span>
-          </div>
+          <img src="/logo.png" alt="Plan2Park" className="h-9 w-9 object-contain rounded-lg drop-shadow-sm shrink-0" />
           <div className="flex flex-col leading-tight">
-            <span className="font-extrabold text-[15px] text-slate-800 tracking-tight">
-              Planto<span className="text-emerald-500">park</span>
+            <span className="font-extrabold text-[15.5px] text-slate-900 tracking-tight">
+              Plan<span className="text-blue-600">2</span>Park
             </span>
-            <span className="text-[8.5px] uppercase tracking-widest text-slate-400 font-semibold -mt-0.5">
-              Smart Park. Smart Earn.
+            <span className="text-[8.5px] uppercase tracking-widest text-blue-600 font-bold -mt-0.5">
+              Smart Park • Repo Yards
             </span>
           </div>
         </Link>
@@ -192,13 +189,25 @@ const Navbar = () => {
             <>
               {/* Role badge pill */}
               <span className={`hidden sm:inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${
-                user.role === 'seeker'
-                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                  : user.role === 'owner'
+                user.accountCategory === 'vehicle_storage_owner'
+                  ? 'bg-amber-100 text-amber-900 border-amber-300'
+                  : user.accountCategory === 'bank_finance_seeker'
+                  ? 'bg-cyan-100 text-cyan-900 border-cyan-300'
+                  : user.role === 'seeker'
                   ? 'bg-blue-50 text-blue-700 border-blue-200'
+                  : user.role === 'owner'
+                  ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
                   : 'bg-amber-50 text-amber-700 border-amber-200'
               }`}>
-                {user.role === 'seeker' ? 'I want parking' : user.role === 'owner' ? 'I have parking' : 'Admin'}
+                {user.accountCategory === 'vehicle_storage_owner'
+                  ? '🏢 Storage Partner (1+ Ac)'
+                  : user.accountCategory === 'bank_finance_seeker'
+                  ? '🏦 Bank Repo Fleet'
+                  : user.role === 'seeker'
+                  ? '🅿️ Parking Seeker'
+                  : user.role === 'owner'
+                  ? '🅿️ Parking Host'
+                  : 'Admin'}
               </span>
 
               {/* ── NOTIFICATION BELL ─────────────────────────────────── */}

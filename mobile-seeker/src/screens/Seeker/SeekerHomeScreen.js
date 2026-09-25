@@ -49,6 +49,13 @@ const RADIUS_OPTIONS = [
   { label: '25 km', value: 25, icon: '🎯' },
 ];
 
+const VEHICLE_FILTER_OPTIONS = [
+  { label: 'All Cars', value: 'all', icon: '🚘' },
+  { label: 'Hatchback', value: 'hatchback', icon: '🚗' },
+  { label: 'Sedan', value: 'sedan', icon: '🚘' },
+  { label: 'SUV', value: 'suv', icon: '🚙' },
+];
+
 export default function SeekerHomeScreen({ navigation }) {
   const { user, token, updateProfile, logout } = useContext(AuthContext);
   const insets = useSafeAreaInsets();
@@ -61,6 +68,10 @@ export default function SeekerHomeScreen({ navigation }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterEv, setFilterEv] = useState(false);
   const [selectedRadius, setSelectedRadius] = useState(null); // null (All), 1, 5, 10, 15, 20 km
+  const [selectedVehicleType, setSelectedVehicleType] = useState('all'); // 'all', 'hatchback', 'sedan', 'suv'
+  const [spaceCategoryFilter, setSpaceCategoryFilter] = useState(
+    user?.accountCategory === 'bank_finance_seeker' ? 'commercial_vehicle_storage' : 'all'
+  );
   const [viewMode, setViewMode] = useState('map'); // 'map' or 'list'
   const [selectedMapSpot, setSelectedMapSpot] = useState(null);
 
@@ -217,6 +228,13 @@ export default function SeekerHomeScreen({ navigation }) {
       return false;
     }
 
+    // Commercial Storage vs Standard Parking Filter
+    if (spaceCategoryFilter === 'commercial_vehicle_storage') {
+      if (item.spaceCategory !== 'commercial_vehicle_storage') return false;
+    } else if (spaceCategoryFilter === 'standard') {
+      if (item.spaceCategory === 'commercial_vehicle_storage') return false;
+    }
+
     const queryLower = searchQuery.toLowerCase();
     const matchesSearch =
       !searchQuery ||
@@ -226,7 +244,15 @@ export default function SeekerHomeScreen({ navigation }) {
       item.city?.toLowerCase().includes(queryLower);
 
     const matchesEv = filterEv ? item.hasEvCharger : true;
-    return matchesSearch && matchesEv;
+
+    // Vehicle Size / Car Fit Filter
+    let matchesVehicle = true;
+    if (selectedVehicleType !== 'all') {
+      const sv = item.suitableVehicles || [];
+      matchesVehicle = sv.includes(selectedVehicleType) || sv.includes('4-wheeler') || sv.length === 0;
+    }
+
+    return matchesSearch && matchesEv && matchesVehicle;
   });
 
   const renderSpotCard = ({ item }) => {
@@ -236,6 +262,78 @@ export default function SeekerHomeScreen({ navigation }) {
       : (item.slots ? item.slots.filter((s) => s.isAvailable !== false).length : totalSlots);
     const isFull = availableSlots <= 0;
     const demand = getSpotDemand({ ...item, totalSlots, availableSlots });
+    const isCommercialYard = item.spaceCategory === 'commercial_vehicle_storage';
+
+    if (isCommercialYard) {
+      return (
+        <TouchableOpacity
+          style={[styles.spotCard, { borderColor: '#f59e0b', borderWidth: 1.5, backgroundColor: '#0f172a' }]}
+          onPress={() => navigation.navigate('SpotDetails', { space: item })}
+          activeOpacity={0.88}
+        >
+          <View style={styles.cardHeader}>
+            <View style={styles.badgeGroup}>
+              <View style={{ backgroundColor: '#f59e0b', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 }}>
+                <Text style={{ color: '#000000', fontSize: 10, fontWeight: '900' }}>🏢 1+ ACRE BANK REPO STOCKYARD</Text>
+              </View>
+              <View style={{ backgroundColor: 'rgba(56, 189, 248, 0.15)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, borderWidth: 1, borderColor: '#0284c7' }}>
+                <Text style={{ color: '#38bdf8', fontSize: 10, fontWeight: '800' }}>📐 {item.landAcres || 1.0} ACRES</Text>
+              </View>
+            </View>
+            <Text style={[styles.priceTxt, { color: '#fbbf24' }]}>
+              ₹{item.monthlyStorageRate || 1500}
+              <Text style={{ fontSize: 11, color: '#94a3b8', fontWeight: '500' }}>/car/mo</Text>
+            </Text>
+          </View>
+
+          <Text style={[styles.spotTitle, { fontSize: 17 }]}>{item.title || 'Bank Vehicle Stockyard'}</Text>
+          <Text style={styles.spotAddress}>📍 {item.address || item.location || ''}</Text>
+
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginVertical: 8 }}>
+            <View style={{ backgroundColor: '#1e293b', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 }}>
+              <Text style={{ color: '#e2e8f0', fontSize: 11, fontWeight: '700' }}>👮 24/7 Guards</Text>
+            </View>
+            <View style={{ backgroundColor: '#1e293b', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 }}>
+              <Text style={{ color: '#e2e8f0', fontSize: 11, fontWeight: '700' }}>📹 CCTV Monitored</Text>
+            </View>
+            <View style={{ backgroundColor: '#1e293b', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 }}>
+              <Text style={{ color: '#e2e8f0', fontSize: 11, fontWeight: '700' }}>🧱 Compound Wall</Text>
+            </View>
+            <View style={{ backgroundColor: '#1e293b', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 }}>
+              <Text style={{ color: '#e2e8f0', fontSize: 11, fontWeight: '700' }}>💡 Floodlights</Text>
+            </View>
+          </View>
+
+          <View style={styles.distanceRow}>
+            <View style={styles.distChip}>
+              <Text style={styles.distIcon}>🎯</Text>
+              <Text style={styles.distTxt}>{item.distBadge}</Text>
+            </View>
+            <View style={{ backgroundColor: 'rgba(34, 197, 94, 0.15)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, borderWidth: 1, borderColor: '#22c55e' }}>
+              <Text style={{ color: '#4ade80', fontSize: 10, fontWeight: '800' }}>VERIFIED SECURE REPO YARD</Text>
+            </View>
+          </View>
+
+          <View style={styles.divider} />
+
+          <View style={styles.cardFooter}>
+            <View style={styles.metaCol}>
+              <Text style={styles.metaLabel}>Repossession Capacity</Text>
+              <Text style={[styles.metaVal, { color: '#fbbf24', fontWeight: '800' }]} numberOfLines={1}>
+                🟢 ~{availableSlots || Math.round((item.landAcres || 1) * 80)} Staging Bays Ready
+              </Text>
+            </View>
+            <TouchableOpacity
+              style={[styles.bookBtn, { backgroundColor: '#f59e0b' }]}
+              onPress={() => navigation.navigate('SpotDetails', { space: item })}
+              activeOpacity={0.85}
+            >
+              <Text style={[styles.bookBtnTxt, { color: '#000000', fontWeight: '900' }]}>Reserve Yard →</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      );
+    }
 
     return (
       <TouchableOpacity
@@ -254,18 +352,45 @@ export default function SeekerHomeScreen({ navigation }) {
         <Text style={styles.spotTitle}>{item.title || item.location || 'Owner Parking Space'}</Text>
         <Text style={styles.spotAddress}>📍 {item.address || item.location || ''}</Text>
 
-        {/* Distance + Vehicle + Live Demand Badges Row */}
+        {/* Distance + Live Demand Badges Row */}
         <View style={styles.distanceRow}>
           <View style={styles.distChip}>
             <Text style={styles.distIcon}>🎯</Text>
             <Text style={styles.distTxt}>{item.distBadge}</Text>
           </View>
-          <Text style={styles.vehiclePill}>🚗 {item.suitableVehicles ? item.suitableVehicles.join(', ') : '4-wheeler'}</Text>
           <View style={[styles.cardDemandBadge, { backgroundColor: demand.bg, borderColor: demand.color }]}>
             <Text style={[styles.cardDemandTxt, { color: demand.color }]}>
               {demand.badge}
             </Text>
           </View>
+        </View>
+
+        {/* Vehicle Size Compatibility Badges */}
+        <View style={styles.vehicleBadgesRow}>
+          {(item.suitableVehicles && item.suitableVehicles.length > 0 && !item.suitableVehicles.includes('4-wheeler')) ? (
+            item.suitableVehicles.filter((v) => ['hatchback', 'sedan', 'suv'].includes(v)).map((v) => {
+              const isMatch = selectedVehicleType === v;
+              return (
+                <View key={v} style={[styles.carFitBadge, isMatch && styles.carFitBadgeMatch]}>
+                  <Text style={[styles.carFitBadgeTxt, isMatch && styles.carFitBadgeTxtMatch]}>
+                    {v === 'hatchback' ? '🚗 Hatchback' : v === 'sedan' ? '🚘 Sedan' : '🚙 SUV'}
+                  </Text>
+                </View>
+              );
+            })
+          ) : (
+            <>
+              <View style={[styles.carFitBadge, selectedVehicleType === 'hatchback' && styles.carFitBadgeMatch]}>
+                <Text style={[styles.carFitBadgeTxt, selectedVehicleType === 'hatchback' && styles.carFitBadgeTxtMatch]}>🚗 Hatchback</Text>
+              </View>
+              <View style={[styles.carFitBadge, selectedVehicleType === 'sedan' && styles.carFitBadgeMatch]}>
+                <Text style={[styles.carFitBadgeTxt, selectedVehicleType === 'sedan' && styles.carFitBadgeTxtMatch]}>🚘 Sedan</Text>
+              </View>
+              <View style={[styles.carFitBadge, selectedVehicleType === 'suv' && styles.carFitBadgeMatch]}>
+                <Text style={[styles.carFitBadgeTxt, selectedVehicleType === 'suv' && styles.carFitBadgeTxtMatch]}>🚙 SUV</Text>
+              </View>
+            </>
+          )}
         </View>
 
         <Text style={styles.cardTagline}>Helps users decide before traveling.</Text>
@@ -299,13 +424,22 @@ export default function SeekerHomeScreen({ navigation }) {
           <Text style={styles.welcomeText}>Hello, {user?.name || 'Seeker'} 👋</Text>
           <Text style={styles.headerSub}>Find secure owner parking nearby</Text>
         </View>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <TouchableOpacity
+            onPress={() => navigation.navigate('HelpAssistant')}
+            style={styles.notifBellBtn}
+            activeOpacity={0.75}
+            title="Ask Smart Assistant"
+          >
+            <Text style={{ fontSize: 18 }}>🤖</Text>
+          </TouchableOpacity>
+
           <TouchableOpacity
             onPress={() => navigation.navigate('Notifications')}
             style={styles.notifBellBtn}
             activeOpacity={0.75}
           >
-            <Text style={{ fontSize: 20 }}>🔔</Text>
+            <Text style={{ fontSize: 18 }}>🔔</Text>
             {unreadNotifs > 0 && (
               <View style={styles.notifBadge}>
                 <Text style={styles.notifBadgeTxt}>{unreadNotifs > 9 ? '9+' : unreadNotifs}</Text>
@@ -348,6 +482,38 @@ export default function SeekerHomeScreen({ navigation }) {
           />
         </View>
 
+        {/* Portal Category Selector: Standard Parking vs Commercial Repo Yards */}
+        <View style={{ flexDirection: 'row', backgroundColor: '#131b2e', borderRadius: 12, padding: 3, marginTop: 10, borderWidth: 1, borderColor: '#1e293b' }}>
+          {[
+            { id: 'all', label: '🌐 All Spaces' },
+            { id: 'standard', label: '🅿️ Parking' },
+            { id: 'commercial_vehicle_storage', label: '🏢 Repo Yards (1+ Ac)' },
+          ].map((cat) => {
+            const isSel = spaceCategoryFilter === cat.id;
+            return (
+              <TouchableOpacity
+                key={cat.id}
+                style={{
+                  flex: cat.id === 'commercial_vehicle_storage' ? 1.4 : 1,
+                  paddingVertical: 7,
+                  borderRadius: 9,
+                  backgroundColor: isSel ? (cat.id === 'commercial_vehicle_storage' ? '#f59e0b' : COLORS.primary) : 'transparent',
+                  alignItems: 'center',
+                }}
+                onPress={() => setSpaceCategoryFilter(cat.id)}
+              >
+                <Text style={{
+                  color: isSel ? (cat.id === 'commercial_vehicle_storage' ? '#000000' : '#ffffff') : '#94a3b8',
+                  fontSize: 11,
+                  fontWeight: '800',
+                }}>
+                  {cat.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -379,6 +545,38 @@ export default function SeekerHomeScreen({ navigation }) {
             </Text>
           </TouchableOpacity>
         </ScrollView>
+
+        {/* Car Size Fit Filter Bar */}
+        <View style={styles.vehicleFilterBar}>
+          <Text style={styles.vehicleFilterHeader}>🚗 Vehicle Fit:</Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.vehicleFilterScroll}
+          >
+            {VEHICLE_FILTER_OPTIONS.map((opt) => {
+              const isSelected = selectedVehicleType === opt.value;
+              return (
+                <TouchableOpacity
+                  key={opt.value}
+                  style={[
+                    styles.vehicleFilterPill,
+                    isSelected && styles.vehicleFilterPillActive,
+                  ]}
+                  onPress={() => setSelectedVehicleType(opt.value)}
+                  activeOpacity={0.75}
+                >
+                  <Text style={[
+                    styles.vehicleFilterTxt,
+                    isSelected && styles.vehicleFilterTxtActive,
+                  ]}>
+                    {opt.icon} {opt.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
       </View>
 
       {/* Parking Demand Heat Map Info Banner */}
@@ -651,6 +849,72 @@ const styles = StyleSheet.create({
   filterPillTxtActive: {
     color: COLORS.primaryDark,
     fontWeight: '700',
+  },
+  vehicleFilterBar: {
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(51, 65, 85, 0.6)',
+  },
+  vehicleFilterHeader: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#94a3b8',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 6,
+  },
+  vehicleFilterScroll: {
+    gap: 8,
+  },
+  vehicleFilterPill: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    backgroundColor: '#1e293b',
+    borderWidth: 1,
+    borderColor: '#334155',
+  },
+  vehicleFilterPillActive: {
+    backgroundColor: 'rgba(56, 189, 248, 0.18)',
+    borderColor: '#38bdf8',
+  },
+  vehicleFilterTxt: {
+    color: '#94a3b8',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  vehicleFilterTxtActive: {
+    color: '#38bdf8',
+    fontWeight: '800',
+  },
+  vehicleBadgesRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 6,
+    marginBottom: 6,
+  },
+  carFitBadge: {
+    backgroundColor: '#1e293b',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#334155',
+  },
+  carFitBadgeMatch: {
+    backgroundColor: 'rgba(56, 189, 248, 0.2)',
+    borderColor: '#38bdf8',
+  },
+  carFitBadgeTxt: {
+    color: '#cbd5e1',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  carFitBadgeTxtMatch: {
+    color: '#38bdf8',
+    fontWeight: '800',
   },
   heatMapBanner: {
     marginHorizontal: 16,

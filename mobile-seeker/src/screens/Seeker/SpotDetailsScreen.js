@@ -330,6 +330,57 @@ export default function SpotDetailsScreen({ route, navigation }) {
 
           <View style={styles.divider} />
 
+          {/* Supported Vehicle Sizes & Types */}
+          <Text style={styles.sectionTitle}>🚗 Vehicles That Fit in This Spot</Text>
+          <View style={{ gap: 6, marginBottom: 12 }}>
+            {[
+              { id: 'hatchback', name: 'Hatchback', icon: '🚗', desc: 'Small cars (Swift, i20, Baleno)' },
+              { id: 'sedan', name: 'Sedan', icon: '🚘', desc: 'Midsize cars (Dzire, City, Verna)' },
+              { id: 'suv', name: 'SUV', icon: '🚙', desc: 'Large cars (Creta, Seltos, XUV700)' },
+            ].map((v) => {
+              const fits = !space.suitableVehicles ||
+                space.suitableVehicles.length === 0 ||
+                space.suitableVehicles.includes('4-wheeler') ||
+                space.suitableVehicles.includes(v.id);
+              return (
+                <View
+                  key={v.id}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    backgroundColor: fits ? 'rgba(16, 185, 129, 0.08)' : 'rgba(51, 65, 85, 0.3)',
+                    borderWidth: 1,
+                    borderColor: fits ? 'rgba(16, 185, 129, 0.3)' : '#334155',
+                    borderRadius: 10,
+                    paddingHorizontal: 12,
+                    paddingVertical: 8,
+                  }}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                    <Text style={{ fontSize: 18 }}>{v.icon}</Text>
+                    <View>
+                      <Text style={{ color: fits ? '#ffffff' : '#94a3b8', fontSize: 13, fontWeight: '700' }}>
+                        {v.name}
+                      </Text>
+                      <Text style={{ color: '#94a3b8', fontSize: 10 }}>{v.desc}</Text>
+                    </View>
+                  </View>
+                  <View style={{
+                    backgroundColor: fits ? '#10b981' : '#475569',
+                    paddingHorizontal: 8,
+                    paddingVertical: 3,
+                    borderRadius: 6,
+                  }}>
+                    <Text style={{ color: '#ffffff', fontSize: 10, fontWeight: '900' }}>
+                      {fits ? '✓ FITS' : '✕ NO'}
+                    </Text>
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+
           {/* Features */}
           <Text style={styles.sectionTitle}>Amenities & Features</Text>
           <View style={styles.amenitiesGrid}>
@@ -357,20 +408,40 @@ export default function SpotDetailsScreen({ route, navigation }) {
           </View>
 
           {/* Vehicle Type Switcher */}
-          <Text style={styles.label}>Vehicle Type</Text>
+          <Text style={styles.label}>Your Vehicle Type / Size</Text>
           <View style={styles.vehicleTypeRow}>
-            <TouchableOpacity
-              style={[styles.vTypeBtn, vehicleType === '4-wheeler' && styles.vTypeBtnActive]}
-              onPress={() => setVehicleType('4-wheeler')}
-            >
-              <Text style={[styles.vTypeTxt, vehicleType === '4-wheeler' && styles.vTypeTxtActive]}>🚗 4-Wheeler (Car)</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.vTypeBtn, vehicleType === '2-wheeler' && styles.vTypeBtnActive]}
-              onPress={() => setVehicleType('2-wheeler')}
-            >
-              <Text style={[styles.vTypeTxt, vehicleType === '2-wheeler' && styles.vTypeTxtActive]}>🏍️ 2-Wheeler (Bike)</Text>
-            </TouchableOpacity>
+            {[
+              { id: 'hatchback', label: '🚗 Hatchback' },
+              { id: 'sedan', label: '🚘 Sedan' },
+              { id: 'suv', label: '🚙 SUV' },
+              { id: '2-wheeler', label: '🏍️ 2-Wheeler' },
+            ].map((vt) => {
+              const isSelected = vehicleType === vt.id;
+              const isCar = ['hatchback', 'sedan', 'suv'].includes(vt.id);
+              const fits = !isCar ||
+                !space.suitableVehicles ||
+                space.suitableVehicles.length === 0 ||
+                space.suitableVehicles.includes('4-wheeler') ||
+                space.suitableVehicles.includes(vt.id);
+              return (
+                <TouchableOpacity
+                  key={vt.id}
+                  style={[
+                    styles.vTypeBtn,
+                    isSelected && styles.vTypeBtnActive,
+                    !fits && { opacity: 0.6, borderColor: '#ef444450' },
+                  ]}
+                  onPress={() => setVehicleType(vt.id)}
+                >
+                  <Text style={[styles.vTypeTxt, isSelected && styles.vTypeTxtActive]}>
+                    {vt.label}
+                  </Text>
+                  <Text style={{ fontSize: 9, color: fits ? '#10b981' : '#ef4444', marginTop: 2, fontWeight: '700' }}>
+                    {fits ? '✓ Fits Spot' : '⚠️ Space tight'}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
 
           {/* Duration Selector */}
@@ -1134,12 +1205,15 @@ const styles = StyleSheet.create({
   },
   vehicleTypeRow: {
     flexDirection: 'row',
-    gap: 10,
+    flexWrap: 'wrap',
+    gap: 8,
     marginBottom: 14,
   },
   vTypeBtn: {
-    flex: 1,
-    paddingVertical: 12,
+    width: '48%',
+    flexGrow: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
     borderRadius: 10,
     backgroundColor: COLORS.darkBg,
     alignItems: 'center',

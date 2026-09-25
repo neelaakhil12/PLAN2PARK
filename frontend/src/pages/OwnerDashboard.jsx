@@ -56,10 +56,31 @@ const OwnerDashboard = () => {
     imageFile: null,
     lat: 17.313,
     lng: 78.545,
-    suitableVehicles: ['4-wheeler']
+    suitableVehicles: ['hatchback', 'sedan', 'suv'],
+    spaceCategory: user?.accountCategory === 'vehicle_storage_owner' ? 'commercial_vehicle_storage' : 'standard',
+    landAcres: user?.landAcres ? String(user.landAcres) : '1.0',
+    monthlyStorageRate: '1500',
+    hasCompoundWall: true,
+    has24x7Guards: true,
+    hasFloodLights: true,
   });
   const [submittingSpot, setSubmittingSpot] = useState(false);
   const [locatingGps, setLocatingGps] = useState(false);
+
+  const toggleVehicleFit = (vehicleId) => {
+    setSpotForm(prev => {
+      const current = prev.suitableVehicles || [];
+      if (current.includes(vehicleId)) {
+        if (current.length === 1) {
+          alert('Please select at least one vehicle size that fits in this spot.');
+          return prev;
+        }
+        return { ...prev, suitableVehicles: current.filter(v => v !== vehicleId) };
+      } else {
+        return { ...prev, suitableVehicles: [...current, vehicleId] };
+      }
+    });
+  };
 
   // Profile Form (including Bank Details)
   const [profileForm, setProfileForm] = useState({
@@ -238,7 +259,13 @@ const OwnerDashboard = () => {
       imageFile: null,
       lat: spot.coordinates?.lat || spot.lat || 17.313,
       lng: spot.coordinates?.lng || spot.lng || 78.545,
-      suitableVehicles: spot.suitableVehicles || ['4-wheeler']
+      suitableVehicles: (spot.suitableVehicles && spot.suitableVehicles.length > 0) ? spot.suitableVehicles : ['hatchback', 'sedan', 'suv'],
+      spaceCategory: spot.spaceCategory || 'standard',
+      landAcres: String(spot.landAcres || user?.landAcres || '1.0'),
+      monthlyStorageRate: String(spot.monthlyStorageRate || '1500'),
+      hasCompoundWall: spot.securityFacilities?.hasCompoundWall !== false,
+      has24x7Guards: spot.securityFacilities?.has24x7Guards !== false,
+      hasFloodLights: spot.securityFacilities?.hasFloodLights !== false,
     });
     setCurrentView('add_spot');
   };
@@ -286,6 +313,14 @@ const OwnerDashboard = () => {
       return;
     }
 
+    if (spotForm.spaceCategory === 'commercial_vehicle_storage') {
+      const acres = parseFloat(spotForm.landAcres);
+      if (isNaN(acres) || acres < 1.0) {
+        alert('Mandatory Policy: Minimum 1.0 contiguous Acre of land is strictly required for Bank Vehicle Storage Yards.');
+        return;
+      }
+    }
+
     setSubmittingSpot(true);
     try {
       const fd = new FormData();
@@ -293,11 +328,29 @@ const OwnerDashboard = () => {
       fd.append('address', spotForm.address);
       fd.append('city', spotForm.city);
       fd.append('location', spotForm.location || spotForm.city);
-      fd.append('pricePerHour', Number(spotForm.pricePerHour || 50));
+      fd.append('spaceCategory', spotForm.spaceCategory || 'standard');
+
+      if (spotForm.spaceCategory === 'commercial_vehicle_storage') {
+        const acres = parseFloat(spotForm.landAcres);
+        fd.append('landAcres', acres);
+        fd.append('monthlyStorageRate', Number(spotForm.monthlyStorageRate || 1500));
+        fd.append('pricePerHour', Math.round(Number(spotForm.monthlyStorageRate || 1500) / 100));
+        fd.append('totalSlots', Math.max(Number(spotForm.totalSlots) || 80, Math.round(acres * 80)));
+        fd.append('securityFacilities', JSON.stringify({
+          hasCompoundWall: spotForm.hasCompoundWall,
+          has24x7Guards: spotForm.has24x7Guards,
+          hasCctv: spotForm.hasCctv,
+          hasFloodLights: spotForm.hasFloodLights,
+          isGated: true
+        }));
+      } else {
+        fd.append('pricePerHour', Number(spotForm.pricePerHour || 50));
+        fd.append('totalSlots', Number(spotForm.totalSlots || 5));
+      }
+
       fd.append('pricePerDay', Number(spotForm.pricePerDay || 400));
       fd.append('pricePerWeek', Number(spotForm.pricePerWeek || 2000));
       fd.append('pricePerMonth', Number(spotForm.pricePerMonth || 6000));
-      fd.append('totalSlots', Number(spotForm.totalSlots || 5));
       fd.append('maxWalletDiscount', Number(spotForm.maxWalletDiscount ?? 10));
       fd.append('cancellationPolicy', spotForm.cancellationPolicy || 'full');
       fd.append('hasEvCharger', spotForm.hasEvCharger);
@@ -330,7 +383,7 @@ const OwnerDashboard = () => {
           title: '', address: '', city: 'Hyderabad', location: 'Hyderabad', googleMapsLink: '',
           totalSlots: '5', pricePerHour: '50', pricePerDay: '400', pricePerWeek: '2000', pricePerMonth: '6000',
           maxWalletDiscount: '10', cancellationPolicy: 'full', hasEvCharger: false, hasCctv: false, isCovered: false,
-          imageUrl: '', imageFile: null, lat: 17.313, lng: 78.545, suitableVehicles: ['4-wheeler']
+          imageUrl: '', imageFile: null, lat: 17.313, lng: 78.545, suitableVehicles: ['hatchback', 'sedan', 'suv']
         });
         await fetchOwnerData();
         setCurrentView('dashboard');
@@ -422,7 +475,7 @@ const OwnerDashboard = () => {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white border border-slate-200 rounded-3xl p-6 shadow-sm">
               <div>
                 <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight flex items-center gap-2">
-                  Space Owner Hub <span className="text-xl">🅿️</span>
+                  Space Owner Dashboard <span className="text-xl">🅿️</span>
                 </h1>
                 <p className="text-slate-500 text-sm mt-0.5">Welcome back, <span className="font-bold text-slate-800 capitalize">{user?.name || 'Owner'}</span>. Manage your spots & earnings.</p>
               </div>
@@ -478,7 +531,7 @@ const OwnerDashboard = () => {
               >
                 <div className="min-w-0">
                   <p className="font-black text-base flex items-center gap-2">
-                    📑 {bookings.length} Driver Booking(s) Received
+                    📑 {bookings.length} Seeker Booking(s) Received
                   </p>
                   <p className="text-xs text-emerald-100 font-medium mt-0.5 truncate">
                     Latest: {bookings[0]?.vehicleNumber || 'Vehicle'} • Slot {bookings[0]?.slotId || '1'} • ₹{bookings[0]?.totalAmount || 0}
@@ -490,44 +543,81 @@ const OwnerDashboard = () => {
               </div>
             )}
 
-            {/* Add Spot Promo Banner */}
-            <div
-              onClick={() => { setEditingSpot(null); setCurrentView('add_spot'); }}
-              className="bg-white border border-slate-200 hover:border-emerald-300 rounded-3xl p-6 shadow-sm cursor-pointer flex items-center justify-between gap-4 transition-all hover:shadow-md group"
-            >
-              <div>
-                <h3 className="text-base font-black text-slate-900 group-hover:text-emerald-600 transition-colors">
-                  + List New Parking Space
-                </h3>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Turn your driveways, vacant plots, and commercial spots into recurring income
-                </p>
+            {/* Add Spot Promo Banners */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div
+                onClick={() => {
+                  setEditingSpot(null);
+                  setSpotForm(p => ({ ...p, spaceCategory: 'standard' }));
+                  setCurrentView('add_spot');
+                }}
+                className="bg-white border border-slate-200 hover:border-blue-400 rounded-3xl p-6 shadow-sm cursor-pointer flex items-center justify-between gap-4 transition-all hover:shadow-md group"
+              >
+                <div>
+                  <h3 className="text-base font-black text-slate-900 group-hover:text-blue-600 transition-colors">
+                    + List Hourly Parking Space
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Turn driveways & residential bays into recurring parking income
+                  </p>
+                </div>
+                <span className="h-10 w-10 bg-slate-100 group-hover:bg-blue-600 group-hover:text-white rounded-2xl flex items-center justify-center text-slate-700 font-bold transition-colors shrink-0">
+                  →
+                </span>
               </div>
-              <span className="h-10 w-10 bg-slate-100 group-hover:bg-emerald-500 group-hover:text-white rounded-2xl flex items-center justify-center text-slate-700 font-bold transition-colors">
-                →
-              </span>
+
+              <div
+                onClick={() => {
+                  setEditingSpot(null);
+                  setSpotForm(p => ({
+                    ...p,
+                    spaceCategory: 'commercial_vehicle_storage',
+                    landAcres: user?.landAcres ? String(user.landAcres) : '1.0',
+                    monthlyStorageRate: '1500',
+                  }));
+                  setCurrentView('add_spot');
+                }}
+                className="bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-amber-300 hover:border-amber-500 rounded-3xl p-6 shadow-sm cursor-pointer flex items-center justify-between gap-4 transition-all hover:shadow-md group"
+              >
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <h3 className="text-base font-black text-amber-950 group-hover:text-amber-700 transition-colors">
+                      🏢 List Vehicle Storage Yard
+                    </h3>
+                    <span className="text-[10px] font-black bg-amber-200 text-amber-900 px-2 py-0.5 rounded">
+                      MIN 1 ACRE
+                    </span>
+                  </div>
+                  <p className="text-xs text-amber-900/80">
+                    Monetize 1+ Acre land for bank repossessed vehicle holding contracts
+                  </p>
+                </div>
+                <span className="h-10 w-10 bg-amber-500 text-white rounded-2xl flex items-center justify-center font-black transition-colors shrink-0 shadow-sm">
+                  →
+                </span>
+              </div>
             </div>
 
             {/* My Parking Spots Section */}
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <h2 className="text-xl font-black text-slate-900">My Parking Spots</h2>
+                <h2 className="text-xl font-black text-slate-900">My Parking & Storage Listings</h2>
                 <span className="text-xs font-bold text-slate-400">{spaces.length} properties</span>
               </div>
 
               {loading ? (
                 <div className="bg-white border border-slate-200 rounded-3xl p-12 text-center">
-                  <Loader2 className="h-8 w-8 text-emerald-500 animate-spin mx-auto mb-2" />
+                  <Loader2 className="h-8 w-8 text-blue-500 animate-spin mx-auto mb-2" />
                   <p className="text-xs text-slate-400 font-semibold">Loading your parking spots...</p>
                 </div>
               ) : spaces.length === 0 ? (
                 <div className="bg-white border border-slate-200 rounded-3xl p-12 text-center space-y-3">
                   <p className="text-4xl">🏢</p>
-                  <h3 className="font-extrabold text-slate-800 text-base">No parking spots added yet</h3>
-                  <p className="text-xs text-slate-400 max-w-sm mx-auto">Start earning today by listing your available parking spaces.</p>
+                  <h3 className="font-extrabold text-slate-800 text-base">No listings added yet</h3>
+                  <p className="text-xs text-slate-400 max-w-sm mx-auto">Start earning today by listing your available parking spaces or 1+ Acre vehicle storage yards.</p>
                   <button
                     onClick={() => { setEditingSpot(null); setCurrentView('add_spot'); }}
-                    className="mt-2 bg-emerald-500 hover:bg-emerald-600 text-white font-extrabold text-xs px-5 py-2.5 rounded-xl shadow-md transition-all cursor-pointer"
+                    className="mt-2 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs px-5 py-2.5 rounded-xl shadow-md transition-all cursor-pointer"
                   >
                     + Add Your First Spot
                   </button>
@@ -536,6 +626,7 @@ const OwnerDashboard = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {spaces.map(spot => {
                     const isActive = spot.isActive !== false;
+                    const isCommercial = spot.spaceCategory === 'commercial_vehicle_storage';
                     const spotRate = spot.pricePerHour !== undefined ? spot.pricePerHour : (spot.hourlyRate || 40);
                     const spotSlots = spot.totalSlots || (spot.slots ? spot.slots.length : 5);
                     const spotImg = getImageUrl ? getImageUrl(spot.images?.[0] || spot.image || spot.photoUrl) : (spot.image || spot.photoUrl);
@@ -543,8 +634,21 @@ const OwnerDashboard = () => {
                     return (
                       <div
                         key={spot._id}
-                        className="bg-white border border-slate-200 rounded-3xl p-5 shadow-sm space-y-4 hover:shadow-md transition-shadow"
+                        className={`bg-white rounded-3xl p-5 shadow-sm space-y-4 hover:shadow-md transition-shadow border ${
+                          isCommercial ? 'border-amber-300 ring-1 ring-amber-200' : 'border-slate-200'
+                        }`}
                       >
+                        {isCommercial && (
+                          <div className="flex items-center gap-2">
+                            <span className="bg-amber-500 text-slate-950 font-black text-[10px] px-2.5 py-0.5 rounded-md">
+                              🏢 1+ ACRE REPO STOCKYARD
+                            </span>
+                            <span className="bg-blue-100 text-blue-800 font-bold text-[10px] px-2 py-0.5 rounded-md">
+                              📐 {spot.landAcres || 1.0} Acres
+                            </span>
+                          </div>
+                        )}
+
                         <div className="flex gap-4">
                           {/* Image */}
                           <div className="h-24 w-24 rounded-2xl bg-slate-100 overflow-hidden shrink-0 border border-slate-100">
@@ -552,7 +656,7 @@ const OwnerDashboard = () => {
                               <img src={spotImg} alt="" className="h-full w-full object-cover" />
                             ) : (
                               <div className="h-full w-full flex items-center justify-center text-2xl bg-slate-100 text-slate-400">
-                                🅿️
+                                {isCommercial ? '🏢' : '🅿️'}
                               </div>
                             )}
                           </div>
@@ -561,16 +665,22 @@ const OwnerDashboard = () => {
                           <div className="flex-1 min-w-0">
                             <div className="flex items-start justify-between gap-2">
                               <h3 className="font-black text-slate-900 text-base truncate" title={spot.title || spot.address}>
-                                {spot.title || 'Parking Spot'}
+                                {spot.title || (isCommercial ? 'Vehicle Storage Yard' : 'Parking Spot')}
                               </h3>
                             </div>
                             <p className="text-xs text-slate-500 font-medium truncate mt-1 flex items-center gap-1">
                               <MapPin className="h-3.5 w-3.5 text-slate-400 shrink-0" />
                               {spot.address || 'Address'}, {spot.city || 'Hyderabad'}
                             </p>
-                            <p className="text-xs font-bold text-slate-700 mt-2">
-                              Rate: <span className="text-emerald-600 font-extrabold">₹{spotRate}/hr</span> • {spotSlots} slots {spot.hasEvCharger ? '• ⚡ EV' : ''}
-                            </p>
+                            {isCommercial ? (
+                              <p className="text-xs font-bold text-amber-950 mt-2">
+                                Monthly: <span className="text-amber-600 font-black">₹{spot.monthlyStorageRate || 1500}/car</span> • ~{spotSlots} Staging Bays
+                              </p>
+                            ) : (
+                              <p className="text-xs font-bold text-slate-700 mt-2">
+                                Rate: <span className="text-blue-600 font-extrabold">₹{spotRate}/hr</span> • {spotSlots} slots {spot.hasEvCharger ? '• ⚡ EV' : ''}
+                              </p>
+                            )}
                           </div>
                         </div>
 
@@ -629,9 +739,9 @@ const OwnerDashboard = () => {
             {/* Header */}
             <div>
               <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight flex items-center gap-2">
-                Driver Bookings &amp; Orders <span className="text-xl">📑</span>
+                Seeker Bookings &amp; Orders <span className="text-xl">📑</span>
               </h1>
-              <p className="text-slate-500 text-sm mt-0.5">Manage reservations, verify driver check-ins, and track earnings.</p>
+              <p className="text-slate-500 text-sm mt-0.5">Manage reservations, verify seeker check-ins, and track earnings.</p>
             </div>
 
             {/* Summary Card matching Mobile App */}
@@ -686,7 +796,7 @@ const OwnerDashboard = () => {
               <div className="bg-white border border-slate-200 rounded-3xl p-12 text-center space-y-2">
                 <p className="text-4xl">📑</p>
                 <h3 className="font-extrabold text-slate-800 text-base">No booking orders found</h3>
-                <p className="text-xs text-slate-400">Driver reservations for your spaces will appear here in real time.</p>
+                <p className="text-xs text-slate-400">Seeker reservations for your spaces will appear here in real time.</p>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -738,8 +848,8 @@ const OwnerDashboard = () => {
                       {/* Meta Grid */}
                       <div className="grid grid-cols-3 gap-2 bg-slate-50 p-3 rounded-2xl border border-slate-100 text-xs">
                         <div>
-                          <p className="text-[10px] text-slate-400 font-bold uppercase">Driver</p>
-                          <p className="font-extrabold text-slate-900 mt-0.5 truncate">{item.seekerName || 'Driver'}</p>
+                          <p className="text-[10px] text-slate-400 font-bold uppercase">Parking Seeker</p>
+                          <p className="font-extrabold text-slate-900 mt-0.5 truncate">{item.seekerName || 'Seeker'}</p>
                         </div>
                         <div>
                           <p className="text-[10px] text-slate-400 font-bold uppercase">Vehicle</p>
@@ -758,7 +868,7 @@ const OwnerDashboard = () => {
                             href={`tel:${item.seekerContact}`}
                             className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 font-bold text-xs px-3.5 py-2 rounded-xl transition-colors flex items-center gap-1.5"
                           >
-                            <Phone className="h-3.5 w-3.5" /> Call Driver ({item.seekerContact})
+                            <Phone className="h-3.5 w-3.5" /> Call Seeker ({item.seekerContact})
                           </a>
                         ) : <div />}
 
@@ -799,20 +909,61 @@ const OwnerDashboard = () => {
 
             {/* Clean White Card Container Matching Website Theme */}
             <form onSubmit={handleSpotSubmit} className="bg-white border border-slate-200 text-slate-800 rounded-3xl p-8 shadow-sm">
+              {/* Category Selector Tabs */}
+              <div className="flex bg-slate-100 p-1.5 rounded-2xl mb-6 text-xs font-bold border border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => setSpotForm(p => ({ ...p, spaceCategory: 'standard' }))}
+                  className={`flex-1 py-3 rounded-xl transition-all flex items-center justify-center gap-2 ${
+                    spotForm.spaceCategory !== 'commercial_vehicle_storage'
+                      ? 'bg-blue-600 text-white font-black shadow-sm'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  🅿️ Standard Parking Spot
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSpotForm(p => ({ ...p, spaceCategory: 'commercial_vehicle_storage' }))}
+                  className={`flex-1 py-3 rounded-xl transition-all flex items-center justify-center gap-2 ${
+                    spotForm.spaceCategory === 'commercial_vehicle_storage'
+                      ? 'bg-amber-500 text-slate-950 font-black shadow-sm'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  🏢 Commercial Storage Yard (1+ Acre Required)
+                </button>
+              </div>
+
+              {/* Mandatory Policy Warning if Storage Yard */}
+              {spotForm.spaceCategory === 'commercial_vehicle_storage' && (
+                <div className="bg-amber-500/10 border-2 border-amber-400 rounded-2xl p-4 mb-6 text-left">
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <span className="text-xl">⚠️</span>
+                    <span className="text-xs font-black tracking-wide uppercase text-amber-950">
+                      MANDATORY POLICY REQUIREMENT FOR BANKS & REPO FLEETS
+                    </span>
+                  </div>
+                  <p className="text-xs text-amber-950/90 leading-relaxed font-medium">
+                    Commercial Vehicle Storage partner yards MUST possess a <strong className="font-extrabold underline decoration-amber-500">minimum of 1.0 contiguous Acre of land</strong>. This provides secure, authorized staging capacity for repossessed cars with perimeter fencing and security.
+                  </p>
+                </div>
+              )}
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-5">
 
               {/* 1. Spot Name / Title - full width */}
               <div className="space-y-2 md:col-span-2">
                 <label className="block text-xs font-extrabold text-slate-600 uppercase tracking-wider">
-                  Spot Name / Title
+                  {spotForm.spaceCategory === 'commercial_vehicle_storage' ? 'Stockyard Name / Title' : 'Spot Name / Title'}
                 </label>
                 <input
                   type="text"
                   required
-                  placeholder="e.g. Covered Driveway near Metro"
+                  placeholder={spotForm.spaceCategory === 'commercial_vehicle_storage' ? 'e.g. Hyderabad Mega Vehicle Holding Yard 1' : 'e.g. Covered Driveway near Metro'}
                   value={spotForm.title}
                   onChange={e => setSpotForm(p => ({ ...p, title: e.target.value }))}
-                  className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-800 placeholder-slate-400 focus:outline-none focus:border-emerald-500 focus:bg-white transition-colors"
+                  className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:bg-white transition-colors"
                 />
               </div>
 
@@ -826,7 +977,7 @@ const OwnerDashboard = () => {
                     type="button"
                     onClick={handleDetectGps}
                     disabled={locatingGps}
-                    className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-300 font-extrabold text-xs px-3.5 py-1.5 rounded-xl shadow-xs transition-all cursor-pointer flex items-center gap-1.5 shrink-0"
+                    className="bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-300 font-extrabold text-xs px-3.5 py-1.5 rounded-xl shadow-xs transition-all cursor-pointer flex items-center gap-1.5 shrink-0"
                   >
                     📍 {locatingGps ? 'Locating...' : 'Use GPS'}
                   </button>
@@ -834,14 +985,14 @@ const OwnerDashboard = () => {
                 <textarea
                   required
                   rows={3}
-                  placeholder="Complete address with colony, landmark & city"
+                  placeholder={spotForm.spaceCategory === 'commercial_vehicle_storage' ? 'Survey No., Ring Road Junction, Hyderabad' : 'Complete address with colony, landmark & city'}
                   value={spotForm.address}
                   onChange={e => setSpotForm(p => ({ ...p, address: e.target.value }))}
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:border-emerald-500 focus:bg-white transition-colors resize-none"
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:bg-white transition-colors resize-none"
                 />
               </div>
 
-              {/* 3. City and Pincode - share one column by putting them side by side inside the column */}
+              {/* 3. City and Pincode */}
               <div className="space-y-2">
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-2">
@@ -852,7 +1003,7 @@ const OwnerDashboard = () => {
                       placeholder="Hyderabad"
                       value={spotForm.city}
                       onChange={e => setSpotForm(p => ({ ...p, city: e.target.value, location: e.target.value }))}
-                      className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-800 placeholder-slate-400 focus:outline-none focus:border-emerald-500 focus:bg-white transition-colors"
+                      className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:bg-white transition-colors"
                     />
                   </div>
                   <div className="space-y-2">
@@ -863,7 +1014,7 @@ const OwnerDashboard = () => {
                       placeholder="500097"
                       value={spotForm.pincode || '500097'}
                       onChange={e => setSpotForm(p => ({ ...p, pincode: e.target.value }))}
-                      className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-800 placeholder-slate-400 focus:outline-none focus:border-emerald-500 focus:bg-white transition-colors"
+                      className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:bg-white transition-colors"
                     />
                   </div>
                 </div>
@@ -879,38 +1030,114 @@ const OwnerDashboard = () => {
                   placeholder="Paste Google Maps URL or use GPS above"
                   value={spotForm.googleMapsLink}
                   onChange={e => setSpotForm(p => ({ ...p, googleMapsLink: e.target.value }))}
-                  className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-semibold text-slate-800 placeholder-slate-400 focus:outline-none focus:border-emerald-500 focus:bg-white transition-colors"
+                  className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-semibold text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:bg-white transition-colors"
                 />
               </div>
 
-              {/* 5. Hourly Rate (₹) and Total Capacity (Slots) */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2">
-                  <label className="block text-xs font-extrabold text-slate-600 uppercase tracking-wider">Hourly Rate (₹)</label>
-                  <input
-                    type="number"
-                    required
-                    min={5}
-                    placeholder="50"
-                    value={spotForm.pricePerHour}
-                    onChange={e => setSpotForm(p => ({ ...p, pricePerHour: e.target.value }))}
-                    className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-black text-slate-800 focus:outline-none focus:border-emerald-500 focus:bg-white transition-colors"
-                  />
+              {/* 5. Conditional Pricing & Capacity Section */}
+              {spotForm.spaceCategory === 'commercial_vehicle_storage' ? (
+                <>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <label className="block text-xs font-black text-amber-950 uppercase tracking-wider">Land Area (Acres)</label>
+                        <span className="text-[10px] font-black text-amber-800 bg-amber-200 px-1.5 py-0.5 rounded">Min 1.0 Ac</span>
+                      </div>
+                      <input
+                        type="number"
+                        step="0.1"
+                        min="1.0"
+                        required
+                        value={spotForm.landAcres}
+                        onChange={e => setSpotForm(p => ({ ...p, landAcres: e.target.value }))}
+                        className={`w-full px-4 py-3.5 bg-slate-50 border rounded-2xl text-sm font-black text-slate-800 focus:outline-none ${
+                          parseFloat(spotForm.landAcres) < 1.0 ? 'border-rose-500 ring-2 ring-rose-100' : 'border-amber-300 focus:border-amber-500'
+                        }`}
+                      />
+                      {parseFloat(spotForm.landAcres) < 1.0 && (
+                        <p className="text-[11px] font-bold text-rose-600">Strictly 1.0 Acre minimum required!</p>
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      <label className="block text-xs font-black text-amber-950 uppercase tracking-wider">Monthly Rate (₹/car)</label>
+                      <input
+                        type="number"
+                        required
+                        min="100"
+                        value={spotForm.monthlyStorageRate}
+                        onChange={e => setSpotForm(p => ({ ...p, monthlyStorageRate: e.target.value }))}
+                        className="w-full px-4 py-3.5 bg-slate-50 border border-amber-300 rounded-2xl text-sm font-black text-slate-800 focus:outline-none focus:border-amber-500 focus:bg-white transition-colors"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="block text-xs font-black text-amber-950 uppercase tracking-wider">Total Staging Capacity (Cars)</label>
+                    <input
+                      type="number"
+                      required
+                      min={10}
+                      value={spotForm.totalSlots}
+                      onChange={e => setSpotForm(p => ({ ...p, totalSlots: e.target.value }))}
+                      className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-black text-slate-800 focus:outline-none focus:border-amber-500 focus:bg-white transition-colors"
+                    />
+                    <p className="text-[11px] text-slate-400 font-semibold">Typical capacity: ~80 to 120 seized cars per acre.</p>
+                  </div>
+
+                  {/* Security Facilities Checkboxes */}
+                  <div className="space-y-3 pt-2 md:col-span-2 bg-amber-50/40 border border-amber-200/80 p-5 rounded-2xl">
+                    <p className="text-xs font-black uppercase tracking-wider text-amber-950 flex items-center gap-1.5">
+                      <ShieldCheck className="h-4 w-4 text-amber-600" /> Boundary & Security Facilities (Bank Repo Requirements)
+                    </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                      {[
+                        { key: 'hasCompoundWall', label: '🧱 Concrete Perimeter Compound Wall' },
+                        { key: 'has24x7Guards', label: '👮 24/7 Security Guards on premises' },
+                        { key: 'hasCctv', label: '📹 Full CCTV Camera Surveillance' },
+                        { key: 'hasFloodLights', label: '💡 Perimeter Flood Lighting' },
+                      ].map((sec) => (
+                        <label key={sec.key} className="flex items-center gap-2.5 cursor-pointer bg-white p-3 rounded-xl border border-amber-200 hover:border-amber-400 transition-colors">
+                          <input
+                            type="checkbox"
+                            checked={!!spotForm[sec.key]}
+                            onChange={e => setSpotForm(p => ({ ...p, [sec.key]: e.target.checked }))}
+                            className="rounded border-amber-300 text-amber-600 focus:ring-amber-500 h-4 w-4"
+                          />
+                          <span className="text-xs font-bold text-slate-800">{sec.label}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <label className="block text-xs font-extrabold text-slate-600 uppercase tracking-wider">Hourly Rate (₹)</label>
+                    <input
+                      type="number"
+                      required
+                      min={5}
+                      placeholder="50"
+                      value={spotForm.pricePerHour}
+                      onChange={e => setSpotForm(p => ({ ...p, pricePerHour: e.target.value }))}
+                      className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-black text-slate-800 focus:outline-none focus:border-blue-500 focus:bg-white transition-colors"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="block text-xs font-extrabold text-slate-600 uppercase tracking-wider">Total Capacity (Slots)</label>
+                    <input
+                      type="number"
+                      required
+                      min={1}
+                      max={50}
+                      placeholder="5"
+                      value={spotForm.totalSlots}
+                      onChange={e => setSpotForm(p => ({ ...p, totalSlots: e.target.value }))}
+                      className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-black text-slate-800 focus:outline-none focus:border-blue-500 focus:bg-white transition-colors"
+                    />
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <label className="block text-xs font-extrabold text-slate-600 uppercase tracking-wider">Total Capacity (Slots)</label>
-                  <input
-                    type="number"
-                    required
-                    min={1}
-                    max={50}
-                    placeholder="5"
-                    value={spotForm.totalSlots}
-                    onChange={e => setSpotForm(p => ({ ...p, totalSlots: e.target.value }))}
-                    className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-black text-slate-800 focus:outline-none focus:border-emerald-500 focus:bg-white transition-colors"
-                  />
-                </div>
-              </div>
+              )}
 
               {/* 6. Cancellation & Refund Policy - full width */}
               <div className="space-y-3 pt-2 md:col-span-2">
@@ -918,7 +1145,7 @@ const OwnerDashboard = () => {
                   <span className="text-base">🛡️</span>
                   <div>
                     <p className="text-xs font-extrabold text-slate-700 uppercase tracking-wider">Cancellation &amp; Refund Policy</p>
-                    <p className="text-xs text-slate-500">Select refund amount driver receives if they cancel:</p>
+                    <p className="text-xs text-slate-500">Select refund amount seeker receives if they cancel:</p>
                   </div>
                 </div>
 
@@ -1011,11 +1238,89 @@ const OwnerDashboard = () => {
                   className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-black text-slate-800 focus:outline-none focus:border-emerald-500 focus:bg-white transition-colors"
                 />
                 <p className="text-xs text-slate-400">
-                  Drivers can deduct up to ₹10 from their PlanToPark Wallet balance on each booking.
+                  Seekers can deduct up to ₹10 from their PlanToPark Wallet balance on each booking.
                 </p>
               </div>
 
-              {/* 8. EV Charger Facility Switch Toggle */}
+              {/* 8. Supported Vehicle Sizes & Types */}
+              <div className="space-y-3 pt-2 md:col-span-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-base">🚗</span>
+                    <div>
+                      <p className="text-xs font-extrabold text-slate-700 uppercase tracking-wider">Vehicles Fit in this Spot</p>
+                      <p className="text-xs text-slate-500">Select all car sizes that can comfortably enter and park:</p>
+                    </div>
+                  </div>
+                  <span className="text-xs font-black text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
+                    {(spotForm.suitableVehicles || []).length} of 3 Selected
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  {[
+                    {
+                      id: 'hatchback',
+                      title: 'Hatchback',
+                      icon: '🚗',
+                      subtitle: 'Small cars, 4–5 seats',
+                      examples: 'Swift, i20, Baleno',
+                    },
+                    {
+                      id: 'sedan',
+                      title: 'Sedan',
+                      icon: '🚘',
+                      subtitle: 'Separate boot/trunk, 4–5 seats',
+                      examples: 'Dzire, Honda City, Verna',
+                    },
+                    {
+                      id: 'suv',
+                      title: 'SUV',
+                      icon: '🚙',
+                      subtitle: 'Taller, larger body, 5–7 seats',
+                      examples: 'Creta, Seltos, XUV700',
+                    },
+                  ].map((v) => {
+                    const isChecked = (spotForm.suitableVehicles || []).includes(v.id);
+                    return (
+                      <div
+                        key={v.id}
+                        onClick={() => toggleVehicleFit(v.id)}
+                        className={`p-4 rounded-2xl border cursor-pointer transition-all flex flex-col justify-between ${
+                          isChecked
+                            ? 'bg-emerald-50/80 border-emerald-500 ring-1 ring-emerald-500 text-slate-900 shadow-xs'
+                            : 'bg-slate-50 border-slate-200 hover:border-slate-300 text-slate-700'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-center gap-2.5">
+                            <span className="text-2xl">{v.icon}</span>
+                            <div>
+                              <p className="text-sm font-black text-slate-900">{v.title}</p>
+                              <p className="text-xs text-slate-500 mt-0.5">{v.subtitle}</p>
+                            </div>
+                          </div>
+                          {/* Checkbox box */}
+                          <div
+                            className={`h-5 w-5 rounded-md border-2 flex items-center justify-center shrink-0 mt-0.5 transition-colors ${
+                              isChecked ? 'border-emerald-500 bg-emerald-500 text-white' : 'border-slate-300 bg-white'
+                            }`}
+                          >
+                            {isChecked && <span className="text-xs font-black leading-none">✓</span>}
+                          </div>
+                        </div>
+
+                        <div className="mt-3 pt-2.5 border-t border-slate-200/60 flex items-center gap-1.5 text-[11px]">
+                          <span className="font-extrabold text-emerald-700">e.g.</span>
+                          <span className="text-slate-500 font-medium truncate">{v.examples}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* 9. EV Charger Facility Switch Toggle */}
               <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
                 <div>
                   <p className="text-xs font-extrabold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">

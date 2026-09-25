@@ -6,7 +6,7 @@ import {
   UserX, CheckCircle, XCircle, Activity, Layers, BarChart3,
   Bell, ChevronDown, Calendar, Search, LogOut, Settings,
   AlertTriangle, ShieldAlert, Heart, ClipboardList, HelpCircle, Star, MessageSquare,
-  Menu, X, Send, Tag, Sparkles, Megaphone
+  Menu, X, Send, Tag, Sparkles, Megaphone, FileText, Edit2, Trash2, Plus
 } from 'lucide-react';
 import Invoice from './Invoice';
 
@@ -79,17 +79,126 @@ const AdminDashboard = () => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  const [terms, setTerms] = useState([]);
+  const [termsType, setTermsType] = useState('owner');
+  const [editingTerm, setEditingTerm] = useState(null);
+  const [termClauseInput, setTermClauseInput] = useState('');
+  const [termOrderInput, setTermOrderInput] = useState(1);
+  const [termSearchQuery, setTermSearchQuery] = useState('');
+  const [termLoading, setTermLoading] = useState(false);
+  const [showAddTermModal, setShowAddTermModal] = useState(false);
+
+  const fetchTerms = async () => {
+    try {
+      const res = await fetch(`${API_URL}/terms/admin/all`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        setTerms(await res.json());
+      }
+    } catch (e) {
+      console.error('Fetch terms error:', e);
+    }
+  };
+
+  const handleSaveTerm = async (e) => {
+    e.preventDefault();
+    if (!termClauseInput.trim()) return;
+    setTermLoading(true);
+    try {
+      if (editingTerm) {
+        const res = await fetch(`${API_URL}/terms/admin/${editingTerm._id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            clause: termClauseInput.trim(),
+            order: termOrderInput,
+            type: termsType,
+          })
+        });
+        if (res.ok) {
+          const updated = await res.json();
+          setTerms(prev => prev.map(t => t._id === updated._id ? updated : t));
+          setEditingTerm(null);
+          setTermClauseInput('');
+          setShowAddTermModal(false);
+        }
+      } else {
+        const res = await fetch(`${API_URL}/terms/admin`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            clause: termClauseInput.trim(),
+            order: termOrderInput,
+            type: termsType,
+          })
+        });
+        if (res.ok) {
+          const created = await res.json();
+          setTerms(prev => [...prev, created]);
+          setTermClauseInput('');
+          setShowAddTermModal(false);
+        }
+      }
+    } catch (err) {
+      alert('Error saving term: ' + err.message);
+    } finally {
+      setTermLoading(false);
+    }
+  };
+
+  const handleDeleteTerm = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this term clause?')) return;
+    try {
+      const res = await fetch(`${API_URL}/terms/admin/${id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        setTerms(prev => prev.filter(t => t._id !== id));
+      }
+    } catch (err) {
+      alert('Delete term error: ' + err.message);
+    }
+  };
+
+  const handleToggleTermActive = async (term) => {
+    try {
+      const res = await fetch(`${API_URL}/terms/admin/${term._id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ isActive: !term.isActive })
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        setTerms(prev => prev.map(t => t._id === updated._id ? updated : t));
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   const fetchData = async () => {
     setLoading(true);
     try {
       const headers = { Authorization: `Bearer ${token}` };
-      const [rAnal, rUsers, rSpaces, rBookings, rComplaints, rReviews] = await Promise.all([
+      const [rAnal, rUsers, rSpaces, rBookings, rComplaints, rReviews, rTerms] = await Promise.all([
         fetch(`${API_URL}/analytics/admin`, { headers }),
         fetch(`${API_URL}/auth/admin/users`, { headers }),
         fetch(`${API_URL}/spaces/pending`, { headers }),
         fetch(`${API_URL}/bookings/admin-bookings`, { headers }), // lists bookings
         fetch(`${API_URL}/complaints`, { headers }),
         fetch(`${API_URL}/reviews`, { headers }),
+        fetch(`${API_URL}/terms/admin/all`, { headers }),
       ]);
       let userList = [];
       let spaceList = [];
@@ -112,6 +221,7 @@ const AdminDashboard = () => {
       }
       if (rComplaints.ok) setComplaints(await rComplaints.json());
       if (rReviews.ok) setReviews(await rReviews.json());
+      if (rTerms && rTerms.ok) setTerms(await rTerms.json());
 
       // Generate actual live dynamic notifications based on real DB records
       const dynamicNotifs = [];
@@ -416,11 +526,13 @@ const AdminDashboard = () => {
     reviews: 'Support Reviews',
     notifications: 'Notifications',
     promotions: 'Promotional Offers & Push Broadcasts',
+    terms: '📜 Terms & Conditions Management',
   };
 
   const menuItems = [
     { id: 'overview', path: '/admin/dashboard', label: 'Dashboard', icon: <Layers className="h-4.5 w-4.5" /> },
     { id: 'promotions', path: '/admin/promotions', label: '📢 Promotional Offers', icon: <Megaphone className="h-4.5 w-4.5 text-amber-400" /> },
+    { id: 'terms', path: '/admin/terms', label: '📜 Terms & Conditions', icon: <FileText className="h-4.5 w-4.5 text-indigo-400" /> },
     { id: 'users', path: '/admin/users', label: 'Users Management', icon: <Users className="h-4.5 w-4.5" /> },
     { id: 'owners', path: '/admin/owners', label: 'Place Owners verifications', icon: <UserCheck className="h-4.5 w-4.5" /> },
     { id: 'spaces', path: '/admin/spaces', label: 'Parking Spaces', icon: <MapPin className="h-4.5 w-4.5" /> },
@@ -909,6 +1021,243 @@ const AdminDashboard = () => {
                 </div>
               )}
 
+              {/* ── VIEW: TERMS & CONDITIONS MANAGEMENT ────────────────────── */}
+              {currentView === 'terms' && (() => {
+                const filteredTerms = terms
+                  .filter(t => t.type === termsType)
+                  .filter(t => !termSearchQuery || t.clause.toLowerCase().includes(termSearchQuery.toLowerCase()))
+                  .sort((a, b) => a.order - b.order);
+
+                return (
+                  <div className="space-y-6 animate-fadeIn">
+                    {/* Header Banner */}
+                    <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+                      <div>
+                        <h2 className="text-xl font-black text-slate-900 flex items-center gap-2">
+                          <FileText className="h-6 w-6 text-indigo-500" />
+                          Terms & Conditions Live Editor
+                        </h2>
+                        <p className="text-xs text-slate-500 mt-1">
+                          Manage, edit, add, or delete legal clauses for Space Owners and Parking Seekers. Updates reflect instantly in the mobile apps.
+                        </p>
+                      </div>
+
+                      <button
+                        onClick={() => {
+                          setEditingTerm(null);
+                          setTermClauseInput('');
+                          const maxOrd = Math.max(0, ...terms.filter(t => t.type === termsType).map(t => t.order || 0));
+                          setTermOrderInput(maxOrd + 1);
+                          setShowAddTermModal(true);
+                        }}
+                        className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-4 py-2.5 rounded-xl text-xs flex items-center gap-2 shadow-md shadow-indigo-600/20 transition-all shrink-0"
+                      >
+                        <Plus className="h-4 w-4" /> Add New Clause
+                      </button>
+                    </div>
+
+                    {/* Navigation Filter Tabs & Search */}
+                    <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                      <div className="flex items-center gap-2 bg-slate-200/60 p-1.5 rounded-2xl w-full sm:w-auto">
+                        <button
+                          onClick={() => setTermsType('owner')}
+                          className={`flex-1 sm:flex-initial px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+                            termsType === 'owner'
+                              ? 'bg-white text-indigo-700 shadow-sm font-black'
+                              : 'text-slate-600 hover:text-slate-900'
+                          }`}
+                        >
+                          <span>🏢 Place Owner Terms</span>
+                          <span className="px-2 py-0.5 rounded-full text-[10px] bg-indigo-50 text-indigo-600">
+                            {terms.filter(t => t.type === 'owner').length}
+                          </span>
+                        </button>
+                        <button
+                          onClick={() => setTermsType('seeker')}
+                          className={`flex-1 sm:flex-initial px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+                            termsType === 'seeker'
+                              ? 'bg-white text-blue-700 shadow-sm font-black'
+                              : 'text-slate-600 hover:text-slate-900'
+                          }`}
+                        >
+                          <span>🚗 Parking Seeker Terms</span>
+                          <span className="px-2 py-0.5 rounded-full text-[10px] bg-blue-50 text-blue-600">
+                            {terms.filter(t => t.type === 'seeker').length}
+                          </span>
+                        </button>
+                      </div>
+
+                      <div className="relative w-full sm:w-72">
+                        <Search className="absolute left-3.5 top-3 h-4 w-4 text-slate-400" />
+                        <input
+                          type="text"
+                          placeholder="Search clauses..."
+                          value={termSearchQuery}
+                          onChange={(e) => setTermSearchQuery(e.target.value)}
+                          className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 transition-all"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Clauses List Table */}
+                    <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm">
+                      <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+                        <div>
+                          <h3 className="font-extrabold text-slate-800 text-sm">
+                            {termsType === 'owner' ? 'Place Owner (Space Provider)' : 'Parking Seeker (Vehicle Owner)'} Clauses
+                          </h3>
+                          <p className="text-[11px] text-slate-400">Total {filteredTerms.length} active clauses loaded</p>
+                        </div>
+                      </div>
+
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm text-left">
+                          <thead className="bg-slate-50 text-slate-400 text-xs uppercase">
+                            <tr>
+                              <th className="px-6 py-3 w-16">#</th>
+                              <th className="px-6 py-3">Clause Description</th>
+                              <th className="px-6 py-3 w-28 text-center">Status</th>
+                              <th className="px-6 py-3 w-32 text-right">Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100 font-medium">
+                            {filteredTerms.length === 0 ? (
+                              <tr>
+                                <td colSpan="4" className="text-center py-12 text-slate-400">
+                                  No clauses found matching your search.
+                                </td>
+                              </tr>
+                            ) : (
+                              filteredTerms.map((t, idx) => (
+                                <tr key={t._id} className="hover:bg-slate-50/70 transition-colors">
+                                  <td className="px-6 py-4">
+                                    <span className="h-7 w-7 rounded-lg bg-indigo-50 border border-indigo-200 text-indigo-700 font-black text-xs flex items-center justify-center font-mono">
+                                      {t.order || idx + 1}
+                                    </span>
+                                  </td>
+                                  <td className="px-6 py-4 text-slate-800 font-medium text-xs leading-relaxed max-w-xl">
+                                    {t.clause}
+                                  </td>
+                                  <td className="px-6 py-4 text-center">
+                                    <button
+                                      onClick={() => handleToggleTermActive(t)}
+                                      className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase transition-all ${
+                                        t.isActive
+                                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100'
+                                          : 'bg-slate-100 text-slate-500 border border-slate-200 hover:bg-slate-200'
+                                      }`}
+                                    >
+                                      {t.isActive ? '✓ Active' : 'Inactive'}
+                                    </button>
+                                  </td>
+                                  <td className="px-6 py-4 text-right">
+                                    <div className="flex items-center justify-end gap-1.5">
+                                      <button
+                                        onClick={() => {
+                                          setEditingTerm(t);
+                                          setTermClauseInput(t.clause);
+                                          setTermOrderInput(t.order || idx + 1);
+                                          setShowAddTermModal(true);
+                                        }}
+                                        className="h-8 w-8 rounded-lg bg-slate-50 border border-slate-200 text-slate-600 hover:text-indigo-600 hover:border-indigo-300 flex items-center justify-center transition-colors"
+                                        title="Edit Clause"
+                                      >
+                                        <Edit2 className="h-3.5 w-3.5" />
+                                      </button>
+                                      <button
+                                        onClick={() => handleDeleteTerm(t._id)}
+                                        className="h-8 w-8 rounded-lg bg-slate-50 border border-slate-200 text-slate-600 hover:text-rose-600 hover:border-rose-300 flex items-center justify-center transition-colors"
+                                        title="Delete Clause"
+                                      >
+                                        <Trash2 className="h-3.5 w-3.5" />
+                                      </button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              ))
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                    {/* Add / Edit Modal */}
+                    {showAddTermModal && (
+                      <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+                        <div className="bg-white rounded-3xl border border-slate-200 max-w-lg w-full p-6 shadow-2xl animate-scaleUp">
+                          <div className="flex items-center justify-between pb-4 border-b border-slate-100 mb-4">
+                            <h3 className="font-black text-slate-900 text-base flex items-center gap-2">
+                              <FileText className="h-5 w-5 text-indigo-500" />
+                              {editingTerm ? 'Edit Term Clause' : 'Add New Term Clause'}
+                            </h3>
+                            <button
+                              onClick={() => setShowAddTermModal(false)}
+                              className="h-8 w-8 rounded-xl bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200 transition-colors"
+                            >
+                              <X className="h-4 w-4" />
+                            </button>
+                          </div>
+
+                          <form onSubmit={handleSaveTerm} className="space-y-4">
+                            <div>
+                              <label className="block text-xs font-bold text-slate-600 mb-1">Target Application</label>
+                              <select
+                                value={termsType}
+                                onChange={(e) => setTermsType(e.target.value)}
+                                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:border-indigo-400"
+                              >
+                                <option value="owner">🏢 Place Owner App</option>
+                                <option value="seeker">🚗 Parking Seeker App</option>
+                              </select>
+                            </div>
+
+                            <div>
+                              <label className="block text-xs font-bold text-slate-600 mb-1">Clause Number (Order)</label>
+                              <input
+                                type="number"
+                                min="1"
+                                value={termOrderInput}
+                                onChange={(e) => setTermOrderInput(Number(e.target.value))}
+                                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:border-indigo-400"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-xs font-bold text-slate-600 mb-1">Clause Content</label>
+                              <textarea
+                                rows="5"
+                                required
+                                placeholder="Enter clause description..."
+                                value={termClauseInput}
+                                onChange={(e) => setTermClauseInput(e.target.value)}
+                                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+                              />
+                            </div>
+
+                            <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
+                              <button
+                                type="button"
+                                onClick={() => setShowAddTermModal(false)}
+                                className="px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors"
+                              >
+                                Cancel
+                              </button>
+                              <button
+                                type="submit"
+                                disabled={termLoading}
+                                className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl text-xs font-bold shadow-md shadow-indigo-600/20 transition-all flex items-center gap-2"
+                              >
+                                {termLoading ? 'Saving...' : editingTerm ? 'Update Clause' : 'Create Clause'}
+                              </button>
+                            </div>
+                          </form>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+
               {/* ── VIEW: USERS MANAGEMENT ─────────────────────────────────── */}
               {currentView === 'users' && (
                 <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm animate-fadeIn">
@@ -921,6 +1270,7 @@ const AdminDashboard = () => {
                       <thead className="bg-slate-50 text-slate-400 text-xs uppercase">
                         <tr>
                           <th className="px-6 py-3">User Details</th>
+                          <th className="px-6 py-3">Unique ID</th>
                           <th className="px-6 py-3">Phone</th>
                           <th className="px-6 py-3">System Role</th>
                           <th className="px-6 py-3">Mail Verified</th>
@@ -931,7 +1281,7 @@ const AdminDashboard = () => {
                       </thead>
                       <tbody className="divide-y divide-slate-100 font-medium">
                         {users.length === 0 ? (
-                          <tr><td colSpan="7" className="text-center py-10 text-slate-400">No registered users.</td></tr>
+                          <tr><td colSpan="8" className="text-center py-10 text-slate-400">No registered users.</td></tr>
                         ) : users.map(u => (
                           <tr key={u._id} className="hover:bg-slate-50">
                             <td className="px-6 py-4">
@@ -953,6 +1303,15 @@ const AdminDashboard = () => {
                                   )}
                                 </div>
                               </div>
+                            </td>
+                            <td className="px-6 py-4">
+                              <span className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold tracking-wider ${
+                                u.role === 'owner'
+                                  ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                                  : 'bg-blue-50 text-blue-700 border border-blue-200'
+                              }`}>
+                                {u.uniqueId || (u.role === 'owner' ? 'PO000001' : 'VO000001')}
+                              </span>
                             </td>
                             <td className="px-6 py-4 text-slate-600">{u.contact}</td>
                             <td className="px-6 py-4">
@@ -995,7 +1354,12 @@ const AdminDashboard = () => {
                         <div key={owner._id} className="border border-slate-200 rounded-2xl p-5 bg-slate-50/50 flex flex-col justify-between">
                           <div>
                             <div className="flex justify-between items-start mb-3">
-                              <h4 className="font-bold text-slate-800 text-base">{owner.name}</h4>
+                              <div>
+                                <h4 className="font-bold text-slate-800 text-base">{owner.name}</h4>
+                                <span className="inline-block mt-1 px-2.5 py-0.5 rounded-md text-[11px] font-mono font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                                  ID: {owner.uniqueId || 'PO000001'}
+                                </span>
+                              </div>
                               <StatusBadge status={owner.status} />
                             </div>
                             <p className="text-slate-500 text-sm">{owner.email}</p>

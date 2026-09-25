@@ -32,3 +32,13 @@ yarn-error.log*
 Thumbs.db
 .vscode/
 .idea/
+
+# Scratch & Migration scripts
+check_*.js
+sync_*.js
+update_ec2_pwd.js
+test_login.sh
+fix_owner.js
+inspect_live.js
+set_password.js
+image.png

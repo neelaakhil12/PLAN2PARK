@@ -65,7 +65,7 @@ export default function OwnerHomeScreen({ navigation }) {
       {/* Header with notch padding */}
       <View style={[styles.header, { paddingTop: topPadding + 10 }]}>
         <View>
-          <Text style={styles.headerTitle}>Space Owner Hub 🅿️</Text>
+          <Text style={styles.headerTitle}>Space Owner Dashboard 🅿️</Text>
           <Text style={styles.headerSub}>Welcome, {user?.name || 'Owner'}</Text>
         </View>
         <TouchableOpacity onPress={logout} style={styles.logoutBtn}>

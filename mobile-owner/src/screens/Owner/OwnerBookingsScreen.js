@@ -114,7 +114,7 @@ export default function OwnerBookingsScreen({ navigation }) {
       {/* Header */}
       <View style={[styles.header, { paddingTop: topPadding + 10 }]}>
         <View>
-          <Text style={styles.headerTitle}>Driver Bookings & Orders 📑</Text>
+          <Text style={styles.headerTitle}>Seeker Bookings & Orders 📑</Text>
           <Text style={styles.headerSub}>Manage reservations and earnings</Text>
         </View>
       </View>
@@ -182,7 +182,7 @@ export default function OwnerBookingsScreen({ navigation }) {
             const isPaid = booking.paymentStatus === 'paid' || booking.status === 'paid';
             const isCancelled = booking.status === 'cancelled';
             const spotTitle = booking.spaceId?.title || 'Parking Space';
-            const seekerName = booking.seekerName || booking.seekerId?.name || 'Driver';
+            const seekerName = booking.seekerName || booking.seekerId?.name || 'Seeker';
             const seekerPhone = booking.seekerContact || booking.seekerId?.contact || '';
             const slot = booking.slotId || 'Slot-1';
             const amount = booking.totalAmount || 0;
@@ -222,7 +222,7 @@ export default function OwnerBookingsScreen({ navigation }) {
                     <Text style={styles.detailVal}>{booking.vehicleNumber || 'TS07AB1234'}</Text>
                   </View>
                   <View style={styles.detailItem}>
-                    <Text style={styles.detailLabel}>👤 Driver Name</Text>
+                    <Text style={styles.detailLabel}>👤 Seeker Name</Text>
                     <Text style={styles.detailVal}>{seekerName}</Text>
                   </View>
                   <View style={styles.detailItem}>

@@ -14,8 +14,8 @@ import { COLORS } from '../theme/colors';
 import Button from './Button';
 
 const AVATAR_OPTIONS = [
-  { id: 'av1', emoji: '👨‍✈️', label: 'Driver 1' },
-  { id: 'av2', emoji: '👩‍✈️', label: 'Driver 2' },
+  { id: 'av1', emoji: '👨‍✈️', label: 'Seeker 1' },
+  { id: 'av2', emoji: '👩‍✈️', label: 'Seeker 2' },
   { id: 'av3', emoji: '🚗', label: 'Sedan' },
   { id: 'av4', emoji: '🚙', label: 'SUV' },
   { id: 'av5', emoji: '⚡', label: 'EV Rider' },

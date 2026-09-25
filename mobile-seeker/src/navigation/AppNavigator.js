@@ -21,6 +21,7 @@ import BookingsScreen from '../screens/Seeker/BookingsScreen';
 import WalletScreen from '../screens/Seeker/WalletScreen';
 import ProfileScreen from '../screens/Seeker/ProfileScreen';
 import NotificationsScreen from '../screens/Seeker/NotificationsScreen';
+import HelpAssistantScreen from '../screens/Seeker/HelpAssistantScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -81,6 +82,7 @@ function SeekerStack() {
       <Stack.Screen name="SeekerMain" component={SeekerTabs} />
       <Stack.Screen name="SpotDetails" component={SpotDetailsScreen} />
       <Stack.Screen name="Notifications" component={NotificationsScreen} />
+      <Stack.Screen name="HelpAssistant" component={HelpAssistantScreen} />
     </Stack.Navigator>
   );
 }

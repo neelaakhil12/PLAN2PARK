@@ -64,7 +64,7 @@ export default function BookingsScreen({ navigation }) {
   const handleCheckOut = async (item) => {
     Alert.alert(
       'Check Out of Parking Spot',
-      `Are you ready to check out from ${item.spaceId?.title || 'this spot'} (Slot: ${item.slotId || 'Slot-1'})?\n\nThis will release the spot for other drivers.`,
+      `Are you ready to check out from ${item.spaceId?.title || 'this spot'} (Slot: ${item.slotId || 'Slot-1'})?\n\nThis will release the spot for other parking seekers.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {

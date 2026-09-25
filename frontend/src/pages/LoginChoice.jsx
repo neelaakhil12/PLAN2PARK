@@ -1,51 +1,118 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Car, Building2, ChevronRight, LayoutGrid } from 'lucide-react';
+import { Car, Building2, ChevronRight, ShieldCheck, Landmark } from 'lucide-react';
 
 const LoginChoice = () => {
   return (
-    <div className="min-h-screen bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-emerald-50 via-slate-50 to-slate-100 flex items-center justify-center px-4 py-12 relative overflow-hidden">
-      {/* Decorative background elements */}
-      <div className="absolute top-0 right-0 -mr-20 -mt-20 w-96 h-96 rounded-full bg-emerald-400/20 blur-3xl mix-blend-multiply filter animate-pulse"></div>
-      <div className="absolute bottom-0 left-0 -ml-20 -mb-20 w-96 h-96 rounded-full bg-teal-300/20 blur-3xl mix-blend-multiply filter animate-pulse" style={{ animationDelay: '2s' }}></div>
+    <div className="min-h-screen bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-blue-50 via-slate-50 to-indigo-50 flex items-center justify-center px-4 py-12 relative overflow-hidden">
+      {/* Decorative background glows */}
+      <div className="absolute top-0 right-0 -mr-20 -mt-20 w-96 h-96 rounded-full bg-blue-500/10 blur-3xl mix-blend-multiply filter"></div>
+      <div className="absolute bottom-0 left-0 -ml-20 -mb-20 w-96 h-96 rounded-full bg-indigo-500/10 blur-3xl mix-blend-multiply filter"></div>
 
-      <div className="w-full max-w-md relative z-10">
-        <div className="text-center mb-10">
-          <h1 className="text-3xl sm:text-4xl font-extrabold bg-clip-text text-transparent bg-gradient-to-r from-emerald-600 to-teal-700 tracking-tight mb-3">
-            Welcome to Plantopark
+      <div className="w-full max-w-lg relative z-10">
+        <div className="text-center mb-8">
+          <div className="flex justify-center mb-3">
+            <img src="/logo.png" alt="Plan2Park" className="h-16 w-auto object-contain drop-shadow" />
+          </div>
+          <h1 className="text-3xl sm:text-4xl font-black bg-clip-text text-transparent bg-gradient-to-r from-blue-700 via-indigo-700 to-violet-800 tracking-tight mb-2">
+            Welcome to Plan2Park
           </h1>
-          <p className="text-slate-500 font-medium text-sm sm:text-base">Select your account type to continue</p>
+          <p className="text-slate-500 font-medium text-sm sm:text-base">
+            Smart Hourly Parking & Bank Seized Vehicle Storage Yards
+          </p>
         </div>
 
-        <div className="space-y-4">
+        {/* Mandatory Policy Warning Banner */}
+        <div className="bg-amber-500/10 border-2 border-amber-400/60 rounded-2xl p-4 mb-6 text-left shadow-sm">
+          <div className="flex items-center gap-2 mb-1.5">
+            <span className="text-xl">⚠️</span>
+            <span className="text-xs font-black tracking-wide uppercase text-amber-900">
+              Mandatory Commercial Land Policy
+            </span>
+          </div>
+          <p className="text-xs text-amber-900/90 leading-relaxed">
+            Landowners registering for <strong className="font-bold text-amber-950">Banks & Auto Finance Vehicle Storage</strong> must possess a <strong className="font-bold text-amber-950 underline decoration-amber-500">minimum of 1.0 Acre contiguous land</strong> with perimeter security.
+          </p>
+        </div>
+
+        <div className="space-y-3.5">
           {/* Seeker / Driver */}
           <Link
             to="/seeker/login"
-            className="flex items-center gap-4 p-5 bg-white border border-slate-200 hover:border-emerald-400 hover:shadow-sm rounded-2xl transition-all group"
+            className="flex items-center gap-4 p-4.5 bg-white border border-slate-200 hover:border-blue-500 hover:shadow-md rounded-2xl transition-all group"
           >
-            <div className="h-12 w-12 bg-emerald-50 rounded-xl flex items-center justify-center text-emerald-600 group-hover:bg-emerald-100 transition-colors shrink-0">
+            <div className="h-12 w-12 bg-blue-50 rounded-xl flex items-center justify-center text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-colors shrink-0">
               <Car className="h-6 w-6" />
             </div>
             <div className="flex-1 text-left">
-              <h3 className="font-extrabold text-slate-800 text-base">I want parking</h3>
-              <p className="text-slate-400 text-xs mt-0.5">Find parking, book spaces, make secure payments</p>
+              <div className="flex items-center gap-2">
+                <h3 className="font-extrabold text-slate-800 text-base">Parking Seeker</h3>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-blue-100 text-blue-700">Driver</span>
+              </div>
+              <p className="text-slate-400 text-xs mt-0.5">Find parking, book spots by car size, navigate safely</p>
             </div>
-            <ChevronRight className="h-5 w-5 text-slate-300 group-hover:text-emerald-500 transition-colors" />
+            <ChevronRight className="h-5 w-5 text-slate-300 group-hover:text-blue-600 transition-colors" />
           </Link>
 
-          {/* Host / Owner */}
+          {/* Banks & Auto Finance Seeker */}
+          <Link
+            to="/seeker/login?category=bank_finance_seeker"
+            className="flex items-center gap-4 p-4.5 bg-white border border-slate-200 hover:border-cyan-500 hover:shadow-md rounded-2xl transition-all group"
+          >
+            <div className="h-12 w-12 bg-cyan-50 rounded-xl flex items-center justify-center text-cyan-600 group-hover:bg-cyan-600 group-hover:text-white transition-colors shrink-0">
+              <Landmark className="h-6 w-6" />
+            </div>
+            <div className="flex-1 text-left">
+              <div className="flex items-center gap-2">
+                <h3 className="font-extrabold text-slate-800 text-base">Banks & Auto Finance</h3>
+                <span className="text-[10px] font-black px-2 py-0.5 rounded bg-cyan-100 text-cyan-800">Repo Fleet</span>
+              </div>
+              <p className="text-slate-400 text-xs mt-0.5">Locate & reserve 1+ Acre secure yards for seized vehicles</p>
+            </div>
+            <ChevronRight className="h-5 w-5 text-slate-300 group-hover:text-cyan-600 transition-colors" />
+          </Link>
+
+          {/* Standard Space Owner */}
           <Link
             to="/owner/login"
-            className="flex items-center gap-4 p-5 bg-white border border-slate-200 hover:border-emerald-400 hover:shadow-sm rounded-2xl transition-all group"
+            className="flex items-center gap-4 p-4.5 bg-white border border-slate-200 hover:border-indigo-500 hover:shadow-md rounded-2xl transition-all group"
           >
-            <div className="h-12 w-12 bg-emerald-50 rounded-xl flex items-center justify-center text-emerald-600 group-hover:bg-emerald-100 transition-colors shrink-0">
+            <div className="h-12 w-12 bg-indigo-50 rounded-xl flex items-center justify-center text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors shrink-0">
               <Building2 className="h-6 w-6" />
             </div>
             <div className="flex-1 text-left">
-              <h3 className="font-extrabold text-slate-800 text-base">I have parking</h3>
-              <p className="text-slate-400 text-xs mt-0.5">List driveway/garages, allot slots, earn 90% payout</p>
+              <div className="flex items-center gap-2">
+                <h3 className="font-extrabold text-slate-800 text-base">Parking Space Host</h3>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-indigo-100 text-indigo-700">Driveway</span>
+              </div>
+              <p className="text-slate-400 text-xs mt-0.5">List residential/commercial spots, allot parking by car type</p>
             </div>
-            <ChevronRight className="h-5 w-5 text-slate-300 group-hover:text-emerald-500 transition-colors" />
+            <ChevronRight className="h-5 w-5 text-slate-300 group-hover:text-indigo-600 transition-colors" />
+          </Link>
+
+          {/* Vehicle Storage Yard Owner (1+ Acre) */}
+          <Link
+            to="/owner/login?category=vehicle_storage_owner"
+            className="flex items-center gap-4 p-4.5 bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-amber-300/80 hover:border-amber-500 hover:shadow-md rounded-2xl transition-all group"
+          >
+            <div className="h-12 w-12 bg-amber-500 rounded-xl flex items-center justify-center text-white group-hover:bg-amber-600 transition-colors shrink-0 shadow-sm">
+              <ShieldCheck className="h-6 w-6" />
+            </div>
+            <div className="flex-1 text-left">
+              <div className="flex items-center gap-2">
+                <h3 className="font-black text-amber-950 text-base">Vehicle Storage Partner</h3>
+                <span className="text-[10px] font-black px-2 py-0.5 rounded bg-amber-200 text-amber-900">1+ Acre Land</span>
+              </div>
+              <p className="text-amber-800/80 text-xs mt-0.5">Monetize 1+ Acre secure yards for bank repossession contracts</p>
+            </div>
+            <ChevronRight className="h-5 w-5 text-amber-400 group-hover:text-amber-600 transition-colors" />
+          </Link>
+        </div>
+
+        <div className="mt-8 text-center text-xs text-slate-400">
+          Don't have an account?{' '}
+          <Link to="/register" className="font-bold text-blue-600 hover:underline">
+            Register Here →
           </Link>
         </div>
       </div>

@@ -41,6 +41,8 @@ app.use('/api/analytics', analyticsRoutes);
 app.use('/api/reviews', reviewRoutes);
 app.use('/api/complaints', complaintRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/terms', require('./routes/terms'));
+app.use('/api/faqs', require('./routes/faqs'));
 
 // Root health check
 app.get('/', (req, res) => {

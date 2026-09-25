@@ -22,6 +22,33 @@ const userSchema = new mongoose.Schema(
       enum: ['seeker', 'owner', 'admin'],
       default: 'seeker',
     },
+    accountCategory: {
+      type: String,
+      enum: ['standard', 'vehicle_storage_owner', 'bank_finance_seeker'],
+      default: 'standard',
+    },
+    organizationName: {
+      type: String,
+      default: '',
+    },
+    landAcres: {
+      type: Number,
+      default: 0,
+    },
+    fencingType: {
+      type: String,
+      default: '',
+    },
+    hasSecurityGuards: {
+      type: Boolean,
+      default: false,
+    },
+    uniqueId: {
+      type: String,
+      sparse: true,
+      trim: true,
+      index: true,
+    },
     status: {
       type: String,
       enum: ['pending', 'verified', 'rejected'],

@@ -194,6 +194,10 @@ router.post('/', protect, ownerOnly, upload.single('imageFile'), async (req, res
     pricePerDay,
     pricePerWeek,
     pricePerMonth,
+    monthlyStorageRate,
+    spaceCategory,
+    landAcres,
+    securityFacilities,
     imageUrl,
     lat,
     lng,
@@ -201,8 +205,17 @@ router.post('/', protect, ownerOnly, upload.single('imageFile'), async (req, res
   } = req.body;
 
   try {
+    // Validate 1 Acre minimum requirement for Commercial Vehicle Storage
+    const isCommercial = spaceCategory === 'commercial_vehicle_storage';
+    const acres = landAcres ? Number(landAcres) : 0;
+    if (isCommercial && acres < 1) {
+      return res.status(400).json({
+        message: 'Minimum 1.0 Acre of secure land is strictly required to list a Vehicle Storage Yard for Banks & Auto Finance companies.',
+      });
+    }
+
     const finalImageUrl = formatImageUrl(req, req.file, imageUrl);
-    const finalTotalSlots = Number(totalSlots || totalSpots || 5);
+    const finalTotalSlots = Number(totalSlots || totalSpots || (isCommercial ? 100 : 5));
     const finalRate = Number(pricePerHour || hourlyRate || 50);
     const finalAddress = address || location || 'Hyderabad';
     const finalLocation = location || address || 'Hyderabad';
@@ -211,17 +224,17 @@ router.post('/', protect, ownerOnly, upload.single('imageFile'), async (req, res
 
     // Auto-generate slots
     const slots = [];
-    const prefix = 'Slot-';
-    for (let i = 1; i <= finalTotalSlots; i++) {
+    const prefix = isCommercial ? 'Yard-Bay-' : 'Slot-';
+    for (let i = 1; i <= Math.min(finalTotalSlots, 500); i++) {
       slots.push({
         slotId: `${prefix}${i}`,
-        name: `Slot #${i}`,
+        name: isCommercial ? `Storage Bay #${i}` : `Slot #${i}`,
         isAvailable: true,
       });
     }
 
     // Parse suitable vehicles
-    let suitableList = ['4-wheeler'];
+    let suitableList = ['hatchback', 'sedan', 'suv'];
     if (suitableVehicles) {
       if (typeof suitableVehicles === 'string') {
         try {
@@ -234,9 +247,26 @@ router.post('/', protect, ownerOnly, upload.single('imageFile'), async (req, res
       }
     }
 
+    let parsedSecurity = {
+      hasCompoundWall: false,
+      has24x7Guards: false,
+      hasCctv: true,
+      hasFloodLights: false,
+      isGated: true,
+    };
+    if (securityFacilities) {
+      if (typeof securityFacilities === 'string') {
+        try {
+          parsedSecurity = { ...parsedSecurity, ...JSON.parse(securityFacilities) };
+        } catch (e) {}
+      } else if (typeof securityFacilities === 'object') {
+        parsedSecurity = { ...parsedSecurity, ...securityFacilities };
+      }
+    }
+
     const space = new ParkingSpace({
       ownerId: req.user._id,
-      title: title || finalAddress,
+      title: title || (isCommercial ? `Secured ${acres} Acre Auto Stockyard` : finalAddress),
       address: finalAddress,
       location: finalLocation,
       city: finalCity,
@@ -247,6 +277,10 @@ router.post('/', protect, ownerOnly, upload.single('imageFile'), async (req, res
       pricePerDay: pricePerDay ? Number(pricePerDay) : finalRate * 8,
       pricePerWeek: pricePerWeek ? Number(pricePerWeek) : finalRate * 24 * 7,
       pricePerMonth: pricePerMonth ? Number(pricePerMonth) : finalRate * 24 * 30,
+      monthlyStorageRate: monthlyStorageRate ? Number(monthlyStorageRate) : (isCommercial ? 1500 : 0),
+      spaceCategory: isCommercial ? 'commercial_vehicle_storage' : 'standard',
+      landAcres: acres,
+      securityFacilities: parsedSecurity,
       image: finalImageUrl,
       coordinates: {
         lat: lat ? parseFloat(lat) : 17.385044,
@@ -357,8 +391,16 @@ router.get('/:id/available-slots-by-time', async (req, res) => {
 // ─── GET /api/spaces  (Public / Seeker) ──────────────────────────────────────
 router.get('/', async (req, res) => {
   try {
-    const { includeInactive, search } = req.query;
+    const { includeInactive, search, category } = req.query;
     const query = { status: 'approved' };
+
+    if (category) {
+      if (category === 'standard') {
+        query.spaceCategory = { $in: ['standard', null] };
+      } else {
+        query.spaceCategory = category;
+      }
+    }
 
     // Hide inactive / offline spaces from seekers unless explicitly requested
     if (!includeInactive || includeInactive === 'false') {

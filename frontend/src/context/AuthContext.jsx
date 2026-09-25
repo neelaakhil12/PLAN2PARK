@@ -75,16 +75,19 @@ export const AuthProvider = ({ children }) => {
       status: data.status,
       contact: data.contact,
       isEmailVerified: data.isEmailVerified,
+      accountCategory: data.accountCategory,
+      landAcres: data.landAcres,
+      organizationName: data.organizationName,
     });
     return data;
   };
 
-  const signupForRole = async (role, name, email, password, contact) => {
+  const signupForRole = async (role, name, email, password, contact, extra = {}) => {
     const endpoint = `${API_URL}/auth/${role}/signup`;
     const res = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, email, password, contact }),
+      body: JSON.stringify({ name, email, password, contact, ...extra }),
     });
     const data = await res.json();
 
@@ -101,6 +104,9 @@ export const AuthProvider = ({ children }) => {
         status: data.status,
         contact: data.contact,
         isEmailVerified: data.isEmailVerified,
+        accountCategory: data.accountCategory,
+        landAcres: data.landAcres,
+        organizationName: data.organizationName,
       });
     }
 

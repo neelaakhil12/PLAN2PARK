@@ -92,15 +92,13 @@ const Invoice = ({ inlineBookingId, onClose }) => {
           
           <div className="flex items-center gap-3 mb-4 sm:mb-0">
             {/* Exactly the navbar logo style */}
-            <div className="h-10 w-10 rounded-lg bg-emerald-500 flex items-center justify-center shadow-sm shrink-0">
-              <span className="text-white font-black text-xl leading-none">P</span>
-            </div>
+            <img src="/logo.png" alt="Plan2Park" className="h-10 w-10 object-contain rounded-lg shadow-sm shrink-0" />
             <div className="flex flex-col leading-tight">
-              <span className="font-extrabold text-xl text-slate-800 tracking-tight">
-                Planto<span className="text-emerald-500">park</span>
+              <span className="font-black text-xl text-slate-900 tracking-tight">
+                Plan<span className="text-blue-600">2</span>Park
               </span>
-              <span className="text-[10px] uppercase tracking-widest text-slate-500 font-semibold -mt-0.5">
-                Smart Park. Smart Earn.
+              <span className="text-[10px] uppercase tracking-widest text-blue-600 font-bold -mt-0.5">
+                Smart Park • Vehicle Storage
               </span>
             </div>
           </div>

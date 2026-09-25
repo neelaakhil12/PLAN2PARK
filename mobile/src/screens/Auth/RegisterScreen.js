@@ -9,29 +9,71 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { AuthContext } from '../../context/AuthContext';
 import { COLORS } from '../../theme/colors';
 import Button from '../../components/Button';
 import Header from '../../components/Header';
 
 export default function RegisterScreen({ route, navigation }) {
-  const role = route.params?.role || 'seeker';
-  const { signupForRole, serverIp, updateServerIp } = useContext(AuthContext);
+  const initialRole = route.params?.role || 'owner';
+  const category = route.params?.category || (initialRole === 'owner' ? 'vehicle_storage_owner' : 'standard');
+  const role = (category === 'bank_finance_seeker') ? 'seeker' : (category === 'vehicle_storage_owner' ? 'owner' : initialRole);
+  const { signupForRole } = useContext(AuthContext);
+
+  const isStorageOwner = category === 'vehicle_storage_owner';
+  const isBankSeeker = category === 'bank_finance_seeker';
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [contact, setContact] = useState('');
   const [password, setPassword] = useState('');
-  const [customIp, setCustomIp] = useState(serverIp || '192.168.29.203');
-  const [showConfig, setShowConfig] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const roleTitle = role === 'seeker' ? 'Create Seeker Account' : 'Register Space Owner';
-  const themeColor = role === 'seeker' ? COLORS.primary : COLORS.ownerAccent;
+  // Storage Landowner specific fields
+  const [landAcres, setLandAcres] = useState('1.0');
+  const [fencingType, setFencingType] = useState('Compound Wall');
+  const [hasSecurityGuards, setHasSecurityGuards] = useState(true);
+
+  // Bank & Auto Finance specific fields
+  const [organizationName, setOrganizationName] = useState('');
+
+  const roleTitle = isStorageOwner
+    ? 'Register 1+ Acre Stockyard'
+    : isBankSeeker
+    ? 'Register Bank & Repo Dept'
+    : role === 'seeker'
+    ? 'Create Seeker Account'
+    : 'Register Space Owner';
+
+  const themeColor = isStorageOwner
+    ? COLORS.storageAccent
+    : isBankSeeker
+    ? COLORS.bankAccent
+    : role === 'seeker'
+    ? COLORS.seekerAccent
+    : COLORS.ownerAccent;
 
   const handleRegister = async () => {
     if (!name.trim() || !email.trim() || !password.trim() || !contact.trim()) {
       Alert.alert('Missing Fields', 'Please fill in all details (Name, Email, Mobile, Password)');
+      return;
+    }
+
+    if (isStorageOwner) {
+      const acres = parseFloat(landAcres);
+      if (isNaN(acres) || acres < 1.0) {
+        Alert.alert(
+          '1 Acre Minimum Required',
+          'A minimum of 1.0 Acre of secure land is strictly required to register as an authorized Vehicle Storage Yard for banks and auto finance companies.'
+        );
+        return;
+      }
+    }
+
+    if (isBankSeeker && !organizationName.trim()) {
+      Alert.alert('Required', 'Please enter your Bank / NBFC / Recovery Agency Name');
       return;
     }
 
@@ -42,28 +84,22 @@ export default function RegisterScreen({ route, navigation }) {
 
     setLoading(true);
     try {
-      await signupForRole(role, name.trim(), email.trim(), password.trim(), contact.trim());
-      Alert.alert('🎉 Welcome!', 'Account registered successfully!', [
-        { text: 'OK' }
-      ]);
+      const extraData = {
+        accountCategory: category,
+        ...(isStorageOwner ? { landAcres: parseFloat(landAcres), fencingType, hasSecurityGuards } : {}),
+        ...(isBankSeeker ? { organizationName: organizationName.trim() } : {}),
+      };
+
+      await signupForRole(role, name.trim(), email.trim(), password.trim(), contact.trim(), extraData);
+      Alert.alert('🎉 Welcome!', 'Account registered successfully!');
     } catch (err) {
       Alert.alert(
         'Registration Issue',
-        err.message || 'Could not register account',
-        [
-          { text: 'OK' },
-          { text: 'Server Settings', onPress: () => setShowConfig(true) }
-        ]
+        err.message || 'Could not register account'
       );
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleSaveIp = async () => {
-    await updateServerIp(customIp.trim());
-    Alert.alert('Server Saved', `Backend target set to http://${customIp.trim()}:5000/api`);
-    setShowConfig(false);
   };
 
   return (
@@ -71,8 +107,35 @@ export default function RegisterScreen({ route, navigation }) {
       <Header title={roleTitle} subtitle="PlanToPark Mobile" onBack={() => navigation.goBack()} />
 
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <Text style={styles.heading}>Get Started 🚀</Text>
-        <Text style={styles.subheading}>Join PlanToPark as a {role.toUpperCase()}</Text>
+        <Text style={styles.heading}>
+          {isStorageOwner ? 'List 1+ Acre Land 🏢' : isBankSeeker ? 'Bank & Finance Sign Up 🏦' : 'Get Started 🚀'}
+        </Text>
+        <Text style={styles.subheading}>
+          {isStorageOwner
+            ? 'Monetize your vacant 1+ Acre land for bank seized vehicle stockyard'
+            : isBankSeeker
+            ? 'Access secured 1+ Acre yards for repossessed vehicles'
+            : `Join PlanToPark as a ${role.toUpperCase()}`}
+        </Text>
+
+        {/* ⚠️ Mandatory 1 Acre Policy Warning for Vehicle Storage */}
+        {isStorageOwner && (
+          <View style={{
+            backgroundColor: 'rgba(245, 158, 11, 0.12)',
+            borderWidth: 1.5,
+            borderColor: COLORS.storageAccent,
+            borderRadius: 14,
+            padding: 14,
+            marginBottom: 16,
+          }}>
+            <Text style={{ color: COLORS.storageAccent, fontWeight: '900', fontSize: 13, marginBottom: 4 }}>
+              ⚠️ MANDATORY 1 ACRE LAND REQUIREMENT
+            </Text>
+            <Text style={{ color: '#cbd5e1', fontSize: 12, lineHeight: 18 }}>
+              To register as an authorized Vehicle Storage Yard for Banks & Auto Finance repossession, you must have a minimum of 1.0 Acre (43,560 sq ft) of secure, gated/fenced land.
+            </Text>
+          </View>
+        )}
 
         <View style={styles.inputGroup}>
           <Text style={styles.label}>Full Name</Text>
@@ -98,28 +161,125 @@ export default function RegisterScreen({ route, navigation }) {
           />
         </View>
 
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>Mobile Number</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="10-digit phone number"
-            placeholderTextColor={COLORS.textMuted}
-            value={contact}
-            onChangeText={setContact}
-            keyboardType="phone-pad"
-          />
-        </View>
+        {/* Bank & Finance: Organization Name */}
+        {isBankSeeker && (
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Bank / Finance / Repo Agency Name *</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="e.g. HDFC Bank Auto Loans / Shiva Agency"
+              placeholderTextColor={COLORS.textMuted}
+              value={organizationName}
+              onChangeText={setOrganizationName}
+            />
+          </View>
+        )}
+
+        {/* Storage Landowner: Land Area in Acres */}
+        {isStorageOwner && (
+          <>
+            <View style={styles.inputGroup}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                <Text style={styles.label}>Total Land Area (Acres) *</Text>
+                <Text style={{ fontSize: 11, color: COLORS.storageAccent, fontWeight: '800' }}>MIN 1.0 ACRE</Text>
+              </View>
+              <TextInput
+                style={styles.input}
+                placeholder="1.0"
+                placeholderTextColor={COLORS.textMuted}
+                value={landAcres}
+                onChangeText={setLandAcres}
+                keyboardType="numeric"
+              />
+              <Text style={{ fontSize: 11, color: COLORS.textMuted, marginTop: 4 }}>
+                Contiguous land size available for vehicle stockyard.
+              </Text>
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Fencing & Boundary Security</Text>
+              <View style={{ flexDirection: 'row', gap: 8, marginTop: 4 }}>
+                {['Compound Wall', 'High Chain-link', 'Barbed Wire'].map((fence) => (
+                  <TouchableOpacity
+                    key={fence}
+                    style={{
+                      flex: 1,
+                      paddingVertical: 8,
+                      paddingHorizontal: 4,
+                      borderRadius: 8,
+                      alignItems: 'center',
+                      backgroundColor: fencingType === fence ? COLORS.storageAccent : '#1e293b',
+                      borderWidth: 1,
+                      borderColor: fencingType === fence ? COLORS.storageAccent : '#334155',
+                    }}
+                    onPress={() => setFencingType(fence)}
+                  >
+                    <Text style={{ fontSize: 11, fontWeight: '700', color: fencingType === fence ? '#000000' : '#ffffff' }}>
+                      {fence}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            <TouchableOpacity
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                backgroundColor: '#1e293b',
+                padding: 12,
+                borderRadius: 12,
+                borderWidth: 1,
+                borderColor: hasSecurityGuards ? COLORS.storageAccent : '#334155',
+                marginBottom: 16,
+              }}
+              onPress={() => setHasSecurityGuards(!hasSecurityGuards)}
+              activeOpacity={0.8}
+            >
+              <View style={{ flex: 1, marginRight: 10 }}>
+                <Text style={{ color: '#ffffff', fontSize: 13, fontWeight: '700' }}>🛡️ 24/7 Security Guards Available</Text>
+                <Text style={{ color: COLORS.textMuted, fontSize: 11, marginTop: 2 }}>Are guards on site day and night?</Text>
+              </View>
+              <View style={{
+                width: 22,
+                height: 22,
+                borderRadius: 6,
+                backgroundColor: hasSecurityGuards ? COLORS.storageAccent : 'transparent',
+                borderWidth: 2,
+                borderColor: hasSecurityGuards ? COLORS.storageAccent : '#64748b',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}>
+                {hasSecurityGuards && <Text style={{ color: '#000000', fontSize: 12, fontWeight: '900' }}>✓</Text>}
+              </View>
+            </TouchableOpacity>
+          </>
+        )}
 
         <View style={styles.inputGroup}>
           <Text style={styles.label}>Password</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="••••••••"
-            placeholderTextColor={COLORS.textMuted}
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-          />
+          <View style={styles.passwordContainer}>
+            <TextInput
+              style={[styles.input, { flex: 1, borderWidth: 0, paddingRight: 0 }]}
+              placeholder="••••••••"
+              placeholderTextColor={COLORS.textMuted}
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry={!showPassword}
+            />
+            <TouchableOpacity
+              style={styles.eyeBtn}
+              onPress={() => setShowPassword(!showPassword)}
+              activeOpacity={0.7}
+            >
+              <Ionicons
+                name={showPassword ? 'eye-off' : 'eye'}
+                size={20}
+                color={COLORS.textMuted}
+              />
+            </TouchableOpacity>
+          </View>
         </View>
 
         <Button
@@ -135,29 +295,6 @@ export default function RegisterScreen({ route, navigation }) {
             <Text style={[styles.loginLink, { color: themeColor }]}>Sign In</Text>
           </TouchableOpacity>
         </View>
-
-        {/* Server IP Config Toggle */}
-        <TouchableOpacity
-          style={styles.configToggle}
-          onPress={() => setShowConfig(!showConfig)}
-        >
-          <Text style={styles.configToggleTxt}>⚙️ Backend Server IP ({serverIp || '192.168.29.203'})</Text>
-        </TouchableOpacity>
-
-        {showConfig && (
-          <View style={styles.configBox}>
-            <Text style={styles.configTitle}>Backend Server IPv4 Address</Text>
-            <Text style={styles.configSub}>Default: 192.168.29.203 (Port 5000)</Text>
-            <TextInput
-              style={styles.configInput}
-              value={customIp}
-              onChangeText={setCustomIp}
-              placeholder="e.g. 192.168.29.203"
-              placeholderTextColor={COLORS.textMuted}
-            />
-            <Button title="Save Server IP" onPress={handleSaveIp} variant="secondary" />
-          </View>
-        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -215,41 +352,18 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     fontSize: 14,
   },
-  configToggle: {
-    marginTop: 28,
+  passwordContainer: {
+    flexDirection: 'row',
     alignItems: 'center',
-  },
-  configToggleTxt: {
-    color: COLORS.textMuted,
-    fontSize: 12,
-    textDecorationLine: 'underline',
-  },
-  configBox: {
     backgroundColor: COLORS.cardBg,
+    borderWidth: 1,
+    borderColor: COLORS.borderDark,
     borderRadius: 12,
-    padding: 16,
-    marginTop: 12,
-    borderWidth: 1,
-    borderColor: COLORS.borderDark,
+    paddingRight: 10,
   },
-  configTitle: {
-    color: COLORS.white,
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  configSub: {
-    color: COLORS.textMuted,
-    fontSize: 11,
-    marginBottom: 10,
-  },
-  configInput: {
-    backgroundColor: COLORS.darkBg,
-    borderWidth: 1,
-    borderColor: COLORS.borderDark,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    color: COLORS.white,
-    marginBottom: 10,
+  eyeBtn: {
+    padding: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
