@@ -7,6 +7,7 @@ import {
   ScrollView,
   Alert,
   TouchableOpacity,
+  Switch,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -16,13 +17,12 @@ import Button from '../../components/Button';
 import Header from '../../components/Header';
 
 export default function RegisterScreen({ route, navigation }) {
-  const initialRole = route.params?.role || 'owner';
-  const category = route.params?.category || (initialRole === 'owner' ? 'vehicle_storage_owner' : 'standard');
-  const role = (category === 'bank_finance_seeker') ? 'seeker' : (category === 'vehicle_storage_owner' ? 'owner' : initialRole);
+  const initialCategory = route.params?.category === 'vehicle_storage_owner' ? 'vehicle_storage_owner' : 'standard';
+  const [currentCategory, setCurrentCategory] = useState(initialCategory);
+
   const { signupForRole } = useContext(AuthContext);
 
-  const isStorageOwner = category === 'vehicle_storage_owner';
-  const isBankSeeker = category === 'bank_finance_seeker';
+  const isStorageOwner = currentCategory === 'vehicle_storage_owner';
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -36,28 +36,12 @@ export default function RegisterScreen({ route, navigation }) {
   const [fencingType, setFencingType] = useState('Compound Wall');
   const [hasSecurityGuards, setHasSecurityGuards] = useState(true);
 
-  // Bank & Auto Finance specific fields
-  const [organizationName, setOrganizationName] = useState('');
-
-  const roleTitle = isStorageOwner
-    ? 'Register 1+ Acre Stockyard'
-    : isBankSeeker
-    ? 'Register Bank & Repo Dept'
-    : role === 'seeker'
-    ? 'Create Seeker Account'
-    : 'Register Space Owner';
-
-  const themeColor = isStorageOwner
-    ? COLORS.storageAccent
-    : isBankSeeker
-    ? COLORS.bankAccent
-    : role === 'seeker'
-    ? COLORS.seekerAccent
-    : COLORS.ownerAccent;
+  const roleTitle = isStorageOwner ? 'Register 1+ Acre Stockyard' : 'Register Space Owner';
+  const themeColor = isStorageOwner ? COLORS.storageAccent : COLORS.ownerAccent;
 
   const handleRegister = async () => {
     if (!name.trim() || !email.trim() || !password.trim() || !contact.trim()) {
-      Alert.alert('Missing Fields', 'Please fill in all details (Name, Email, Mobile, Password)');
+      Alert.alert('Missing Fields', 'Please fill in Name, Email, Mobile and Password');
       return;
     }
 
@@ -72,11 +56,6 @@ export default function RegisterScreen({ route, navigation }) {
       }
     }
 
-    if (isBankSeeker && !organizationName.trim()) {
-      Alert.alert('Required', 'Please enter your Bank / NBFC / Recovery Agency Name');
-      return;
-    }
-
     if (password.length < 4) {
       Alert.alert('Weak Password', 'Password must be at least 4 characters long');
       return;
@@ -85,12 +64,12 @@ export default function RegisterScreen({ route, navigation }) {
     setLoading(true);
     try {
       const extraData = {
-        accountCategory: category,
+        accountCategory: currentCategory,
         ...(isStorageOwner ? { landAcres: parseFloat(landAcres), fencingType, hasSecurityGuards } : {}),
-        ...(isBankSeeker ? { organizationName: organizationName.trim() } : {}),
       };
 
-      await signupForRole(role, name.trim(), email.trim(), password.trim(), contact.trim(), extraData);
+      // Always register as role 'owner' in Owner App
+      await signupForRole('owner', name.trim(), email.trim(), password.trim(), contact.trim(), extraData);
       Alert.alert('🎉 Welcome!', 'Account registered successfully!');
     } catch (err) {
       Alert.alert(
@@ -104,44 +83,60 @@ export default function RegisterScreen({ route, navigation }) {
 
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
-      <Header title={roleTitle} subtitle="PlanToPark Mobile" onBack={() => navigation.goBack()} />
+      <Header title={roleTitle} subtitle="PlanToPark Owner" onBack={() => navigation.goBack()} />
 
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        {/* Toggle between Standard Space Owner and 1+ Acre Landowner */}
+        <View style={styles.tabContainer}>
+          <TouchableOpacity
+            style={[
+              styles.tabBtn,
+              !isStorageOwner && { backgroundColor: COLORS.ownerAccent },
+            ]}
+            onPress={() => setCurrentCategory('standard')}
+          >
+            <Text style={[styles.tabTxt, !isStorageOwner && { color: '#ffffff', fontWeight: '800' }]}>
+              🅿️ Space Owner
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.tabBtn,
+              isStorageOwner && { backgroundColor: COLORS.storageAccent },
+            ]}
+            onPress={() => setCurrentCategory('vehicle_storage_owner')}
+          >
+            <Text style={[styles.tabTxt, isStorageOwner && { color: '#000000', fontWeight: '800' }]}>
+              🏢 Storage (1+ Ac)
+            </Text>
+          </TouchableOpacity>
+        </View>
+
         <Text style={styles.heading}>
-          {isStorageOwner ? 'List 1+ Acre Land 🏢' : isBankSeeker ? 'Bank & Finance Sign Up 🏦' : 'Get Started 🚀'}
+          {isStorageOwner ? 'List 1+ Acre Land 🏢' : 'Join as Space Owner 🅿️'}
         </Text>
         <Text style={styles.subheading}>
           {isStorageOwner
             ? 'Monetize your vacant 1+ Acre land for bank seized vehicle stockyard'
-            : isBankSeeker
-            ? 'Access secured 1+ Acre yards for repossessed vehicles'
-            : `Join PlanToPark as a ${role.toUpperCase()}`}
+            : 'Turn your vacant driveway, garage, or commercial parking lot into income'}
         </Text>
 
         {/* ⚠️ Mandatory 1 Acre Policy Warning for Vehicle Storage */}
         {isStorageOwner && (
-          <View style={{
-            backgroundColor: 'rgba(245, 158, 11, 0.12)',
-            borderWidth: 1.5,
-            borderColor: COLORS.storageAccent,
-            borderRadius: 14,
-            padding: 14,
-            marginBottom: 16,
-          }}>
-            <Text style={{ color: COLORS.storageAccent, fontWeight: '900', fontSize: 13, marginBottom: 4 }}>
-              ⚠️ MANDATORY 1 ACRE LAND REQUIREMENT
-            </Text>
-            <Text style={{ color: '#cbd5e1', fontSize: 12, lineHeight: 18 }}>
-              To register as an authorized Vehicle Storage Yard for Banks & Auto Finance repossession, you must have a minimum of 1.0 Acre (43,560 sq ft) of secure, gated/fenced land.
+          <View style={styles.warningBox}>
+            <Text style={styles.warningTitle}>⚠️ MANDATORY 1 ACRE LAND REQUIREMENT</Text>
+            <Text style={styles.warningTxt}>
+              To register as an authorized Vehicle Storage Yard for Banks & Auto Finance repossession, you must have a minimum of <Text style={{ fontWeight: '800', color: '#fbbf24' }}>1.0 Acre (43,560 sq ft)</Text> of secure, gated/fenced land.
             </Text>
           </View>
         )}
 
         <View style={styles.inputGroup}>
-          <Text style={styles.label}>Full Name</Text>
+          <Text style={styles.label}>{isStorageOwner ? 'Landowner / Company Name' : 'Full Name'}</Text>
           <TextInput
             style={styles.input}
-            placeholder="John Doe"
+            placeholder={isStorageOwner ? 'e.g. Ramesh Reddy (Landowner)' : 'e.g. Ramesh Reddy'}
             placeholderTextColor={COLORS.textMuted}
             value={name}
             onChangeText={setName}
@@ -152,7 +147,7 @@ export default function RegisterScreen({ route, navigation }) {
           <Text style={styles.label}>Email Address</Text>
           <TextInput
             style={styles.input}
-            placeholder="john@example.com"
+            placeholder="e.g. owner@example.com"
             placeholderTextColor={COLORS.textMuted}
             value={email}
             onChangeText={setEmail}
@@ -161,99 +156,64 @@ export default function RegisterScreen({ route, navigation }) {
           />
         </View>
 
-        {/* Bank & Finance: Organization Name */}
-        {isBankSeeker && (
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Bank / Finance / Repo Agency Name *</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="e.g. HDFC Bank Auto Loans / Shiva Agency"
-              placeholderTextColor={COLORS.textMuted}
-              value={organizationName}
-              onChangeText={setOrganizationName}
-            />
-          </View>
-        )}
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>Mobile Number</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="e.g. 9876543210"
+            placeholderTextColor={COLORS.textMuted}
+            value={contact}
+            onChangeText={setContact}
+            keyboardType="phone-pad"
+          />
+        </View>
 
-        {/* Storage Landowner: Land Area in Acres */}
         {isStorageOwner && (
           <>
             <View style={styles.inputGroup}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                <Text style={styles.label}>Total Land Area (Acres) *</Text>
-                <Text style={{ fontSize: 11, color: COLORS.storageAccent, fontWeight: '800' }}>MIN 1.0 ACRE</Text>
-              </View>
+              <Text style={styles.label}>Total Land Area (Acres - Minimum 1.0)</Text>
               <TextInput
                 style={styles.input}
-                placeholder="1.0"
+                placeholder="e.g. 1.5"
                 placeholderTextColor={COLORS.textMuted}
                 value={landAcres}
                 onChangeText={setLandAcres}
-                keyboardType="numeric"
+                keyboardType="decimal-pad"
               />
-              <Text style={{ fontSize: 11, color: COLORS.textMuted, marginTop: 4 }}>
-                Contiguous land size available for vehicle stockyard.
-              </Text>
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Fencing & Boundary Security</Text>
-              <View style={{ flexDirection: 'row', gap: 8, marginTop: 4 }}>
-                {['Compound Wall', 'High Chain-link', 'Barbed Wire'].map((fence) => (
+              <Text style={styles.label}>Boundary Security / Fencing Type</Text>
+              <View style={styles.fencingRow}>
+                {['Compound Wall', 'Barbed Wire Fencing', 'Chain Link Mesh'].map((fType) => (
                   <TouchableOpacity
-                    key={fence}
-                    style={{
-                      flex: 1,
-                      paddingVertical: 8,
-                      paddingHorizontal: 4,
-                      borderRadius: 8,
-                      alignItems: 'center',
-                      backgroundColor: fencingType === fence ? COLORS.storageAccent : '#1e293b',
-                      borderWidth: 1,
-                      borderColor: fencingType === fence ? COLORS.storageAccent : '#334155',
-                    }}
-                    onPress={() => setFencingType(fence)}
+                    key={fType}
+                    style={[
+                      styles.fencingOption,
+                      fencingType === fType && { borderColor: COLORS.storageAccent, backgroundColor: 'rgba(245, 158, 11, 0.15)' },
+                    ]}
+                    onPress={() => setFencingType(fType)}
                   >
-                    <Text style={{ fontSize: 11, fontWeight: '700', color: fencingType === fence ? '#000000' : '#ffffff' }}>
-                      {fence}
+                    <Text style={[styles.fencingTxt, fencingType === fType && { color: COLORS.storageAccent, fontWeight: '700' }]}>
+                      {fType}
                     </Text>
                   </TouchableOpacity>
                 ))}
               </View>
             </View>
 
-            <TouchableOpacity
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                backgroundColor: '#1e293b',
-                padding: 12,
-                borderRadius: 12,
-                borderWidth: 1,
-                borderColor: hasSecurityGuards ? COLORS.storageAccent : '#334155',
-                marginBottom: 16,
-              }}
-              onPress={() => setHasSecurityGuards(!hasSecurityGuards)}
-              activeOpacity={0.8}
-            >
-              <View style={{ flex: 1, marginRight: 10 }}>
-                <Text style={{ color: '#ffffff', fontSize: 13, fontWeight: '700' }}>🛡️ 24/7 Security Guards Available</Text>
-                <Text style={{ color: COLORS.textMuted, fontSize: 11, marginTop: 2 }}>Are guards on site day and night?</Text>
+            <View style={styles.switchRow}>
+              <View style={{ flex: 1, paddingRight: 10 }}>
+                <Text style={styles.switchLabel}>24/7 Security Guards Available</Text>
+                <Text style={styles.switchDesc}>Guards physically stationed at premises</Text>
               </View>
-              <View style={{
-                width: 22,
-                height: 22,
-                borderRadius: 6,
-                backgroundColor: hasSecurityGuards ? COLORS.storageAccent : 'transparent',
-                borderWidth: 2,
-                borderColor: hasSecurityGuards ? COLORS.storageAccent : '#64748b',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}>
-                {hasSecurityGuards && <Text style={{ color: '#000000', fontSize: 12, fontWeight: '900' }}>✓</Text>}
-              </View>
-            </TouchableOpacity>
+              <Switch
+                value={hasSecurityGuards}
+                onValueChange={setHasSecurityGuards}
+                trackColor={{ false: '#334155', true: COLORS.storageAccent }}
+                thumbColor="#ffffff"
+              />
+            </View>
           </>
         )}
 
@@ -283,16 +243,22 @@ export default function RegisterScreen({ route, navigation }) {
         </View>
 
         <Button
-          title={`Register as ${role.charAt(0).toUpperCase() + role.slice(1)}`}
+          title={loading ? 'Registering...' : isStorageOwner ? 'Register 1+ Acre Stockyard' : 'Register Space Owner'}
           onPress={handleRegister}
-          loading={loading}
-          style={{ marginTop: 12, backgroundColor: themeColor }}
+          disabled={loading}
+          style={[styles.submitBtn, { backgroundColor: themeColor }]}
         />
 
-        <View style={styles.loginRow}>
-          <Text style={styles.loginText}>Already have an account? </Text>
-          <TouchableOpacity onPress={() => navigation.navigate('Login', { role })}>
-            <Text style={[styles.loginLink, { color: themeColor }]}>Sign In</Text>
+        <View style={styles.footerRow}>
+          <Text style={styles.footerTxt}>Already have an account? </Text>
+          <TouchableOpacity
+            onPress={() =>
+              navigation.navigate('Login', {
+                role: 'owner',
+              })
+            }
+          >
+            <Text style={[styles.footerLink, { color: themeColor }]}>Log In</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -307,63 +273,141 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 24,
-    paddingBottom: 40,
+    paddingTop: 10,
+  },
+  tabContainer: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 16,
+    backgroundColor: '#0f172a',
+    padding: 4,
+    borderRadius: 12,
+  },
+  tabBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 10,
+    alignItems: 'center',
+    backgroundColor: '#1e293b',
+  },
+  tabTxt: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#94a3b8',
   },
   heading: {
     fontSize: 26,
     fontWeight: '800',
     color: COLORS.white,
+    marginBottom: 6,
   },
   subheading: {
-    fontSize: 14,
+    fontSize: 13.5,
     color: COLORS.textMuted,
-    marginTop: 4,
-    marginBottom: 24,
+    marginBottom: 20,
+    lineHeight: 19,
+  },
+  warningBox: {
+    backgroundColor: 'rgba(245, 158, 11, 0.12)',
+    borderWidth: 1.5,
+    borderColor: '#f59e0b',
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 16,
+  },
+  warningTitle: {
+    color: '#f59e0b',
+    fontWeight: '900',
+    fontSize: 12,
+    marginBottom: 4,
+    letterSpacing: 0.5,
+  },
+  warningTxt: {
+    color: '#cbd5e1',
+    fontSize: 12,
+    lineHeight: 18,
   },
   inputGroup: {
     marginBottom: 16,
   },
   label: {
-    fontSize: 14,
+    fontSize: 13.5,
     fontWeight: '600',
-    color: COLORS.white,
+    color: COLORS.textLight,
     marginBottom: 6,
   },
   input: {
     backgroundColor: COLORS.cardBg,
     borderWidth: 1,
-    borderColor: COLORS.borderDark,
+    borderColor: COLORS.border,
     borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
     color: COLORS.white,
     fontSize: 15,
-  },
-  loginRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginTop: 20,
-  },
-  loginText: {
-    color: COLORS.textMuted,
-    fontSize: 14,
-  },
-  loginLink: {
-    fontWeight: '700',
-    fontSize: 14,
   },
   passwordContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: COLORS.cardBg,
     borderWidth: 1,
-    borderColor: COLORS.borderDark,
+    borderColor: COLORS.border,
     borderRadius: 12,
-    paddingRight: 10,
+    paddingHorizontal: 14,
   },
   eyeBtn: {
     padding: 8,
-    justifyContent: 'center',
+  },
+  fencingRow: {
+    gap: 8,
+  },
+  fencingOption: {
+    padding: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#334155',
+    backgroundColor: '#1e293b',
+  },
+  fencingTxt: {
+    color: '#cbd5e1',
+    fontSize: 12.5,
+  },
+  switchRow: {
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#1e293b',
+    padding: 12,
+    borderRadius: 12,
+    marginBottom: 16,
+  },
+  switchLabel: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  switchDesc: {
+    color: '#94a3b8',
+    fontSize: 11,
+    marginTop: 2,
+  },
+  submitBtn: {
+    marginTop: 10,
+    paddingVertical: 15,
+    borderRadius: 12,
+  },
+  footerRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginTop: 22,
+    paddingBottom: 24,
+  },
+  footerTxt: {
+    color: COLORS.textMuted,
+    fontSize: 14,
+  },
+  footerLink: {
+    fontWeight: '700',
+    fontSize: 14,
   },
 });

@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Platform, StatusBar, Image } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { COLORS } from '../../theme/colors';
 
@@ -7,37 +7,20 @@ export default function RoleSelectScreen({ navigation }) {
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom', 'left', 'right']}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Brand Logo with updated branding */}
         <View style={styles.brandContainer}>
           <Image
             source={require('../../../assets/logo.png')}
             style={styles.logoImg}
             resizeMode="contain"
           />
-          <Text style={styles.brandName}>PlanToPark</Text>
-          <Text style={styles.tagline}>PARK SMART, EARN SMART</Text>
+          <Text style={styles.brandName}>PlanToPark Owner</Text>
+          <Text style={styles.tagline}>LIST PARKING & STORAGE LAND</Text>
         </View>
 
-        <Text style={styles.title}>Select Your Portal</Text>
-        <Text style={styles.subtitle}>Choose how you want to use PlanToPark today</Text>
+        <Text style={styles.title}>Owner Dashboard Portal</Text>
+        <Text style={styles.subtitle}>Choose how you want to list your space or land</Text>
 
-        {/* Option 1: Seeker */}
-        <TouchableOpacity
-          style={[styles.roleCard, { borderColor: COLORS.seekerAccent }]}
-          onPress={() => navigation.navigate('Login', { role: 'seeker', category: 'standard' })}
-          activeOpacity={0.85}
-        >
-          <View style={[styles.iconContainer, { backgroundColor: 'rgba(37, 99, 235, 0.15)' }]}>
-            <Text style={styles.cardEmoji}>🚗</Text>
-          </View>
-          <View style={styles.cardInfo}>
-            <Text style={styles.roleTitle}>Parking Seeker</Text>
-            <Text style={styles.roleDesc}>Find, reserve, and pay for verified commuter parking spots near your destination instantly.</Text>
-          </View>
-          <Text style={[styles.arrow, { color: COLORS.seekerAccent }]}>→</Text>
-        </TouchableOpacity>
-
-        {/* Option 2: Spot Owner */}
+        {/* Option 1: Spot Owner */}
         <TouchableOpacity
           style={[styles.roleCard, { borderColor: COLORS.ownerAccent }]}
           onPress={() => navigation.navigate('Login', { role: 'owner', category: 'standard' })}
@@ -53,7 +36,7 @@ export default function RoleSelectScreen({ navigation }) {
           <Text style={[styles.arrow, { color: COLORS.ownerAccent }]}>→</Text>
         </TouchableOpacity>
 
-        {/* Option 3: NEW! Vehicle Storage Landowner (Min 1 Acre) */}
+        {/* Option 2: Vehicle Storage Landowner (Min 1 Acre) */}
         <TouchableOpacity
           style={[styles.roleCard, { borderColor: COLORS.storageAccent, backgroundColor: 'rgba(245, 158, 11, 0.06)' }]}
           onPress={() => navigation.navigate('Login', { role: 'owner', category: 'vehicle_storage_owner' })}
@@ -65,50 +48,12 @@ export default function RoleSelectScreen({ navigation }) {
           <View style={styles.cardInfo}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               <Text style={styles.roleTitle}>Vehicle Storage Land</Text>
-              <View style={styles.miniBadgeAmber}><Text style={styles.miniBadgeAmberTxt}>1+ ACRE</Text></View>
+              <View style={styles.miniBadgeAmber}><Text style={styles.miniBadgeAmberTxt}>1+ ACRE MIN</Text></View>
             </View>
-            <Text style={styles.roleDesc}>List 1+ Acre secure land for Banks & Auto Finance companies to store seized & repossession vehicles.</Text>
+            <Text style={styles.roleDesc}>List 1+ Acre secure land for Banks & Auto Finance companies to store seized & repossessed vehicles.</Text>
           </View>
           <Text style={[styles.arrow, { color: COLORS.storageAccent }]}>→</Text>
         </TouchableOpacity>
-
-        {/* Option 4: NEW! Banks & Auto Finance Companies */}
-        <TouchableOpacity
-          style={[styles.roleCard, { borderColor: COLORS.bankAccent, backgroundColor: 'rgba(14, 165, 233, 0.06)' }]}
-          onPress={() => navigation.navigate('Login', { role: 'seeker', category: 'bank_finance_seeker' })}
-          activeOpacity={0.85}
-        >
-          <View style={[styles.iconContainer, { backgroundColor: 'rgba(14, 165, 233, 0.2)' }]}>
-            <Text style={styles.cardEmoji}>🏦</Text>
-          </View>
-          <View style={styles.cardInfo}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <Text style={styles.roleTitle}>Banks & Auto Finance</Text>
-              <View style={styles.miniBadgeCyan}><Text style={styles.miniBadgeCyanTxt}>REPO YARDS</Text></View>
-            </View>
-            <Text style={styles.roleDesc}>Book high-security 1+ Acre stockyards with 24/7 guards & CCTV for seized/repossessed vehicles.</Text>
-          </View>
-          <Text style={[styles.arrow, { color: COLORS.bankAccent }]}>→</Text>
-        </TouchableOpacity>
-
-        {/* Option 5: Admin */}
-        <TouchableOpacity
-          style={[styles.roleCard, { borderColor: '#475569' }]}
-          onPress={() => navigation.navigate('Login', { role: 'admin' })}
-          activeOpacity={0.85}
-        >
-          <View style={[styles.iconContainer, { backgroundColor: '#1e293b' }]}>
-            <Text style={styles.cardEmoji}>👑</Text>
-          </View>
-          <View style={styles.cardInfo}>
-            <Text style={styles.roleTitle}>Platform Admin</Text>
-            <Text style={styles.roleDesc}>Oversee system operations, verify listings, and manage user support.</Text>
-          </View>
-          <Text style={[styles.arrow, { color: '#94a3b8' }]}>→</Text>
-        </TouchableOpacity>
-
-        {/* Footer info */}
-        <Text style={styles.footerNote}>🇮🇳 India's Most Trusted Parking & Stockyard Marketplace</Text>
       </ScrollView>
     </SafeAreaView>
   );
@@ -121,77 +66,56 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 24,
-    paddingBottom: 40,
-    justifyContent: 'center',
+    paddingTop: 10,
   },
   brandContainer: {
     alignItems: 'center',
-    marginTop: 10,
+    marginTop: 20,
     marginBottom: 28,
   },
   logoImg: {
-    width: 80,
-    height: 80,
-    borderRadius: 20,
+    width: 90,
+    height: 90,
+    borderRadius: 18,
     marginBottom: 12,
   },
-  miniBadgeAmber: {
-    backgroundColor: '#f59e0b',
-    paddingHorizontal: 6,
-    paddingVertical: 1,
-    borderRadius: 4,
-  },
-  miniBadgeAmberTxt: {
-    color: '#000000',
-    fontSize: 9,
-    fontWeight: '900',
-  },
-  miniBadgeCyan: {
-    backgroundColor: '#0ea5e9',
-    paddingHorizontal: 6,
-    paddingVertical: 1,
-    borderRadius: 4,
-  },
-  miniBadgeCyanTxt: {
-    color: '#ffffff',
-    fontSize: 9,
-    fontWeight: '900',
-  },
   brandName: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: COLORS.white,
+    fontSize: 24,
+    fontWeight: '900',
+    color: '#ffffff',
+    letterSpacing: 0.5,
   },
   tagline: {
-    fontSize: 14,
-    color: COLORS.primary,
-    fontWeight: '600',
+    fontSize: 11,
+    fontWeight: '800',
+    color: COLORS.ownerAccent,
+    letterSpacing: 1.5,
     marginTop: 4,
   },
   title: {
     fontSize: 22,
-    fontWeight: '700',
-    color: COLORS.white,
-    marginBottom: 6,
+    fontWeight: '800',
+    color: '#ffffff',
+    marginBottom: 4,
   },
   subtitle: {
-    fontSize: 14,
-    color: COLORS.textMuted,
-    marginBottom: 24,
+    fontSize: 13.5,
+    color: '#94a3b8',
+    marginBottom: 20,
   },
   roleCard: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: COLORS.cardBg,
     borderRadius: 16,
-    padding: 18,
-    marginVertical: 8,
     borderWidth: 1.5,
+    padding: 16,
+    marginBottom: 16,
   },
   iconContainer: {
-    width: 50,
-    height: 50,
-    borderRadius: 12,
+    width: 52,
+    height: 52,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 14,
@@ -203,25 +127,30 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   roleTitle: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: COLORS.white,
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#ffffff',
     marginBottom: 4,
   },
   roleDesc: {
     fontSize: 12,
-    color: COLORS.textMuted,
-    lineHeight: 16,
+    color: '#94a3b8',
+    lineHeight: 17,
   },
   arrow: {
-    fontSize: 22,
-    fontWeight: 'bold',
+    fontSize: 20,
+    fontWeight: '800',
     marginLeft: 8,
   },
-  footerNote: {
-    textAlign: 'center',
-    color: COLORS.textMuted,
-    fontSize: 12,
-    marginTop: 28,
+  miniBadgeAmber: {
+    backgroundColor: '#f59e0b',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  miniBadgeAmberTxt: {
+    color: '#000000',
+    fontWeight: '900',
+    fontSize: 9,
   },
 });
