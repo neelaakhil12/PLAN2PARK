@@ -39,8 +39,8 @@ export default function LoginScreen({ route, navigation }) {
     setLoading(true);
     setErrorMsg('');
     try {
-      // Owner app always logs in with role 'owner'
-      await loginForRole('owner', email.trim(), password);
+      // Owner app logs in with role 'owner' and active category ('standard' or 'vehicle_storage_owner')
+      await loginForRole('owner', email.trim(), password, category);
     } catch (err) {
       const msg = err.message || 'Invalid credentials';
       setErrorMsg(msg);

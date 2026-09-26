@@ -62,7 +62,7 @@ export default function LoginScreen({ route, navigation }) {
     setLoading(true);
     setErrorMsg('');
     try {
-      await loginForRole(role, email.trim(), password);
+      await loginForRole(role, email.trim(), password, currentCategory);
     } catch (err) {
       const msg = err.message || 'Invalid credentials';
       setErrorMsg(msg);

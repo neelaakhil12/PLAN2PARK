@@ -47,7 +47,7 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const loginForRole = async (role, email, password) => {
+  const loginForRole = async (role, email, password, category) => {
     const baseUrl = await getBaseApiUrl();
     const endpoint = `${baseUrl}/auth/${role}/login`;
 
@@ -56,7 +56,7 @@ export const AuthProvider = ({ children }) => {
       res = await fetch(endpoint, {
         method: 'POST',
         headers: COMMON_HEADERS,
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, password, category }),
       });
     } catch (netErr) {
       throw new Error(`Cannot connect to server. Please check your internet connection.`);
@@ -76,6 +76,8 @@ export const AuthProvider = ({ children }) => {
       name: data.name,
       email: data.email,
       role: data.role || role,
+      accountCategory: data.accountCategory || category || 'standard',
+      organizationName: data.organizationName || '',
       contact: data.contact,
       status: data.status,
       profileImage: data.profileImage || '',
@@ -122,6 +124,8 @@ export const AuthProvider = ({ children }) => {
         name: data.name,
         email: data.email,
         role: data.role || role,
+        accountCategory: data.accountCategory || extraData.accountCategory || 'standard',
+        organizationName: data.organizationName || extraData.organizationName || '',
         contact: data.contact,
         status: data.status,
         profileImage: data.profileImage || '',

@@ -60,13 +60,22 @@ export default function OwnerHomeScreen({ navigation }) {
     }
   };
 
+  const isStorageOwner = user?.accountCategory === 'vehicle_storage_owner';
+  const visibleSpots = spots.filter((s) =>
+    isStorageOwner
+      ? s.spaceCategory === 'commercial_vehicle_storage'
+      : s.spaceCategory !== 'commercial_vehicle_storage'
+  );
+
   return (
     <SafeAreaView style={styles.container} edges={['left', 'right']}>
       {/* Header with notch padding */}
       <View style={[styles.header, { paddingTop: topPadding + 10 }]}>
         <View>
-          <Text style={styles.headerTitle}>Owner Dashboard 🅿️</Text>
-          <Text style={styles.headerSub}>Welcome, {user?.name || 'Owner'}</Text>
+          <Text style={[styles.headerTitle, isStorageOwner && { color: '#fbbf24' }]}>
+            {isStorageOwner ? 'Storage Land Owner 🏢' : 'Owner Dashboard 🅿️'}
+          </Text>
+          <Text style={styles.headerSub}>Welcome, {user?.name || (isStorageOwner ? 'Land Owner' : 'Owner')}</Text>
         </View>
         <TouchableOpacity onPress={logout} style={styles.logoutBtn}>
           <Text style={styles.logoutTxt}>Sign Out</Text>
@@ -93,47 +102,71 @@ export default function OwnerHomeScreen({ navigation }) {
             <Text style={styles.metricLabel}>Total Earnings</Text>
           </View>
           <View style={styles.metricCard}>
-            <Text style={[styles.metricVal, { color: COLORS.ownerAccent }]}>{spots.length}</Text>
-            <Text style={styles.metricLabel}>Listed Spots</Text>
+            <Text style={[styles.metricVal, { color: isStorageOwner ? COLORS.storageAccent : COLORS.ownerAccent }]}>
+              {visibleSpots.length}
+            </Text>
+            <Text style={styles.metricLabel}>{isStorageOwner ? 'Listed Stockyards' : 'Listed Spots'}</Text>
           </View>
         </View>
 
-        {/* Add Spot Banner */}
-        <TouchableOpacity
-          style={styles.addBanner}
-          onPress={() => navigation.navigate('AddSpot')}
-          activeOpacity={0.85}
-        >
-          <View style={styles.addBannerCol}>
-            <Text style={styles.addBannerTitle}>+ List New Parking Space</Text>
-            <Text style={styles.addBannerSub}>Turn your driveways into recurring income</Text>
-          </View>
-          <Text style={styles.addBannerArrow}>→</Text>
-        </TouchableOpacity>
+        {/* Add Spot Banner - Strictly Separated */}
+        {isStorageOwner ? (
+          <TouchableOpacity
+            style={[styles.addBanner, { backgroundColor: 'rgba(245, 158, 11, 0.15)', borderWidth: 1.5, borderColor: COLORS.storageAccent }]}
+            onPress={() => navigation.navigate('AddSpot', { category: 'commercial_vehicle_storage' })}
+            activeOpacity={0.85}
+          >
+            <View style={styles.addBannerCol}>
+              <Text style={[styles.addBannerTitle, { color: '#fbbf24' }]}>🏢 List Vehicle Storage Yard (1+ Acre)</Text>
+              <Text style={[styles.addBannerSub, { color: '#fef3c7' }]}>Monetize land for Banks & Repo vehicle holding yards</Text>
+            </View>
+            <Text style={[styles.addBannerArrow, { color: '#fbbf24' }]}>→</Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity
+            style={styles.addBanner}
+            onPress={() => navigation.navigate('AddSpot', { category: 'standard' })}
+            activeOpacity={0.85}
+          >
+            <View style={styles.addBannerCol}>
+              <Text style={styles.addBannerTitle}>+ List New Parking Space</Text>
+              <Text style={styles.addBannerSub}>Turn your driveways into recurring income</Text>
+            </View>
+            <Text style={styles.addBannerArrow}>→</Text>
+          </TouchableOpacity>
+        )}
 
         {/* Manage Spots Section */}
-        <Text style={styles.sectionTitle}>My Parking Spots</Text>
+        <Text style={styles.sectionTitle}>
+          {isStorageOwner ? 'My Storage Land Listings' : 'My Parking Spots'}
+        </Text>
 
         {loading ? (
-          <ActivityIndicator size="large" color={COLORS.ownerAccent} style={{ marginTop: 20 }} />
-        ) : spots.length === 0 ? (
+          <ActivityIndicator size="large" color={isStorageOwner ? COLORS.storageAccent : COLORS.ownerAccent} style={{ marginTop: 20 }} />
+        ) : visibleSpots.length === 0 ? (
           <View style={styles.emptyCard}>
-            <Text style={styles.emptyTxt}>No parking spots added yet</Text>
+            <Text style={styles.emptyTxt}>
+              {isStorageOwner ? 'No vehicle storage yards added yet' : 'No parking spots added yet'}
+            </Text>
           </View>
         ) : (
-          spots.map((spot) => (
+          visibleSpots.map((spot) => (
             <View key={spot._id} style={styles.spotItem}>
               <View style={styles.spotInfo}>
                 <Text style={styles.spotTitle}>{spot.title}</Text>
                 <Text style={styles.spotAddress}>📍 {spot.address}, {spot.city}</Text>
-                <Text style={styles.spotPrice}>Rate: ₹{spot.hourlyRate}/hr • {spot.totalSpots} spots</Text>
+                <Text style={styles.spotPrice}>
+                  {spot.spaceCategory === 'commercial_vehicle_storage'
+                    ? `Holding Fee: ₹${spot.monthlyStorageRate || 1500}/car/mo • ${spot.landAcres || 1} Acres`
+                    : `Rate: ₹${spot.hourlyRate}/hr • ${spot.totalSpots} spots`}
+                </Text>
               </View>
               <View style={styles.toggleCol}>
                 <Text style={styles.toggleLabel}>{spot.isActive ? 'Active' : 'Offline'}</Text>
                 <Switch
                   value={spot.isActive !== false}
                   onValueChange={() => handleToggleStatus(spot._id, spot.isActive)}
-                  trackColor={{ false: COLORS.borderDark, true: COLORS.ownerAccent }}
+                  trackColor={{ false: COLORS.borderDark, true: isStorageOwner ? COLORS.storageAccent : COLORS.ownerAccent }}
                 />
               </View>
             </View>

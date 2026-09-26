@@ -177,6 +177,8 @@ router.post('/seeker/login', async (req, res) => {
       name: user.name,
       email: user.email,
       role: user.role,
+      accountCategory: user.accountCategory || 'standard',
+      organizationName: user.organizationName || '',
       status: user.status,
       contact: user.contact,
       profileImage: user.profileImage || '',
@@ -191,12 +193,27 @@ router.post('/seeker/login', async (req, res) => {
 // @desc    Owner Login (Enforce role: owner)
 // @route   POST /api/auth/owner/login
 router.post('/owner/login', async (req, res) => {
-  const { email, password } = req.body;
+  const { email, password, category } = req.body;
   try {
     const normalizedEmail = (email || '').trim().toLowerCase();
     const user = await User.findOne({ email: normalizedEmail });
     if (!user || user.role !== 'owner') {
       return res.status(401).json({ message: 'Access denied: Not a parking owner account or invalid email.' });
+    }
+
+    // Portal matching validation if category is passed
+    if (category) {
+      const userCat = user.accountCategory || 'standard';
+      if (category === 'vehicle_storage_owner' && userCat !== 'vehicle_storage_owner') {
+        return res.status(403).json({
+          message: 'This account is registered as a Space Owner (Parking Spots). Please log in via the Space Owner portal.',
+        });
+      }
+      if (category === 'standard' && userCat === 'vehicle_storage_owner') {
+        return res.status(403).json({
+          message: 'This account is registered as a Vehicle Storage Land Owner (1+ Acre). Please log in via the Vehicle Storage Land Owner portal.',
+        });
+      }
     }
 
     const isMatch = await user.matchPassword(password);
@@ -220,6 +237,10 @@ router.post('/owner/login', async (req, res) => {
       name: user.name,
       email: user.email,
       role: user.role,
+      accountCategory: user.accountCategory || 'standard',
+      landAcres: user.landAcres || 0,
+      fencingType: user.fencingType || '',
+      hasSecurityGuards: user.hasSecurityGuards || false,
       status: user.status,
       contact: user.contact,
       profileImage: user.profileImage || '',

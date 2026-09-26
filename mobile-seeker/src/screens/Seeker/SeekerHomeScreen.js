@@ -204,6 +204,9 @@ export default function SeekerHomeScreen({ navigation }) {
 
   const seekerCoords = getPinnedCoords();
 
+  // Determine if the logged-in seeker is a bank/finance user (used throughout)
+  const isBankSeeker = user?.accountCategory === 'bank_finance_seeker';
+
   // Process spaces with Geocoding distance calculation & proximity sorting
   const processedSpaces = spaces.map((space) => {
     const sLat = space.coordinates?.lat || space.lat || (space.location?.coordinates && space.location.coordinates[1]);
@@ -229,10 +232,10 @@ export default function SeekerHomeScreen({ navigation }) {
       return false;
     }
 
-    // Commercial Storage vs Standard Parking Filter
-    if (spaceCategoryFilter === 'commercial_vehicle_storage') {
+    // Commercial Storage vs Standard Parking Filter - Strictly separated!
+    if (isBankSeeker) {
       if (item.spaceCategory !== 'commercial_vehicle_storage') return false;
-    } else if (spaceCategoryFilter === 'standard') {
+    } else {
       if (item.spaceCategory === 'commercial_vehicle_storage') return false;
     }
 
@@ -433,13 +436,195 @@ export default function SeekerHomeScreen({ navigation }) {
     );
   };
 
+  const renderHeaderControls = () => (
+    <View>
+      {/* Pinned Location Banner */}
+      <TouchableOpacity
+        style={styles.pinnedBanner}
+        onPress={() => setShowPinModal(true)}
+        activeOpacity={0.85}
+      >
+        <Text style={styles.pinnedIcon}>📍</Text>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.pinnedTitle}>
+            {isBankSeeker ? 'SEARCH NEAR SECURED LAND AREA' : 'SEARCH NEAR PINNED LOCATION'}
+          </Text>
+          <Text style={styles.pinnedLocTxt} numberOfLines={1}>{pinnedLocation}</Text>
+        </View>
+        <View style={[styles.changePinBadge, isBankSeeker && { backgroundColor: COLORS.bankAccent }]}>
+          <Text style={styles.changePinTxt}>Change Pin 🎯</Text>
+        </View>
+      </TouchableOpacity>
+
+      {/* Search Bar & Distance Filter Options */}
+      <View style={styles.searchSection}>
+        <View style={styles.searchBar}>
+          <Text style={styles.searchIcon}>🔍</Text>
+          <TextInput
+            style={styles.searchInput}
+            placeholder={
+              isBankSeeker
+                ? 'Search repo yard, land area, or stockyard name...'
+                : 'Search specific area, landmark, or spot name...'
+            }
+            placeholderTextColor={COLORS.textMuted}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
+          {searchQuery ? (
+            <TouchableOpacity onPress={() => setSearchQuery('')} style={{ padding: 4 }}>
+              <Text style={{ color: COLORS.textMuted, fontSize: 13, fontWeight: '700' }}>✕</Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
+
+        {/* Radius Filter Options */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filterScroll}
+        >
+          {RADIUS_OPTIONS.map((opt) => {
+            const isSelected = selectedRadius === opt.value;
+            return (
+              <TouchableOpacity
+                key={opt.label}
+                style={[
+                  styles.filterPill,
+                  isSelected && (isBankSeeker ? { backgroundColor: COLORS.bankAccent, borderColor: COLORS.bankAccent } : styles.filterPillActive)
+                ]}
+                onPress={() => setSelectedRadius(opt.value)}
+                activeOpacity={0.75}
+              >
+                <Text style={[styles.filterPillTxt, isSelected && styles.filterPillTxtActive]}>
+                  {opt.icon} {opt.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+
+          {!isBankSeeker && (
+            <TouchableOpacity
+              style={[styles.filterPill, filterEv && styles.filterPillActive]}
+              onPress={() => setFilterEv(!filterEv)}
+              activeOpacity={0.75}
+            >
+              <Text style={[styles.filterPillTxt, filterEv && styles.filterPillTxtActive]}>
+                ⚡ EV Only
+              </Text>
+            </TouchableOpacity>
+          )}
+        </ScrollView>
+
+        {/* Car Size Fit Filter Bar - STRICTLY for Parking Seeker only */}
+        {!isBankSeeker && (
+          <View style={styles.vehicleFilterBar}>
+            <Text style={styles.vehicleFilterHeader}>🚗 Vehicle Fit:</Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.vehicleFilterScroll}
+            >
+              {VEHICLE_FILTER_OPTIONS.map((opt) => {
+                const isSelected = selectedVehicleType === opt.value;
+                return (
+                  <TouchableOpacity
+                    key={opt.value}
+                    style={[
+                      styles.vehicleFilterPill,
+                      isSelected && styles.vehicleFilterPillActive,
+                    ]}
+                    onPress={() => setSelectedVehicleType(opt.value)}
+                    activeOpacity={0.75}
+                  >
+                    <Text style={[
+                      styles.vehicleFilterTxt,
+                      isSelected && styles.vehicleFilterTxtActive,
+                    ]}>
+                      {opt.icon} {opt.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        )}
+      </View>
+
+      {/* Parking Demand Heat Map Info Banner (or Bank Repo Standards) */}
+      <View style={styles.heatMapBanner}>
+        {isBankSeeker ? (
+          <View>
+            <View style={styles.heatMapHeader}>
+              <Text style={[styles.heatMapTitle, { color: '#38bdf8' }]}>🏢 1+ Acre Verified Stockyards</Text>
+              <View style={[styles.legendPill, { backgroundColor: '#0284c7' }]}>
+                <Text style={{ color: '#fff', fontSize: 10, fontWeight: '800' }}>MIN 1 ACRE</Text>
+              </View>
+            </View>
+            <Text style={styles.heatMapTagline}>
+              High-security yards for Banks & NBFCs with 24/7 security, compound wall & CCTV.
+            </Text>
+          </View>
+        ) : (
+          <View>
+            <View style={styles.heatMapHeader}>
+              <Text style={styles.heatMapTitle}>🔥 Parking Demand Heat Map</Text>
+              <View style={styles.heatMapLegend}>
+                <View style={styles.legendPill}>
+                  <View style={[styles.legendDot, { backgroundColor: '#10b981' }]} />
+                  <Text style={styles.legendTxt}>Easy</Text>
+                </View>
+                <View style={styles.legendPill}>
+                  <View style={[styles.legendDot, { backgroundColor: '#f59e0b' }]} />
+                  <Text style={styles.legendTxt}>Moderate</Text>
+                </View>
+                <View style={styles.legendPill}>
+                  <View style={[styles.legendDot, { backgroundColor: '#ef4444' }]} />
+                  <Text style={styles.legendTxt}>Full</Text>
+                </View>
+              </View>
+            </View>
+            <Text style={styles.heatMapTagline}>Helps users decide before traveling.</Text>
+          </View>
+        )}
+      </View>
+
+      {/* View Mode Toggle Switch (Map vs List) */}
+      <View style={styles.viewModeRow}>
+        <TouchableOpacity
+          style={[styles.viewModeBtn, viewMode === 'map' && styles.viewModeBtnActive]}
+          onPress={() => setViewMode('map')}
+          activeOpacity={0.8}
+        >
+          <Text style={[styles.viewModeTxt, viewMode === 'map' && styles.viewModeTxtActive]}>
+            🗺️ Live Map View ({displaySpaces.length})
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.viewModeBtn, viewMode === 'list' && styles.viewModeBtnActive]}
+          onPress={() => setViewMode('list')}
+          activeOpacity={0.8}
+        >
+          <Text style={[styles.viewModeTxt, viewMode === 'list' && styles.viewModeTxtActive]}>
+            📋 List View ({displaySpaces.length})
+          </Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+
   return (
     <SafeAreaView style={styles.container} edges={['left', 'right']}>
       {/* App Header */}
       <View style={[styles.header, { paddingTop: topPadding + 10 }]}>
         <View>
-          <Text style={styles.welcomeText}>Hello, {user?.name || 'Seeker'} 👋</Text>
-          <Text style={styles.headerSub}>Find secure owner parking nearby</Text>
+          <Text style={styles.welcomeText}>
+            Hello, {user?.name || (isBankSeeker ? 'Bank Partner' : 'Seeker')} 👋
+          </Text>
+          <Text style={[styles.headerSub, isBankSeeker && { color: '#38bdf8' }]}>
+            {isBankSeeker ? 'Find 1+ Acre secure stockyards for repossession' : 'Find secure owner parking nearby'}
+          </Text>
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <TouchableOpacity
@@ -470,207 +655,72 @@ export default function SeekerHomeScreen({ navigation }) {
         </View>
       </View>
 
-      {/* Pinned Location Banner */}
-      <TouchableOpacity
-        style={styles.pinnedBanner}
-        onPress={() => setShowPinModal(true)}
-        activeOpacity={0.85}
-      >
-        <Text style={styles.pinnedIcon}>📍</Text>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.pinnedTitle}>SEARCH NEAR PINNED LOCATION</Text>
-          <Text style={styles.pinnedLocTxt} numberOfLines={1}>{pinnedLocation}</Text>
-        </View>
-        <View style={styles.changePinBadge}>
-          <Text style={styles.changePinTxt}>Change Pin 🎯</Text>
-        </View>
-      </TouchableOpacity>
-
-      {/* Search Bar & Distance Filter Options */}
-      <View style={styles.searchSection}>
-        <View style={styles.searchBar}>
-          <Text style={styles.searchIcon}>🔍</Text>
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search specific area, landmark, or spot name..."
-            placeholderTextColor={COLORS.textMuted}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-          />
-        </View>
-
-        {/* Portal Category Selector: Standard Parking vs Commercial Repo Yards */}
-        <View style={{ flexDirection: 'row', backgroundColor: '#131b2e', borderRadius: 12, padding: 3, marginTop: 10, borderWidth: 1, borderColor: '#1e293b' }}>
-          {[
-            { id: 'all', label: '🌐 All Spaces' },
-            { id: 'standard', label: '🅿️ Parking' },
-            { id: 'commercial_vehicle_storage', label: '🏢 Repo Yards (1+ Ac)' },
-          ].map((cat) => {
-            const isSel = spaceCategoryFilter === cat.id;
-            return (
-              <TouchableOpacity
-                key={cat.id}
-                style={{
-                  flex: cat.id === 'commercial_vehicle_storage' ? 1.4 : 1,
-                  paddingVertical: 7,
-                  borderRadius: 9,
-                  backgroundColor: isSel ? (cat.id === 'commercial_vehicle_storage' ? '#f59e0b' : COLORS.primary) : 'transparent',
-                  alignItems: 'center',
-                }}
-                onPress={() => setSpaceCategoryFilter(cat.id)}
-              >
-                <Text style={{
-                  color: isSel ? (cat.id === 'commercial_vehicle_storage' ? '#000000' : '#ffffff') : '#94a3b8',
-                  fontSize: 11,
-                  fontWeight: '800',
-                }}>
-                  {cat.label}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.filterScroll}
-        >
-          {RADIUS_OPTIONS.map((opt) => {
-            const isSelected = selectedRadius === opt.value;
-            return (
-              <TouchableOpacity
-                key={opt.label}
-                style={[styles.filterPill, isSelected && styles.filterPillActive]}
-                onPress={() => setSelectedRadius(opt.value)}
-                activeOpacity={0.75}
-              >
-                <Text style={[styles.filterPillTxt, isSelected && styles.filterPillTxtActive]}>
-                  {opt.icon} {opt.label}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-
-          <TouchableOpacity
-            style={[styles.filterPill, filterEv && styles.filterPillActive]}
-            onPress={() => setFilterEv(!filterEv)}
-            activeOpacity={0.75}
-          >
-            <Text style={[styles.filterPillTxt, filterEv && styles.filterPillTxtActive]}>
-              ⚡ EV Only
-            </Text>
-          </TouchableOpacity>
-        </ScrollView>
-
-        {/* Car Size Fit Filter Bar */}
-        <View style={styles.vehicleFilterBar}>
-          <Text style={styles.vehicleFilterHeader}>🚗 Vehicle Fit:</Text>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.vehicleFilterScroll}
-          >
-            {VEHICLE_FILTER_OPTIONS.map((opt) => {
-              const isSelected = selectedVehicleType === opt.value;
-              return (
-                <TouchableOpacity
-                  key={opt.value}
-                  style={[
-                    styles.vehicleFilterPill,
-                    isSelected && styles.vehicleFilterPillActive,
-                  ]}
-                  onPress={() => setSelectedVehicleType(opt.value)}
-                  activeOpacity={0.75}
-                >
-                  <Text style={[
-                    styles.vehicleFilterTxt,
-                    isSelected && styles.vehicleFilterTxtActive,
-                  ]}>
-                    {opt.icon} {opt.label}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
-        </View>
-      </View>
-
-      {/* Parking Demand Heat Map Info Banner */}
-      <View style={styles.heatMapBanner}>
-        <View style={styles.heatMapHeader}>
-          <Text style={styles.heatMapTitle}>🔥 Parking Demand Heat Map</Text>
-          <View style={styles.heatMapLegend}>
-            <View style={styles.legendPill}>
-              <View style={[styles.legendDot, { backgroundColor: '#10b981' }]} />
-              <Text style={styles.legendTxt}>Easy</Text>
-            </View>
-            <View style={styles.legendPill}>
-              <View style={[styles.legendDot, { backgroundColor: '#f59e0b' }]} />
-              <Text style={styles.legendTxt}>Moderate</Text>
-            </View>
-            <View style={styles.legendPill}>
-              <View style={[styles.legendDot, { backgroundColor: '#ef4444' }]} />
-              <Text style={styles.legendTxt}>Full</Text>
-            </View>
-          </View>
-        </View>
-        <Text style={styles.heatMapTagline}>Helps users decide before traveling.</Text>
-      </View>
-
-      {/* View Mode Toggle Switch (Map vs List) */}
-      <View style={styles.viewModeRow}>
-        <TouchableOpacity
-          style={[styles.viewModeBtn, viewMode === 'map' && styles.viewModeBtnActive]}
-          onPress={() => setViewMode('map')}
-          activeOpacity={0.8}
-        >
-          <Text style={[styles.viewModeTxt, viewMode === 'map' && styles.viewModeTxtActive]}>
-            🗺️ Live Map View ({displaySpaces.length})
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.viewModeBtn, viewMode === 'list' && styles.viewModeBtnActive]}
-          onPress={() => setViewMode('list')}
-          activeOpacity={0.8}
-        >
-          <Text style={[styles.viewModeTxt, viewMode === 'list' && styles.viewModeTxtActive]}>
-            📋 List View
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Main Content: Map or List */}
+      {/* Main Content: Map or List with Smooth Full-Page Scrolling */}
       {loading ? (
         <View style={styles.centerLoading}>
-          <ActivityIndicator size="large" color={COLORS.primary} />
-          <Text style={styles.loadingTxt}>Fetching owner parking spaces from database...</Text>
+          <ActivityIndicator size="large" color={isBankSeeker ? COLORS.bankAccent : COLORS.primary} />
+          <Text style={styles.loadingTxt}>Fetching available spaces from database...</Text>
         </View>
       ) : viewMode === 'map' ? (
         <View style={{ flex: 1 }}>
-          <DynamicParkingMap
-            userLat={userCoords.lat}
-            userLng={userCoords.lng}
-            userLocationName={pinnedLocation}
-            spots={displaySpaces}
-            selectedSpot={selectedMapSpot}
-            onSelectSpot={(spot, navigateDirectly) => {
-              if (navigateDirectly) {
-                navigation.navigate('SpotDetails', { space: spot });
-              } else {
-                setSelectedMapSpot(spot);
-              }
-            }}
-            onCloseCard={() => setSelectedMapSpot(null)}
-          />
+          {/* Scrollable filter/search controls above the map */}
+          <ScrollView
+            style={{ flexGrow: 0, flexShrink: 0 }}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={() => {
+                  setRefreshing(true);
+                  fetchSpaces();
+                }}
+                tintColor={isBankSeeker ? COLORS.bankAccent : COLORS.primary}
+              />
+            }
+          >
+            {renderHeaderControls()}
+          </ScrollView>
+
+          {/* Map fills the remaining screen height - no scrolling needed */}
+          <View style={{
+            flex: 1,
+            marginHorizontal: 16,
+            marginTop: 4,
+            marginBottom: 8 + insets.bottom,
+            borderRadius: 18,
+            overflow: 'hidden',
+            borderWidth: 1.5,
+            borderColor: isBankSeeker ? 'rgba(56, 189, 248, 0.4)' : 'rgba(37, 99, 235, 0.4)',
+            backgroundColor: '#0f172a',
+          }}>
+            <DynamicParkingMap
+              userLat={userCoords.lat}
+              userLng={userCoords.lng}
+              userLocationName={pinnedLocation}
+              spots={displaySpaces}
+              selectedSpot={selectedMapSpot}
+              onSelectSpot={(spot, navigateDirectly) => {
+                if (navigateDirectly) {
+                  navigation.navigate('SpotDetails', { space: spot });
+                } else {
+                  setSelectedMapSpot(spot);
+                }
+              }}
+              onCloseCard={() => setSelectedMapSpot(null)}
+            />
+          </View>
         </View>
       ) : (
         <FlatList
+          style={{ flex: 1 }}
           data={displaySpaces}
           keyExtractor={(item) => item._id || Math.random().toString()}
           renderItem={renderSpotCard}
-          contentContainerStyle={[styles.listContainer, { paddingBottom: 40 + insets.bottom }]}
+          ListHeaderComponent={renderHeaderControls}
+          contentContainerStyle={[styles.listContainer, { paddingBottom: 60 + insets.bottom }]}
+          showsVerticalScrollIndicator={true}
+          keyboardShouldPersistTaps="handled"
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -678,14 +728,20 @@ export default function SeekerHomeScreen({ navigation }) {
                 setRefreshing(true);
                 fetchSpaces();
               }}
-              tintColor={COLORS.primary}
+              tintColor={isBankSeeker ? COLORS.bankAccent : COLORS.primary}
             />
           }
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
-              <Text style={styles.emptyEmoji}>🅿️</Text>
-              <Text style={styles.emptyTitle}>No Owner Parking Spots Found</Text>
-              <Text style={styles.emptySub}>No owner has added parking spaces in this area yet.</Text>
+              <Text style={styles.emptyEmoji}>{isBankSeeker ? '🏢' : '🅿️'}</Text>
+              <Text style={styles.emptyTitle}>
+                {isBankSeeker ? 'No 1+ Acre Repo Yards Found' : 'No Owner Parking Spots Found'}
+              </Text>
+              <Text style={styles.emptySub}>
+                {isBankSeeker
+                  ? 'No 1+ Acre vehicle storage yards added in this area yet.'
+                  : 'No owner has added parking spaces in this area yet.'}
+              </Text>
             </View>
           }
         />

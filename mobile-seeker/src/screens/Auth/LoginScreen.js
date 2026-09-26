@@ -26,7 +26,7 @@ export default function LoginScreen({ route, navigation }) {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
-  const roleTitle = isBankSeeker ? 'Banks & Finance Login' : 'Seeker Login';
+  const roleTitle = isBankSeeker ? 'Banks & Finance Login' : 'Parking Seeker Login';
   const themeColor = isBankSeeker ? COLORS.bankAccent : COLORS.seekerAccent;
 
   const handleLogin = async () => {
@@ -39,7 +39,7 @@ export default function LoginScreen({ route, navigation }) {
     setLoading(true);
     setErrorMsg('');
     try {
-      await loginForRole('seeker', email.trim(), password);
+      await loginForRole('seeker', email.trim(), password, isBankSeeker ? 'bank_finance_seeker' : 'standard');
     } catch (err) {
       const msg = err.message || 'Invalid credentials';
       setErrorMsg(msg);
@@ -123,7 +123,7 @@ export default function LoginScreen({ route, navigation }) {
         </View>
 
         <Button
-          title={loading ? 'Signing in...' : isBankSeeker ? 'Sign In as Bank / Auto Finance' : 'Sign In as Seeker'}
+          title={loading ? 'Signing in...' : isBankSeeker ? 'Sign In as Bank / Auto Finance' : 'Sign In as Parking Seeker'}
           onPress={handleLogin}
           disabled={loading}
           style={[styles.submitBtn, { backgroundColor: themeColor }]}
@@ -140,7 +140,7 @@ export default function LoginScreen({ route, navigation }) {
             }
           >
             <Text style={[styles.footerLink, { color: themeColor }]}>
-              {isBankSeeker ? 'Register Bank / Repo Dept' : 'Sign Up as Seeker'}
+              {isBankSeeker ? 'Register Bank / Repo Dept' : 'Sign Up as Parking Seeker'}
             </Text>
           </TouchableOpacity>
         </View>

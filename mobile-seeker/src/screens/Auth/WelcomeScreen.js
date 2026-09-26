@@ -26,9 +26,9 @@ export default function WelcomeScreen({ navigation }) {
         </View>
 
         <View style={styles.buttonContainer}>
-          {/* 1. Standard Seeker Login */}
+          {/* 1. Standard Parking Seeker Login */}
           <Button
-            title="Login as Seeker"
+            title="Login as Parking Seeker"
             onPress={() => navigation.navigate('Login', { role: 'seeker', category: 'standard' })}
             style={styles.loginBtn}
           />
@@ -37,7 +37,7 @@ export default function WelcomeScreen({ navigation }) {
             style={styles.registerBtn}
             onPress={() => navigation.navigate('Register', { role: 'seeker', category: 'standard' })}
           >
-            <Text style={styles.registerTxt}>Don't have an account? Sign Up as Seeker</Text>
+            <Text style={styles.registerTxt}>Don't have an account? Sign Up as Parking Seeker</Text>
           </TouchableOpacity>
 
           {/* Divider */}

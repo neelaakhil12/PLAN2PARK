@@ -67,49 +67,11 @@ export default function ProfileScreen() {
     }
   };
 
-  const handleCameraUpload = async () => {
-    try {
-      const cameraPerm = await ImagePicker.requestCameraPermissionsAsync();
-      if (!cameraPerm.granted) {
-        Alert.alert('Camera Permission Required', 'Please allow camera access to take a profile photo.');
-        return;
-      }
-
-      const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ['images'],
-        allowsEditing: false,
-        quality: 0.6,
-        base64: true,
-      });
-
-      if (!result.canceled && result.assets && result.assets.length > 0) {
-        const asset = result.assets[0];
-        const base64Data = asset.base64 ? `data:image/jpeg;base64,${asset.base64}` : asset.uri;
-
-        setUploadingImage(true);
-        setImageLoadError(false);
-        try {
-          await updateProfile({ profileImage: base64Data, passPhoto: base64Data });
-          Alert.alert('Success', 'Profile photo updated successfully! 📸');
-        } catch (err) {
-          console.error('Image upload failed', err);
-          Alert.alert('Upload Error', 'Failed to update profile photo: ' + (err.message || 'Error'));
-        } finally {
-          setUploadingImage(false);
-        }
-      }
-    } catch (e) {
-      console.error('Camera error', e);
-      Alert.alert('Camera Issue', e.message || 'Could not open camera.');
-    }
-  };
-
   const handlePickProfileImage = () => {
     Alert.alert(
       'Update Profile Photo',
-      'Choose how you would like to set your profile picture:',
+      'Select a photo from your device gallery to update your profile photo:',
       [
-        { text: '📷 Take Photo', onPress: handleCameraUpload },
         { text: '🖼️ Choose from Gallery', onPress: handleGalleryUpload },
         { text: 'Cancel', style: 'cancel' },
       ],

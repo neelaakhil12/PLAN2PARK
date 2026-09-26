@@ -617,58 +617,68 @@ export default function AddSpotScreen({ route, navigation }) {
 
   return (
     <SafeAreaView style={styles.container}>
-      <Header title={editingSpot ? "Edit Parking Spot" : "List New Parking Spot"} onBack={() => navigation.goBack()} />
+      <Header
+        title={
+          editingSpot
+            ? (user?.accountCategory === 'vehicle_storage_owner' ? 'Edit Storage Yard' : 'Edit Parking Spot')
+            : (user?.accountCategory === 'vehicle_storage_owner' ? 'List Storage Yard' : 'List New Parking Spot')
+        }
+        onBack={() => navigation.goBack()}
+      />
 
       <ScrollView contentContainerStyle={styles.content}>
-        {/* Category Switcher: Standard Parking vs 1+ Acre Vehicle Storage Yard */}
-        <View style={{ marginBottom: 18 }}>
-          <Text style={styles.label}>Listing Category</Text>
-          <View style={{ flexDirection: 'row', gap: 10, marginTop: 4 }}>
-            <TouchableOpacity
-              style={{
-                flex: 1,
-                padding: 12,
-                borderRadius: 12,
-                borderWidth: 1.5,
-                borderColor: !isVehicleStorageYard ? COLORS.ownerAccent : '#334155',
-                backgroundColor: !isVehicleStorageYard ? 'rgba(124, 58, 237, 0.15)' : COLORS.darkBg,
-                alignItems: 'center',
-              }}
-              onPress={() => setIsVehicleStorageYard(false)}
-              activeOpacity={0.8}
-            >
-              <Text style={{ fontSize: 22, marginBottom: 4 }}>🅿️</Text>
-              <Text style={{ color: !isVehicleStorageYard ? COLORS.white : '#94a3b8', fontSize: 13, fontWeight: '800' }}>
-                Standard Parking
+        {/* Storage Owner Identity Banner - shown only to vehicle_storage_owner */}
+        {user?.accountCategory === 'vehicle_storage_owner' && (
+          <View style={{
+            backgroundColor: 'rgba(245, 158, 11, 0.12)',
+            borderWidth: 1.5,
+            borderColor: '#f59e0b',
+            borderRadius: 14,
+            padding: 14,
+            marginBottom: 18,
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 10,
+          }}>
+            <Text style={{ fontSize: 24 }}>🏢</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: '#fbbf24', fontWeight: '900', fontSize: 13 }}>VEHICLE STORAGE LAND OWNER</Text>
+              <Text style={{ color: '#fef3c7', fontSize: 11, marginTop: 2 }}>
+                You are listing a 1+ Acre commercial vehicle storage yard for Banks & Auto Finance repossession.
               </Text>
-              <Text style={{ color: COLORS.textMuted, fontSize: 10, marginTop: 2, textAlign: 'center' }}>
-                Daily commuter parking slots
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={{
-                flex: 1.2,
-                padding: 12,
-                borderRadius: 12,
-                borderWidth: 1.5,
-                borderColor: isVehicleStorageYard ? COLORS.storageAccent : '#334155',
-                backgroundColor: isVehicleStorageYard ? 'rgba(245, 158, 11, 0.15)' : COLORS.darkBg,
-                alignItems: 'center',
-              }}
-              onPress={() => setIsVehicleStorageYard(true)}
-              activeOpacity={0.8}
-            >
-              <Text style={{ fontSize: 22, marginBottom: 4 }}>🏢</Text>
-              <Text style={{ color: isVehicleStorageYard ? COLORS.white : '#94a3b8', fontSize: 13, fontWeight: '800' }}>
-                Vehicle Storage Yard
-              </Text>
-              <Text style={{ color: COLORS.storageAccent, fontSize: 10, marginTop: 2, fontWeight: '700', textAlign: 'center' }}>
-                Banks & Repo (Min 1 Acre)
-              </Text>
-            </TouchableOpacity>
+            </View>
           </View>
-        </View>
+        )}
+
+        {/* Category Switcher: Only shown if user is NOT a storage owner - storage owners always use commercial_vehicle_storage */}
+        {user?.accountCategory !== 'vehicle_storage_owner' && (
+          <View style={{ marginBottom: 18 }}>
+            <Text style={styles.label}>Listing Category</Text>
+            <View style={{ flexDirection: 'row', gap: 10, marginTop: 4 }}>
+              <TouchableOpacity
+                style={{
+                  flex: 1,
+                  padding: 12,
+                  borderRadius: 12,
+                  borderWidth: 1.5,
+                  borderColor: !isVehicleStorageYard ? COLORS.ownerAccent : '#334155',
+                  backgroundColor: !isVehicleStorageYard ? 'rgba(124, 58, 237, 0.15)' : COLORS.darkBg,
+                  alignItems: 'center',
+                }}
+                onPress={() => setIsVehicleStorageYard(false)}
+                activeOpacity={0.8}
+              >
+                <Text style={{ fontSize: 22, marginBottom: 4 }}>🅿️</Text>
+                <Text style={{ color: !isVehicleStorageYard ? COLORS.white : '#94a3b8', fontSize: 13, fontWeight: '800' }}>
+                  Standard Parking
+                </Text>
+                <Text style={{ color: COLORS.textMuted, fontSize: 10, marginTop: 2, textAlign: 'center' }}>
+                  Daily commuter parking slots
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
 
         {/* ⚠️ Mandatory 1 Acre Policy Warning for Vehicle Storage */}
         {isVehicleStorageYard && (
