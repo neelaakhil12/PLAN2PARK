@@ -759,13 +759,13 @@ router.put('/:id/toggle', protect, ownerOnly, async (req, res) => {
   }
 });
 
-// ─── DELETE /api/spaces/:id  (Owner) ────────────────────────────────────────
-router.delete('/:id', protect, ownerOnly, async (req, res) => {
+// ─── DELETE /api/spaces/:id  (Owner or Admin) ────────────────────────────────
+router.delete('/:id', protect, async (req, res) => {
   try {
     const space = await ParkingSpace.findById(req.params.id);
     if (!space) return res.status(404).json({ message: 'Parking space not found' });
 
-    if (space.ownerId.toString() !== req.user._id.toString()) {
+    if (req.user.role !== 'admin' && space.ownerId.toString() !== req.user._id.toString()) {
       return res.status(401).json({ message: 'Not authorized to delete this space' });
     }
 

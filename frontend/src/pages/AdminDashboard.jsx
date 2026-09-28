@@ -47,6 +47,9 @@ const AdminDashboard = () => {
   const [resolvingId, setResolvingId] = useState(null);
   const [replyText, setReplyText] = useState('');
   const [viewingInvoiceId, setViewingInvoiceId] = useState(null);
+  const [selectedOwnerForDetail, setSelectedOwnerForDetail] = useState(null);
+  const [selectedStorageOwnerForDetail, setSelectedStorageOwnerForDetail] = useState(null);
+  const [selectedSeekerForDetail, setSelectedSeekerForDetail] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(() => typeof window !== 'undefined' && window.innerWidth >= 1024);
   const [bellOpen, setBellOpen] = useState(false);
   const [filterDate, setFilterDate] = useState('');
@@ -398,6 +401,56 @@ const AdminDashboard = () => {
     }
   };
 
+  const handleDeleteUser = async (userId, userName) => {
+    if (!window.confirm(`Are you sure you want to permanently delete user "${userName || 'User'}"? This action cannot be undone and will delete all their listings.`)) return;
+    try {
+      const res = await fetch(`${API_URL}/auth/admin/users/${userId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        alert('User account deleted successfully.');
+        setUsers(prev => prev.filter(u => u._id !== userId));
+        setSpaces(prev => prev.filter(s => (s.ownerId?._id || s.ownerId) !== userId));
+        if (selectedOwnerForDetail?._id === userId) setSelectedOwnerForDetail(null);
+        if (selectedStorageOwnerForDetail?._id === userId) setSelectedStorageOwnerForDetail(null);
+        if (selectedSeekerForDetail?._id === userId) setSelectedSeekerForDetail(null);
+      } else {
+        const err = await res.json();
+        alert(err.message || 'Failed to delete user');
+      }
+    } catch (e) {
+      console.error(e);
+      alert('Error deleting user: ' + e.message);
+    }
+  };
+
+  const handleDeleteSpace = async (spaceId, spaceTitle) => {
+    if (!window.confirm(`Are you sure you want to delete parking space "${spaceTitle || 'Space'}"?`)) return;
+    try {
+      const res = await fetch(`${API_URL}/spaces/${spaceId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        alert('Parking space deleted successfully.');
+        setSpaces(prev => prev.filter(s => s._id !== spaceId));
+      } else {
+        const err = await res.json();
+        alert(err.message || 'Failed to delete parking space');
+      }
+    } catch (e) {
+      console.error(e);
+      alert('Error deleting space: ' + e.message);
+    }
+  };
+
+  useEffect(() => {
+    setSelectedOwnerForDetail(null);
+    setSelectedStorageOwnerForDetail(null);
+    setSelectedSeekerForDetail(null);
+  }, [currentView]);
+
   const handleResolveComplaint = async (id) => {
     const res = await fetch(`${API_URL}/complaints/${id}/resolve`, {
       method: 'PUT',
@@ -559,8 +612,9 @@ const AdminDashboard = () => {
   const sectionTitles = {
     overview: 'Dashboard Overview',
     spaces: 'Parking Spaces Directory & Approvals',
-    owners: 'Parking Owners Directory & Verifications',
-    seekers: 'Parking Seekers (Drivers & Commuters)',
+    owners: '🏢 Space Owners & Listings',
+    'storage-owners': '🚜 Vehicle Storage Land Owners & Yards',
+    seekers: '🚗 Parking Seekers (Drivers & Commuters)',
     users: 'All Registered Platform Users',
     bookings: 'Platform Bookings',
     revenue: 'Revenue Reports & Ledger',
@@ -574,7 +628,8 @@ const AdminDashboard = () => {
   const menuItems = [
     { id: 'overview', path: '/admin/dashboard', label: 'Dashboard Overview', icon: <Layers className="h-4.5 w-4.5" /> },
     { id: 'spaces', path: '/admin/spaces', label: '🅿️ Parking Spaces', icon: <MapPin className="h-4.5 w-4.5 text-indigo-400" /> },
-    { id: 'owners', path: '/admin/owners', label: '🏢 Parking Owners', icon: <UserCheck className="h-4.5 w-4.5 text-amber-400" /> },
+    { id: 'owners', path: '/admin/owners', label: '🏢 Space Owners', icon: <UserCheck className="h-4.5 w-4.5 text-amber-400" /> },
+    { id: 'storage-owners', path: '/admin/storage-owners', label: '🚜 Vehicle Storage Land Owners', icon: <MapPin className="h-4.5 w-4.5 text-emerald-400" /> },
     { id: 'seekers', path: '/admin/seekers', label: '🚗 Parking Seekers', icon: <Car className="h-4.5 w-4.5 text-blue-400" /> },
     { id: 'users', path: '/admin/users', label: '👥 Users Management', icon: <Users className="h-4.5 w-4.5 text-emerald-400" /> },
     { id: 'bookings', path: '/admin/bookings', label: 'Platform Bookings', icon: <ClipboardList className="h-4.5 w-4.5" /> },
@@ -1883,9 +1938,9 @@ const AdminDashboard = () => {
                 );
               })()}
 
-              {/* ── VIEW: PLACE OWNERS (HOSTS) DIRECTORY ────────────────────── */}
+              {/* ── VIEW: SPACE OWNERS (HOSTS) DIRECTORY & DETAILS ────────────────────── */}
               {currentView === 'owners' && (() => {
-                const ownerUsers = users.filter(u => u.role === 'owner');
+                const ownerUsers = users.filter(u => u.role === 'owner' && u.accountCategory !== 'vehicle_storage_owner');
                 const filteredOwners = ownerUsers.filter(o => {
                   if (!usersSearch) return true;
                   const q = usersSearch.toLowerCase();
@@ -1897,6 +1952,230 @@ const AdminDashboard = () => {
                   );
                 });
 
+                // DETAIL VIEW FOR SELECTED SPACE OWNER
+                if (selectedOwnerForDetail) {
+                  const owner = selectedOwnerForDetail;
+                  const ownerSpaces = spaces.filter(s => (s.ownerId?._id || s.ownerId) === owner._id);
+                  const osSummary = ownerSummaries.find(os => os.ownerId === owner._id);
+
+                  return (
+                    <div className="space-y-6 animate-fadeIn">
+                      {/* Back button and quick actions */}
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedOwnerForDetail(null)}
+                          className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors shadow-sm"
+                        >
+                          ← Back to All Space Owners
+                        </button>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteUser(owner._id, owner.name)}
+                            className="inline-flex items-center gap-1.5 px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold transition-colors shadow-sm"
+                          >
+                            <Trash2 className="h-4 w-4" /> Delete Owner Account
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Owner Profile Banner Card */}
+                      <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm">
+                        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                          <div className="flex items-center gap-4">
+                            <div className="w-16 h-16 rounded-2xl bg-amber-100 text-amber-800 font-black text-2xl flex items-center justify-center border border-amber-200 shrink-0">
+                              {owner.name?.charAt(0)?.toUpperCase() || 'H'}
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-2.5 flex-wrap">
+                                <h3 className="font-black text-slate-900 text-xl">{owner.name}</h3>
+                                <StatusBadge status={owner.status} />
+                                <span className="px-2.5 py-0.5 rounded text-xs font-mono font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                                  ID: {owner.uniqueId || 'PO000001'}
+                                </span>
+                              </div>
+                              <p className="text-xs text-slate-500 mt-1">
+                                Space Owner & Host • Member since {new Date(owner.createdAt || Date.now()).toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' })}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-3">
+                            {owner.status === 'pending' && (
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => { handleUserVerify(owner._id, 'verified'); setSelectedOwnerForDetail(prev => ({ ...prev, status: 'verified' })); }}
+                                  className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold px-3 py-1.5 rounded-xl text-xs"
+                                >
+                                  Approve Host
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => { handleUserVerify(owner._id, 'rejected'); setSelectedOwnerForDetail(prev => ({ ...prev, status: 'rejected' })); }}
+                                  className="bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 font-bold px-3 py-1.5 rounded-xl text-xs"
+                                >
+                                  Reject
+                                </button>
+                              </div>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setPayoutOwnerId(owner._id);
+                                setPayoutAmount(osSummary ? osSummary.owedAmount.toString() : '0');
+                              }}
+                              className="bg-slate-900 hover:bg-slate-800 text-white font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-1.5 shadow-sm"
+                            >
+                              <DollarSign className="h-4 w-4" /> Payout / Ledger
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Detailed Profile Grid */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-6 pt-6 border-t border-slate-100 text-xs">
+                          <div className="bg-slate-50 p-3.5 rounded-2xl">
+                            <span className="text-slate-400 block font-semibold mb-1">Email Address</span>
+                            <span className="font-bold text-slate-900 break-all">{owner.email}</span>
+                          </div>
+                          <div className="bg-slate-50 p-3.5 rounded-2xl">
+                            <span className="text-slate-400 block font-semibold mb-1">Contact Phone</span>
+                            <span className="font-mono font-bold text-slate-900">{owner.contact || 'Not provided'}</span>
+                          </div>
+                          <div className="bg-slate-50 p-3.5 rounded-2xl">
+                            <span className="text-slate-400 block font-semibold mb-1">Listed Spots</span>
+                            <span className="font-black text-indigo-600 text-sm">{ownerSpaces.length} Parking Spaces</span>
+                          </div>
+                          <div className="bg-slate-50 p-3.5 rounded-2xl">
+                            <span className="text-slate-400 block font-semibold mb-1">Pending Payout</span>
+                            <span className="font-black text-amber-600 text-sm">₹{osSummary?.owedAmount || 0}</span>
+                          </div>
+                        </div>
+
+                        {/* Bank Details section */}
+                        <div className="mt-4 p-4 rounded-2xl bg-amber-50/50 border border-amber-100 flex flex-wrap items-center justify-between gap-4 text-xs">
+                          <div>
+                            <span className="font-bold text-amber-900 block">Bank Account Settlement Details</span>
+                            <div className="flex flex-wrap items-center gap-4 mt-1 text-slate-600">
+                              <span><strong>Bank:</strong> {owner.bankAccountDetails?.bankName || 'Not added'}</span>
+                              <span><strong>A/C:</strong> {owner.bankAccountDetails?.accountNumber || 'Not added'}</span>
+                              <span><strong>IFSC:</strong> {owner.bankAccountDetails?.ifscCode || 'Not added'}</span>
+                              <span><strong>Holder:</strong> {owner.bankAccountDetails?.accountName || owner.name}</span>
+                            </div>
+                          </div>
+                          <span className="text-[11px] font-bold px-2.5 py-1 bg-white border border-amber-200 text-amber-800 rounded-lg">
+                            Direct Bank Transfer Ready
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Listed Parking Spaces for this Owner */}
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <h4 className="font-extrabold text-slate-800 text-base flex items-center gap-2">
+                            <MapPin className="h-5 w-5 text-indigo-500" />
+                            Listed Parking Spots by {owner.name} ({ownerSpaces.length})
+                          </h4>
+                        </div>
+
+                        {ownerSpaces.length === 0 ? (
+                          <div className="bg-white border border-slate-200 rounded-3xl p-12 text-center text-slate-400 font-bold shadow-sm">
+                            <MapPin className="h-8 w-8 mx-auto mb-2 text-slate-300" />
+                            No parking spaces listed yet by this owner.
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                            {ownerSpaces.map(sp => (
+                              <div key={sp._id} className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
+                                <div className="p-5">
+                                  <div className="flex gap-4">
+                                    <div className="w-28 h-28 rounded-2xl bg-slate-100 overflow-hidden shrink-0 relative">
+                                      <img
+                                        src={sp.image || (sp.images && sp.images[0]) || 'https://images.unsplash.com/photo-1506015391300-4802dc74de2e?w=600&q=80'}
+                                        alt={sp.title || sp.address}
+                                        className="w-full h-full object-cover"
+                                        onError={(e) => { e.target.src = 'https://images.unsplash.com/photo-1506015391300-4802dc74de2e?w=600&q=80'; }}
+                                      />
+                                      {sp.hasEvCharger && (
+                                        <span className="absolute bottom-1.5 left-1.5 bg-emerald-600 text-white text-[8px] font-black px-1.5 py-0.5 rounded shadow">
+                                          ⚡ EV
+                                        </span>
+                                      )}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex items-start justify-between gap-2">
+                                        <h5 className="font-extrabold text-slate-900 text-sm truncate">{sp.title || sp.address}</h5>
+                                        <span className="text-rose-500 font-black text-sm whitespace-nowrap">₹{sp.pricePerHour || 50}/hr</span>
+                                      </div>
+                                      <p className="text-slate-500 text-xs mt-1 line-clamp-2">{sp.address}</p>
+                                      <div className="flex items-center gap-2 mt-2 flex-wrap">
+                                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700">
+                                          Capacity: {sp.totalSlots || 1} slots
+                                        </span>
+                                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700">
+                                          Available: {sp.availableSlots ?? sp.totalSlots}
+                                        </span>
+                                        <StatusBadge status={sp.status} />
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  {/* Vehicle compatibility badges */}
+                                  {sp.suitableVehicles && sp.suitableVehicles.length > 0 && (
+                                    <div className="flex flex-wrap gap-1 mt-3 pt-3 border-t border-slate-100">
+                                      {sp.suitableVehicles.map((v, i) => (
+                                        <span key={i} className="px-2 py-0.5 rounded bg-slate-100 text-slate-600 text-[9px] font-bold uppercase">
+                                          {v}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+
+                                <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between gap-2">
+                                  <div className="flex items-center gap-2">
+                                    {sp.locationLink && (
+                                      <a
+                                        href={sp.locationLink}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="px-2.5 py-1 bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 rounded-lg text-xs font-bold transition-colors inline-flex items-center gap-1"
+                                      >
+                                        <MapPin className="h-3 w-3" /> Map
+                                      </a>
+                                    )}
+                                    <button
+                                      type="button"
+                                      onClick={() => handleToggleSpaceActive(sp._id, sp.isActive !== false)}
+                                      className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
+                                        sp.isActive !== false
+                                          ? 'bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200'
+                                          : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200'
+                                      }`}
+                                    >
+                                      {sp.isActive !== false ? 'Set Offline' : 'Set Live'}
+                                    </button>
+                                  </div>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteSpace(sp._id, sp.title || sp.address)}
+                                    className="px-3 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-bold transition-colors inline-flex items-center gap-1 shadow-sm"
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" /> Delete Spot
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                }
+
+                // DIRECTORY LIST VIEW FOR SPACE OWNERS
                 return (
                   <div className="space-y-6 animate-fadeIn">
                     {/* Header Banner */}
@@ -1904,17 +2183,17 @@ const AdminDashboard = () => {
                       <div>
                         <h3 className="font-extrabold text-slate-800 text-lg flex items-center gap-2">
                           <UserCheck className="h-6 w-6 text-amber-500" />
-                          Parking Owners (Hosts) Directory
+                          Space Owners (Hosts) Directory
                         </h3>
                         <p className="text-xs text-slate-400 mt-0.5">
-                          Driveway providers, land owners, and commercial vehicle storage yard partners.
+                          Driveway providers, residential and commercial parking lot hosts.
                         </p>
                       </div>
 
                       {/* Stat summary pills */}
                       <div className="flex items-center gap-3">
                         <div className="px-3.5 py-1.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs font-bold">
-                          Total Hosts: {ownerUsers.length}
+                          Total Owners: {ownerUsers.length}
                         </div>
                         <div className="px-3.5 py-1.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold">
                           Verified: {ownerUsers.filter(o => o.status === 'verified').length}
@@ -1932,7 +2211,7 @@ const AdminDashboard = () => {
                       <Search className="absolute left-3.5 top-3 h-4 w-4 text-slate-400" />
                       <input
                         type="text"
-                        placeholder="Search hosts by name, email, phone, ID..."
+                        placeholder="Search space owners by name, email, phone, ID..."
                         value={usersSearch}
                         onChange={e => setUsersSearch(e.target.value)}
                         className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-amber-500 shadow-sm"
@@ -1943,7 +2222,7 @@ const AdminDashboard = () => {
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                       {filteredOwners.length === 0 ? (
                         <div className="col-span-full bg-white border border-slate-200 rounded-3xl p-12 text-center text-slate-400 font-bold">
-                          No parking owners found matching search.
+                          No space owners found matching search.
                         </div>
                       ) : (
                         filteredOwners.map(owner => {
@@ -1978,7 +2257,7 @@ const AdminDashboard = () => {
                                     <span className="font-mono font-bold text-slate-800">{owner.contact || 'Not provided'}</span>
                                   </p>
                                   <p className="flex items-center justify-between">
-                                    <span className="text-slate-400">Listed Spaces:</span>
+                                    <span className="text-slate-400">Listed Spots:</span>
                                     <span className="font-black text-indigo-600">{ownerSpaces.length} spots</span>
                                   </p>
                                   {osSummary && (
@@ -1994,42 +2273,57 @@ const AdminDashboard = () => {
                                   <div className="mt-4 pt-3 border-t border-slate-100">
                                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Listed Parking Spots:</p>
                                     <div className="flex flex-wrap gap-1.5">
-                                      {ownerSpaces.map(sp => (
+                                      {ownerSpaces.slice(0, 3).map(sp => (
                                         <span key={sp._id} className="px-2 py-0.5 rounded-lg bg-slate-100 text-slate-700 text-[10px] font-bold truncate max-w-[160px]">
                                           🅿️ {sp.title || sp.address} ({sp.totalSlots} slots)
                                         </span>
                                       ))}
+                                      {ownerSpaces.length > 3 && (
+                                        <span className="px-2 py-0.5 rounded-lg bg-slate-100 text-slate-500 text-[10px] font-bold">
+                                          +{ownerSpaces.length - 3} more
+                                        </span>
+                                      )}
                                     </div>
                                   </div>
                                 )}
                               </div>
 
-                              <div className="mt-5 pt-4 border-t border-slate-100 flex items-center gap-2">
-                                {owner.status === 'pending' ? (
-                                  <>
+                              <div className="mt-5 pt-4 border-t border-slate-100 space-y-2">
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => setSelectedOwnerForDetail(owner)}
+                                    className="flex-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 font-bold py-2 rounded-xl text-xs transition-colors flex items-center justify-center gap-1.5"
+                                  >
+                                    <MapPin className="h-3.5 w-3.5" /> View Details & Spots
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteUser(owner._id, owner.name)}
+                                    className="p-2 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 rounded-xl transition-colors"
+                                    title="Delete Owner Account"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </button>
+                                </div>
+
+                                {owner.status === 'pending' && (
+                                  <div className="flex items-center gap-2 pt-1">
                                     <button
+                                      type="button"
                                       onClick={() => handleUserVerify(owner._id, 'verified')}
-                                      className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-2 rounded-xl text-xs transition-colors"
+                                      className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-1.5 rounded-xl text-xs transition-colors"
                                     >
-                                      Approve Host
+                                      Approve
                                     </button>
                                     <button
+                                      type="button"
                                       onClick={() => handleUserVerify(owner._id, 'rejected')}
-                                      className="flex-1 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 font-bold py-2 rounded-xl text-xs transition-colors"
+                                      className="flex-1 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 font-bold py-1.5 rounded-xl text-xs transition-colors"
                                     >
                                       Reject
                                     </button>
-                                  </>
-                                ) : (
-                                  <button
-                                    onClick={() => {
-                                      setPayoutOwnerId(owner._id);
-                                      setPayoutAmount(osSummary ? osSummary.owedAmount.toString() : '0');
-                                    }}
-                                    className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-2.5 rounded-xl text-xs transition-colors flex items-center justify-center gap-1.5"
-                                  >
-                                    <DollarSign className="h-3.5 w-3.5" /> Payout / Ledger
-                                  </button>
+                                  </div>
                                 )}
                               </div>
                             </div>
@@ -2041,7 +2335,346 @@ const AdminDashboard = () => {
                 );
               })()}
 
-              {/* ── VIEW: PARKING SEEKERS (COMMUTERS) DIRECTORY ─────────────── */}
+              {/* ── VIEW: VEHICLE STORAGE LAND OWNERS DIRECTORY & DETAILS ───────── */}
+              {currentView === 'storage-owners' && (() => {
+                const storageOwners = users.filter(u => u.role === 'owner' && (u.accountCategory === 'vehicle_storage_owner' || (u.landAcres && u.landAcres > 0)));
+                const filteredStorageOwners = storageOwners.filter(o => {
+                  if (!usersSearch) return true;
+                  const q = usersSearch.toLowerCase();
+                  return (
+                    (o.name && o.name.toLowerCase().includes(q)) ||
+                    (o.email && o.email.toLowerCase().includes(q)) ||
+                    (o.contact && o.contact.toLowerCase().includes(q)) ||
+                    (o.uniqueId && o.uniqueId.toLowerCase().includes(q)) ||
+                    (o.organizationName && o.organizationName.toLowerCase().includes(q))
+                  );
+                });
+
+                // DETAIL VIEW FOR SELECTED STORAGE LAND OWNER
+                if (selectedStorageOwnerForDetail) {
+                  const owner = selectedStorageOwnerForDetail;
+                  const ownerSpaces = spaces.filter(s => (s.ownerId?._id || s.ownerId) === owner._id);
+                  const osSummary = ownerSummaries.find(os => os.ownerId === owner._id);
+
+                  return (
+                    <div className="space-y-6 animate-fadeIn">
+                      {/* Back button and quick actions */}
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedStorageOwnerForDetail(null)}
+                          className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors shadow-sm"
+                        >
+                          ← Back to All Storage Land Owners
+                        </button>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteUser(owner._id, owner.name)}
+                            className="inline-flex items-center gap-1.5 px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold transition-colors shadow-sm"
+                          >
+                            <Trash2 className="h-4 w-4" /> Delete Land Owner Account
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Storage Owner Profile Banner Card */}
+                      <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm">
+                        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                          <div className="flex items-center gap-4">
+                            <div className="w-16 h-16 rounded-2xl bg-emerald-100 text-emerald-800 font-black text-2xl flex items-center justify-center border border-emerald-200 shrink-0">
+                              🚜
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-2.5 flex-wrap">
+                                <h3 className="font-black text-slate-900 text-xl">{owner.name}</h3>
+                                <StatusBadge status={owner.status} />
+                                <span className="px-2.5 py-0.5 rounded text-xs font-mono font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                  ID: {owner.uniqueId || 'SO000001'}
+                                </span>
+                              </div>
+                              <p className="text-xs text-slate-500 mt-1">
+                                Vehicle Storage Land Owner • {owner.organizationName || 'Private Land Facility'} • Member since {new Date(owner.createdAt || Date.now()).toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' })}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-3">
+                            {owner.status === 'pending' && (
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => { handleUserVerify(owner._id, 'verified'); setSelectedStorageOwnerForDetail(prev => ({ ...prev, status: 'verified' })); }}
+                                  className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold px-3 py-1.5 rounded-xl text-xs"
+                                >
+                                  Approve Facility
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => { handleUserVerify(owner._id, 'rejected'); setSelectedStorageOwnerForDetail(prev => ({ ...prev, status: 'rejected' })); }}
+                                  className="bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 font-bold px-3 py-1.5 rounded-xl text-xs"
+                                >
+                                  Reject
+                                </button>
+                              </div>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setPayoutOwnerId(owner._id);
+                                setPayoutAmount(osSummary ? osSummary.owedAmount.toString() : '0');
+                              }}
+                              className="bg-slate-900 hover:bg-slate-800 text-white font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-1.5 shadow-sm"
+                            >
+                              <DollarSign className="h-4 w-4" /> Payout / Ledger
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Land & Storage Yard Specifics */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-6 pt-6 border-t border-slate-100 text-xs">
+                          <div className="bg-emerald-50/60 p-3.5 rounded-2xl border border-emerald-100">
+                            <span className="text-emerald-700 block font-semibold mb-1">Land Area (Acres)</span>
+                            <span className="font-black text-emerald-950 text-base">{owner.landAcres ? `${owner.landAcres} Acres` : 'Specified in Listings'}</span>
+                          </div>
+                          <div className="bg-slate-50 p-3.5 rounded-2xl">
+                            <span className="text-slate-400 block font-semibold mb-1">Fencing & Boundary</span>
+                            <span className="font-bold text-slate-900">{owner.fencingType || 'Standard Security Fencing'}</span>
+                          </div>
+                          <div className="bg-slate-50 p-3.5 rounded-2xl">
+                            <span className="text-slate-400 block font-semibold mb-1">24/7 Security Guards</span>
+                            <span className="font-bold text-slate-900">{owner.hasSecurityGuards ? '✅ On-site Guards' : '❌ Automated / Self-lock'}</span>
+                          </div>
+                          <div className="bg-slate-50 p-3.5 rounded-2xl">
+                            <span className="text-slate-400 block font-semibold mb-1">Active Storage Yards</span>
+                            <span className="font-black text-emerald-600 text-base">{ownerSpaces.length} Listed Yards</span>
+                          </div>
+                        </div>
+
+                        {/* Contact & Settlement Grid */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4 text-xs">
+                          <div className="bg-slate-50 p-3.5 rounded-2xl">
+                            <span className="text-slate-400 block font-semibold mb-1">Direct Contact</span>
+                            <p className="font-bold text-slate-900">{owner.contact || 'No phone'} • <span className="font-normal text-slate-600">{owner.email}</span></p>
+                          </div>
+                          <div className="bg-amber-50/50 p-3.5 rounded-2xl border border-amber-100">
+                            <span className="text-amber-800 block font-semibold mb-1">Bank Settlement Account</span>
+                            <p className="font-bold text-slate-900">
+                              {owner.bankAccountDetails?.bankName || 'Bank on file'}: {owner.bankAccountDetails?.accountNumber || 'Pending'} ({owner.bankAccountDetails?.ifscCode || 'IFSC'})
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Listed Storage Yards for this Land Owner */}
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <h4 className="font-extrabold text-slate-800 text-base flex items-center gap-2">
+                            <MapPin className="h-5 w-5 text-emerald-500" />
+                            Vehicle Storage Listed Yards & Spots by {owner.name} ({ownerSpaces.length})
+                          </h4>
+                        </div>
+
+                        {ownerSpaces.length === 0 ? (
+                          <div className="bg-white border border-slate-200 rounded-3xl p-12 text-center text-slate-400 font-bold shadow-sm">
+                            <MapPin className="h-8 w-8 mx-auto mb-2 text-slate-300" />
+                            No vehicle storage yards listed yet by this land owner.
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                            {ownerSpaces.map(sp => (
+                              <div key={sp._id} className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
+                                <div className="p-5">
+                                  <div className="flex gap-4">
+                                    <div className="w-28 h-28 rounded-2xl bg-slate-100 overflow-hidden shrink-0 relative">
+                                      <img
+                                        src={sp.image || (sp.images && sp.images[0]) || 'https://images.unsplash.com/photo-1590674899484-d5640e854abe?w=600&q=80'}
+                                        alt={sp.title || sp.address}
+                                        className="w-full h-full object-cover"
+                                        onError={(e) => { e.target.src = 'https://images.unsplash.com/photo-1590674899484-d5640e854abe?w=600&q=80'; }}
+                                      />
+                                      <span className="absolute top-1.5 left-1.5 bg-black/70 backdrop-blur-md text-white text-[8px] font-black px-1.5 py-0.5 rounded">
+                                        🚜 YARD
+                                      </span>
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex items-start justify-between gap-2">
+                                        <h5 className="font-extrabold text-slate-900 text-sm truncate">{sp.title || sp.address}</h5>
+                                        <span className="text-emerald-600 font-black text-sm whitespace-nowrap">₹{sp.pricePerHour || 50}/hr</span>
+                                      </div>
+                                      <p className="text-slate-500 text-xs mt-1 line-clamp-2">{sp.address}</p>
+                                      <div className="flex items-center gap-2 mt-2 flex-wrap">
+                                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-800">
+                                          Capacity: {sp.totalSlots || 10} bays
+                                        </span>
+                                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700">
+                                          Available: {sp.availableSlots ?? sp.totalSlots}
+                                        </span>
+                                        <StatusBadge status={sp.status} />
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between gap-2">
+                                  <div className="flex items-center gap-2">
+                                    {sp.locationLink && (
+                                      <a
+                                        href={sp.locationLink}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="px-2.5 py-1 bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 rounded-lg text-xs font-bold transition-colors inline-flex items-center gap-1"
+                                      >
+                                        <MapPin className="h-3 w-3" /> Map
+                                      </a>
+                                    )}
+                                    <button
+                                      type="button"
+                                      onClick={() => handleToggleSpaceActive(sp._id, sp.isActive !== false)}
+                                      className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
+                                        sp.isActive !== false
+                                          ? 'bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200'
+                                          : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200'
+                                      }`}
+                                    >
+                                      {sp.isActive !== false ? 'Set Offline' : 'Set Live'}
+                                    </button>
+                                  </div>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteSpace(sp._id, sp.title || sp.address)}
+                                    className="px-3 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-bold transition-colors inline-flex items-center gap-1 shadow-sm"
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" /> Delete Yard
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                }
+
+                // DIRECTORY LIST VIEW FOR STORAGE LAND OWNERS
+                return (
+                  <div className="space-y-6 animate-fadeIn">
+                    {/* Header Banner */}
+                    <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+                      <div>
+                        <h3 className="font-extrabold text-slate-800 text-lg flex items-center gap-2">
+                          <MapPin className="h-6 w-6 text-emerald-500" />
+                          Vehicle Storage Land Owners Directory
+                        </h3>
+                        <p className="text-xs text-slate-400 mt-0.5">
+                          Open land, yard, warehouse, and commercial vehicle storage facility providers.
+                        </p>
+                      </div>
+
+                      {/* Stat summary pills */}
+                      <div className="flex items-center gap-3">
+                        <div className="px-3.5 py-1.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold">
+                          Total Land Owners: {storageOwners.length}
+                        </div>
+                        <div className="px-3.5 py-1.5 rounded-xl bg-slate-100 border border-slate-200 text-slate-800 text-xs font-bold">
+                          Verified: {storageOwners.filter(o => o.status === 'verified').length}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Search Bar */}
+                    <div className="relative max-w-md">
+                      <Search className="absolute left-3.5 top-3 h-4 w-4 text-slate-400" />
+                      <input
+                        type="text"
+                        placeholder="Search storage land owners by name, phone, acres, facility..."
+                        value={usersSearch}
+                        onChange={e => setUsersSearch(e.target.value)}
+                        className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-emerald-500 shadow-sm"
+                      />
+                    </div>
+
+                    {/* Storage Land Owners Cards Grid */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                      {filteredStorageOwners.length === 0 ? (
+                        <div className="col-span-full bg-white border border-slate-200 rounded-3xl p-12 text-center text-slate-400 font-bold">
+                          No vehicle storage land owners found matching search.
+                        </div>
+                      ) : (
+                        filteredStorageOwners.map(owner => {
+                          const ownerSpaces = spaces.filter(s => (s.ownerId?._id || s.ownerId) === owner._id);
+
+                          return (
+                            <div key={owner._id} className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
+                              <div>
+                                <div className="flex items-start justify-between gap-3 mb-3">
+                                  <div className="flex items-center gap-3">
+                                    <div className="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-800 font-black text-lg flex items-center justify-center border border-emerald-200 shrink-0">
+                                      🚜
+                                    </div>
+                                    <div>
+                                      <h4 className="font-extrabold text-slate-900 text-base leading-tight">{owner.name}</h4>
+                                      <span className="inline-block mt-0.5 px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                        ID: {owner.uniqueId || 'SO000001'}
+                                      </span>
+                                    </div>
+                                  </div>
+                                  <StatusBadge status={owner.status} />
+                                </div>
+
+                                <div className="space-y-1.5 text-xs text-slate-600 mt-4 pt-3 border-t border-slate-100">
+                                  <p className="flex items-center justify-between">
+                                    <span className="text-slate-400">Land Area:</span>
+                                    <span className="font-black text-emerald-700">{owner.landAcres ? `${owner.landAcres} Acres` : 'Yard Listed'}</span>
+                                  </p>
+                                  <p className="flex items-center justify-between">
+                                    <span className="text-slate-400">Security:</span>
+                                    <span className="font-medium text-slate-800">{owner.hasSecurityGuards ? '✅ 24/7 Guarded' : 'Fenced Plot'}</span>
+                                  </p>
+                                  <p className="flex items-center justify-between">
+                                    <span className="text-slate-400">Phone:</span>
+                                    <span className="font-mono font-bold text-slate-800">{owner.contact || 'Not provided'}</span>
+                                  </p>
+                                  <p className="flex items-center justify-between">
+                                    <span className="text-slate-400">Email:</span>
+                                    <span className="font-medium text-slate-800 truncate max-w-[180px]">{owner.email}</span>
+                                  </p>
+                                  <p className="flex items-center justify-between">
+                                    <span className="text-slate-400">Storage Yards:</span>
+                                    <span className="font-black text-indigo-600">{ownerSpaces.length} Listed Yards</span>
+                                  </p>
+                                </div>
+                              </div>
+
+                              <div className="mt-5 pt-4 border-t border-slate-100 flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => setSelectedStorageOwnerForDetail(owner)}
+                                  className="flex-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 font-bold py-2 rounded-xl text-xs transition-colors flex items-center justify-center gap-1.5"
+                                >
+                                  <MapPin className="h-3.5 w-3.5" /> View Details & Yards
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteUser(owner._id, owner.name)}
+                                  className="p-2 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 rounded-xl transition-colors"
+                                  title="Delete Land Owner Account"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* ── VIEW: PARKING SEEKERS (COMMUTERS) DIRECTORY & DETAILS ─────────── */}
               {currentView === 'seekers' && (() => {
                 const seekerUsers = users.filter(u => u.role === 'seeker');
                 const filteredSeekers = seekerUsers.filter(s => {
@@ -2055,6 +2688,193 @@ const AdminDashboard = () => {
                   );
                 });
 
+                // DETAIL VIEW FOR SELECTED SEEKER
+                if (selectedSeekerForDetail) {
+                  const seeker = selectedSeekerForDetail;
+                  const seekerBookings = bookings.filter(b => (b.seekerId?._id || b.seekerId) === seeker._id);
+
+                  return (
+                    <div className="space-y-6 animate-fadeIn">
+                      {/* Back button and quick actions */}
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedSeekerForDetail(null)}
+                          className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors shadow-sm"
+                        >
+                          ← Back to All Parking Seekers
+                        </button>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteUser(seeker._id, seeker.name)}
+                            className="inline-flex items-center gap-1.5 px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold transition-colors shadow-sm"
+                          >
+                            <Trash2 className="h-4 w-4" /> Delete Seeker Account
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Seeker Profile Banner Card */}
+                      <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm">
+                        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                          <div className="flex items-center gap-4">
+                            <div className="w-16 h-16 rounded-2xl bg-blue-100 text-blue-800 font-black text-2xl flex items-center justify-center border border-blue-200 shrink-0">
+                              {seeker.name?.charAt(0)?.toUpperCase() || 'D'}
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-2.5 flex-wrap">
+                                <h3 className="font-black text-slate-900 text-xl">{seeker.name}</h3>
+                                <StatusBadge status={seeker.status} />
+                                <span className="px-2.5 py-0.5 rounded text-xs font-mono font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                                  ID: {seeker.uniqueId || 'VO000001'}
+                                </span>
+                              </div>
+                              <p className="text-xs text-slate-500 mt-1">
+                                Parking Seeker & Commuter • Member since {new Date(seeker.createdAt || Date.now()).toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' })}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-3">
+                            <div className="px-4 py-2 bg-emerald-50 border border-emerald-200 rounded-2xl text-right">
+                              <span className="text-[10px] text-emerald-600 font-bold uppercase block">Wallet Balance</span>
+                              <span className="font-black text-emerald-700 text-lg">₹{seeker.walletBalance || 0}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Detailed Profile Grid */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-6 pt-6 border-t border-slate-100 text-xs">
+                          <div className="bg-slate-50 p-3.5 rounded-2xl">
+                            <span className="text-slate-400 block font-semibold mb-1">Email Address</span>
+                            <span className="font-bold text-slate-900 break-all">{seeker.email}</span>
+                            <span className="block mt-1 text-[10px] text-emerald-600 font-bold">
+                              {seeker.isEmailVerified ? '✓ Email Verified' : 'OTP Pending'}
+                            </span>
+                          </div>
+                          <div className="bg-slate-50 p-3.5 rounded-2xl">
+                            <span className="text-slate-400 block font-semibold mb-1">Contact Phone</span>
+                            <span className="font-mono font-bold text-slate-900">{seeker.contact || 'Not provided'}</span>
+                          </div>
+                          <div className="bg-slate-50 p-3.5 rounded-2xl">
+                            <span className="text-slate-400 block font-semibold mb-1">Driving License</span>
+                            <span className="font-mono font-bold text-slate-900">{seeker.driverLicenseNumber || 'On Record'}</span>
+                            {seeker.driverLicenseImage && (
+                              <a href={seeker.driverLicenseImage} target="_blank" rel="noopener noreferrer" className="block text-[10px] text-blue-600 font-bold hover:underline mt-1">
+                                View License Photo ↗
+                              </a>
+                            )}
+                          </div>
+                          <div className="bg-slate-50 p-3.5 rounded-2xl">
+                            <span className="text-slate-400 block font-semibold mb-1">Total Parking Bookings</span>
+                            <span className="font-black text-blue-600 text-sm">{seekerBookings.length} Trips Completed</span>
+                          </div>
+                        </div>
+
+                        {/* Registered Vehicles */}
+                        {seeker.vehicles && seeker.vehicles.length > 0 && (
+                          <div className="mt-4 pt-4 border-t border-slate-100">
+                            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-2">Registered Vehicles:</span>
+                            <div className="flex flex-wrap gap-2">
+                              {seeker.vehicles.map((v, i) => (
+                                <div key={i} className="px-3 py-1.5 rounded-xl bg-slate-100 border border-slate-200 text-xs flex items-center gap-2">
+                                  <Car className="h-3.5 w-3.5 text-blue-600" />
+                                  <span className="font-mono font-bold text-slate-800">{v.plateNumber || v.vehicleNumber}</span>
+                                  <span className="text-slate-500 uppercase text-[10px]">({v.vehicleType || 'Car'})</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Seeker Booking Trips History */}
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <h4 className="font-extrabold text-slate-800 text-base flex items-center gap-2">
+                            <ClipboardList className="h-5 w-5 text-blue-500" />
+                            Parking Trips & Bookings by {seeker.name} ({seekerBookings.length})
+                          </h4>
+                        </div>
+
+                        {seekerBookings.length === 0 ? (
+                          <div className="bg-white border border-slate-200 rounded-3xl p-12 text-center text-slate-400 font-bold shadow-sm">
+                            <Car className="h-8 w-8 mx-auto mb-2 text-slate-300" />
+                            No parking trips booked yet by this commuter.
+                          </div>
+                        ) : (
+                          <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm">
+                            <div className="overflow-x-auto">
+                              <table className="w-full text-sm text-left">
+                                <thead className="bg-slate-50 text-slate-400 text-xs uppercase font-semibold">
+                                  <tr>
+                                    <th className="px-6 py-3.5">Parking Spot</th>
+                                    <th className="px-6 py-3.5">Slot ID</th>
+                                    <th className="px-6 py-3.5">Vehicle</th>
+                                    <th className="px-6 py-3.5">Timing</th>
+                                    <th className="px-6 py-3.5">Amount</th>
+                                    <th className="px-6 py-3.5">Payment</th>
+                                    <th className="px-6 py-3.5">Trip Status</th>
+                                    <th className="px-6 py-3.5 text-right">Invoice</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100 font-medium text-xs">
+                                  {seekerBookings.map(b => (
+                                    <tr key={b._id} className="hover:bg-slate-50 transition-colors">
+                                      <td className="px-6 py-4">
+                                        <p className="font-bold text-slate-900">{b.spaceId?.title || b.spaceId?.address || 'Parking Location'}</p>
+                                        <p className="text-[10px] text-slate-400 truncate max-w-xs">{b.spaceId?.address || 'Hyderabad'}</p>
+                                      </td>
+                                      <td className="px-6 py-4">
+                                        <span className="font-mono font-bold px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">
+                                          {b.slotId || 'A-1'}
+                                        </span>
+                                      </td>
+                                      <td className="px-6 py-4 font-mono font-bold text-slate-800">
+                                        {b.vehicleNumber || b.vehiclePlate || 'TS09XX0000'}
+                                      </td>
+                                      <td className="px-6 py-4 text-slate-600">
+                                        <div>{new Date(b.startTime || b.createdAt).toLocaleDateString()}</div>
+                                        <div className="text-[10px] text-slate-400">
+                                          {new Date(b.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - {new Date(b.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                        </div>
+                                      </td>
+                                      <td className="px-6 py-4 font-black text-slate-900">
+                                        ₹{b.totalAmount || 0}
+                                      </td>
+                                      <td className="px-6 py-4">
+                                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                          b.paymentStatus === 'paid' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
+                                        }`}>
+                                          {b.paymentStatus || 'paid'}
+                                        </span>
+                                      </td>
+                                      <td className="px-6 py-4">
+                                        <StatusBadge status={b.status} />
+                                      </td>
+                                      <td className="px-6 py-4 text-right">
+                                        <button
+                                          type="button"
+                                          onClick={() => setViewingInvoiceId(b._id)}
+                                          className="text-xs font-bold text-blue-600 hover:text-blue-800 hover:underline"
+                                        >
+                                          View Bill
+                                        </button>
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                }
+
+                // DIRECTORY LIST/TABLE VIEW FOR SEEKERS
                 return (
                   <div className="space-y-6 animate-fadeIn">
                     {/* Header Banner */}
@@ -2169,24 +2989,23 @@ const AdminDashboard = () => {
                                       <StatusBadge status={seeker.status} />
                                     </td>
                                     <td className="px-6 py-4 text-right">
-                                      {seeker.status === 'pending' ? (
-                                        <div className="flex items-center justify-end gap-2">
-                                          <button
-                                            onClick={() => handleUserVerify(seeker._id, 'verified')}
-                                            className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold px-3 py-1.5 rounded-lg text-xs transition-colors"
-                                          >
-                                            Approve
-                                          </button>
-                                          <button
-                                            onClick={() => handleUserVerify(seeker._id, 'rejected')}
-                                            className="bg-rose-50 text-rose-600 border border-rose-200 hover:bg-rose-100 font-bold px-3 py-1.5 rounded-lg text-xs transition-colors"
-                                          >
-                                            Reject
-                                          </button>
-                                        </div>
-                                      ) : (
-                                        <span className="text-xs text-slate-400">Verified Seeker</span>
-                                      )}
+                                      <div className="flex items-center justify-end gap-2">
+                                        <button
+                                          type="button"
+                                          onClick={() => setSelectedSeekerForDetail(seeker)}
+                                          className="bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 font-bold px-3 py-1.5 rounded-lg text-xs transition-colors"
+                                        >
+                                          View Details
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => handleDeleteUser(seeker._id, seeker.name)}
+                                          className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 border border-rose-200 rounded-lg transition-colors"
+                                          title="Delete Seeker Account"
+                                        >
+                                          <Trash2 className="h-3.5 w-3.5" />
+                                        </button>
+                                      </div>
                                     </td>
                                   </tr>
                                 );
@@ -2425,16 +3244,26 @@ const AdminDashboard = () => {
                                       </button>
                                     </div>
                                   ) : (
-                                    <button
-                                      onClick={() => handleToggleSpaceActive(space._id, space.isActive !== false)}
-                                      className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
-                                        space.isActive !== false
-                                          ? 'bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200'
-                                          : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200'
-                                      }`}
-                                    >
-                                      {space.isActive !== false ? 'Set Offline' : 'Set Live'}
-                                    </button>
+                                    <div className="flex items-center gap-1.5">
+                                      <button
+                                        onClick={() => handleToggleSpaceActive(space._id, space.isActive !== false)}
+                                        className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
+                                          space.isActive !== false
+                                            ? 'bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200'
+                                            : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200'
+                                        }`}
+                                      >
+                                        {space.isActive !== false ? 'Set Offline' : 'Set Live'}
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleDeleteSpace(space._id, space.title || space.address)}
+                                        className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition-colors border border-rose-200"
+                                        title="Delete Parking Space"
+                                      >
+                                        <Trash2 className="h-4 w-4" />
+                                      </button>
+                                    </div>
                                   )}
                                 </div>
                               </div>

@@ -3,6 +3,7 @@ const router = express.Router();
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const User = require('../models/User');
+const ParkingSpace = require('../models/ParkingSpace');
 const { protect, adminOnly } = require('../middleware/auth');
 const { sendVerificationEmail, sendPasswordResetEmail } = require('../utils/mailer');
 const { generateUniqueId } = require('../utils/generateId');
@@ -467,6 +468,30 @@ router.put('/admin/users/:id/verify', protect, adminOnly, async (req, res) => {
     } else {
       res.status(404).json({ message: 'User not found' });
     }
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// @desc    Delete user account and all their listed spaces (Admin only)
+// @route   DELETE /api/auth/admin/users/:id
+// @access  Private (Admin only)
+router.delete('/admin/users/:id', protect, adminOnly, async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    if (user.role === 'admin') {
+      return res.status(400).json({ message: 'Root system admin cannot be deleted' });
+    }
+
+    // If owner, remove their spaces
+    if (user.role === 'owner') {
+      await ParkingSpace.deleteMany({ ownerId: user._id });
+    }
+
+    await User.findByIdAndDelete(req.params.id);
+    res.json({ message: 'User account and associated records deleted successfully', userId: req.params.id });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
