@@ -24,7 +24,14 @@ export default function AddSpotScreen({ route, navigation }) {
   const { token, user } = useContext(AuthContext);
   const editingSpot = route?.params?.spot || null;
 
-  const [spotImage, setSpotImage] = useState(editingSpot?.image || editingSpot?.imageUrl || '');
+  const [spotImages, setSpotImages] = useState(
+    editingSpot?.images && Array.isArray(editingSpot.images) && editingSpot.images.length > 0
+      ? editingSpot.images
+      : editingSpot?.image || editingSpot?.imageUrl
+      ? [editingSpot.image || editingSpot.imageUrl]
+      : []
+  );
+  const spotImage = spotImages[0] || '';
   const [title, setTitle] = useState(editingSpot?.title || '');
   const [plotNo, setPlotNo] = useState('');
   const [colonyArea, setColonyArea] = useState('');
@@ -60,6 +67,8 @@ export default function AddSpotScreen({ route, navigation }) {
 
   const [loading, setLoading] = useState(false);
   const [locating, setLocating] = useState(false);
+  const [parsingLink, setParsingLink] = useState(false);
+  const [parseSuccessMsg, setParseSuccessMsg] = useState('');
 
   useEffect(() => {
     const s = route?.params?.spot;
@@ -75,8 +84,10 @@ export default function AddSpotScreen({ route, navigation }) {
       setHasEvCharger(Boolean(s.hasEvCharger));
       setIsActive(s.isActive !== false);
       setCancellationPolicy(s.cancellationPolicy || 'full');
-      if (s.image || s.imageUrl) {
-        setSpotImage(s.image || s.imageUrl);
+      if (s.images && Array.isArray(s.images) && s.images.length > 0) {
+        setSpotImages(s.images);
+      } else if (s.image || s.imageUrl) {
+        setSpotImages([s.image || s.imageUrl]);
       }
       if (s.suitableVehicles && s.suitableVehicles.length > 0) {
         setSuitableVehicles(s.suitableVehicles);
@@ -98,21 +109,34 @@ export default function AddSpotScreen({ route, navigation }) {
 
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
-        allowsEditing: true,
-        aspect: [4, 3],
+        allowsMultipleSelection: true,
+        selectionLimit: 8,
         quality: 0.7,
         base64: true,
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        const asset = result.assets[0];
-        const base64Data = asset.base64 ? `data:image/jpeg;base64,${asset.base64}` : asset.uri;
-        setSpotImage(base64Data);
+        const newImgs = result.assets.map((asset) =>
+          asset.base64 ? `data:image/jpeg;base64,${asset.base64}` : asset.uri
+        );
+        setSpotImages((prev) => [...prev, ...newImgs].slice(0, 10));
       }
     } catch (err) {
       console.error('Image picker error:', err);
-      showAlert('Error', 'Could not select photo: ' + (err.message || 'Error'));
+      showAlert('Error', 'Could not select photos: ' + (err.message || 'Error'));
     }
+  };
+
+  const handleRemoveImage = (indexToRemove) => {
+    setSpotImages((prev) => prev.filter((_, idx) => idx !== indexToRemove));
+  };
+
+  const handleSetPrimaryCover = (index) => {
+    setSpotImages((prev) => {
+      const selected = prev[index];
+      const rest = prev.filter((_, idx) => idx !== index);
+      return [selected, ...rest];
+    });
   };
 
   const toggleVehicleType = (typeId) => {
@@ -158,6 +182,156 @@ export default function AddSpotScreen({ route, navigation }) {
       }
     } else if (typeof Alert !== 'undefined' && Alert.alert) {
       Alert.alert(title, message);
+    }
+  };
+
+  const handleMapsLinkChange = (text) => {
+    setGoogleMapsLink(text);
+    const trimmed = (text || '').trim();
+    if (
+      trimmed.startsWith('http') &&
+      (trimmed.includes('maps.app.goo.gl') ||
+        trimmed.includes('goo.gl/maps') ||
+        trimmed.includes('google.com/maps') ||
+        trimmed.includes('maps.google'))
+    ) {
+      handleParseMapsLink(trimmed);
+    }
+  };
+
+  const handleParseMapsLink = async (urlInput) => {
+    const rawUrl = (urlInput !== undefined ? urlInput : googleMapsLink || '').trim();
+    if (!rawUrl) {
+      showAlert('Enter Link', 'Please paste a Google Maps link first.');
+      return;
+    }
+
+    if (!rawUrl.startsWith('http://') && !rawUrl.startsWith('https://')) {
+      showAlert('Invalid Link', 'Please enter a valid Google Maps link starting with http:// or https://');
+      return;
+    }
+
+    setParsingLink(true);
+    setParseSuccessMsg('');
+
+    try {
+      const baseUrl = await getBaseApiUrl();
+      const res = await fetch(`${baseUrl}/spaces/parse-maps-link`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: rawUrl }),
+      });
+
+      if (!res.ok) {
+        throw new Error(`Server returned status ${res.status}`);
+      }
+
+      const data = await res.json();
+      console.log('parse-maps-link result:', data);
+
+      if (data && (data.address || data.fullUrl)) {
+        let finalAddr = data.address || '';
+        let detectedCity = data.city || city || 'Hyderabad';
+        let detectedPin = pincode;
+        let detectedLat = data.lat;
+        let detectedLng = data.lng;
+
+        // Try extracting lat/lng from fullUrl or rawUrl if missing
+        const targetUrl = data.fullUrl || rawUrl;
+        if (!detectedLat || !detectedLng) {
+          const dMatch = targetUrl.match(/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/);
+          if (dMatch) {
+            detectedLat = parseFloat(dMatch[1]);
+            detectedLng = parseFloat(dMatch[2]);
+          } else {
+            const atMatch = targetUrl.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
+            if (atMatch) {
+              detectedLat = parseFloat(atMatch[1]);
+              detectedLng = parseFloat(atMatch[2]);
+            } else {
+              const qMatch = targetUrl.match(/[?&]q=(-?\d+\.\d+),(-?\d+\.\d+)/);
+              if (qMatch) {
+                detectedLat = parseFloat(qMatch[1]);
+                detectedLng = parseFloat(qMatch[2]);
+              }
+            }
+          }
+        }
+
+        // Extract 6-digit Indian PIN code from address if present
+        const pinMatch = finalAddr.match(/\b(5\d{5})\b/);
+        if (pinMatch) {
+          detectedPin = pinMatch[1];
+        }
+
+        // Extract city from address if identifiable
+        const addrLower = finalAddr.toLowerCase();
+        if (addrLower.includes('hyderabad')) {
+          detectedCity = 'Hyderabad';
+        } else if (addrLower.includes('secunderabad')) {
+          detectedCity = 'Secunderabad';
+        } else if (addrLower.includes('cyberabad')) {
+          detectedCity = 'Hyderabad';
+        } else if (data.city) {
+          detectedCity = data.city;
+        }
+
+        if (finalAddr) setAddress(finalAddr);
+        if (detectedCity) setCity(detectedCity);
+        if (detectedPin) setPincode(detectedPin);
+        if (detectedLat) setLat(detectedLat);
+        if (detectedLng) setLng(detectedLng);
+        if (data.plotNo) setPlotNo(data.plotNo);
+        if (data.colonyArea) setColonyArea(data.colonyArea);
+        if (data.landmark) setLandmark(data.landmark);
+
+        // Auto-fill title if empty
+        if (!title && data.colonyArea) {
+          setTitle(`Parking at ${data.colonyArea}`);
+        } else if (!title && finalAddr) {
+          const firstPart = finalAddr.split(',')[0].trim();
+          if (firstPart) setTitle(`Parking near ${firstPart}`);
+        }
+
+        setParseSuccessMsg('✅ Address & location details auto-filled!');
+        setTimeout(() => setParseSuccessMsg(''), 5000);
+
+        showAlert(
+          '📍 Address Auto-Filled!',
+          `Address, City and Location have been extracted and filled from Google Maps!`
+        );
+      } else {
+        setParseSuccessMsg('⚠️ Could not extract address from this link.');
+        setTimeout(() => setParseSuccessMsg(''), 4000);
+      }
+    } catch (err) {
+      console.error('Error parsing maps link:', err);
+      // Client-side fallback: check if coordinates can be extracted directly
+      let dLat = null;
+      let dLng = null;
+      const dMatch = rawUrl.match(/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/);
+      if (dMatch) {
+        dLat = parseFloat(dMatch[1]);
+        dLng = parseFloat(dMatch[2]);
+      } else {
+        const atMatch = rawUrl.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
+        if (atMatch) {
+          dLat = parseFloat(atMatch[1]);
+          dLng = parseFloat(atMatch[2]);
+        }
+      }
+
+      if (dLat && dLng) {
+        setLat(dLat);
+        setLng(dLng);
+        fetchWhatsAppStyleLocations(dLat, dLng);
+        setParseSuccessMsg('✅ Coordinates extracted, resolving address...');
+      } else {
+        setParseSuccessMsg('⚠️ Could not auto-fill. Please type address or use GPS.');
+      }
+      setTimeout(() => setParseSuccessMsg(''), 5000);
+    } finally {
+      setParsingLink(false);
     }
   };
 
@@ -577,8 +751,9 @@ export default function AddSpotScreen({ route, navigation }) {
           locationLink: googleMapsLink,
           lat,
           lng,
-          image: spotImage,
-          imageUrl: spotImage,
+          image: spotImages[0] || spotImage || '',
+          imageUrl: spotImages[0] || spotImage || '',
+          images: spotImages,
           hourlyRate: Number(hourlyRate),
           pricePerHour: Number(hourlyRate),
           totalSpots: Number(totalSpots),
@@ -765,14 +940,47 @@ export default function AddSpotScreen({ route, navigation }) {
           </View>
 
           {/* Google Maps Link Field */}
-          <Text style={styles.label}>Google Maps Link (Optional)</Text>
+          <View style={styles.locationHeaderRow}>
+            <Text style={styles.label}>Google Maps Link (Optional)</Text>
+            <TouchableOpacity
+              style={[styles.locateBtn, { backgroundColor: '#2563eb' }]}
+              onPress={() => handleParseMapsLink(googleMapsLink)}
+              onClick={() => handleParseMapsLink(googleMapsLink)}
+              disabled={parsingLink}
+              activeOpacity={0.8}
+            >
+              {parsingLink ? (
+                <ActivityIndicator size="small" color="#ffffff" />
+              ) : (
+                <Text style={styles.locateBtnTxt}>⚡ Auto-Fill Address</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+
           <TextInput
             style={styles.input}
             placeholder="Paste Google Maps URL or use GPS above"
             placeholderTextColor={COLORS.textMuted}
             value={googleMapsLink}
-            onChangeText={setGoogleMapsLink}
+            onChangeText={handleMapsLinkChange}
           />
+
+          {parsingLink && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6, gap: 6 }}>
+              <ActivityIndicator size="small" color="#60a5fa" />
+              <Text style={{ color: '#60a5fa', fontSize: 12, fontWeight: '600' }}>
+                Fetching address from Google Maps link...
+              </Text>
+            </View>
+          )}
+
+          {!!parseSuccessMsg && (
+            <View style={{ marginTop: 6 }}>
+              <Text style={{ color: '#34d399', fontSize: 12, fontWeight: '700' }}>
+                {parseSuccessMsg}
+              </Text>
+            </View>
+          )}
 
           {/* Rate and Capacity */}
           <View style={styles.row}>
@@ -1016,7 +1224,7 @@ export default function AddSpotScreen({ route, navigation }) {
             </View>
           )}
 
-          {/* Photo Upload Section */}
+          {/* Multi-Photo Upload Section */}
           <View style={{
             marginBottom: 20,
             marginTop: 10,
@@ -1030,53 +1238,155 @@ export default function AddSpotScreen({ route, navigation }) {
               <Text style={{ fontSize: 15, fontWeight: '800', color: COLORS.white }}>
                 {isVehicleStorageYard ? '📸 1+ Acre Land & Yard Photos' : '📸 Parking Spot Photos'}
               </Text>
-              {spotImage ? (
-                <View style={{ backgroundColor: '#10b981', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 }}>
-                  <Text style={{ color: '#ffffff', fontSize: 11, fontWeight: '800' }}>✓ Photo Added</Text>
+              {spotImages.length > 0 ? (
+                <View style={{ backgroundColor: '#10b981', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 }}>
+                  <Text style={{ color: '#ffffff', fontSize: 11, fontWeight: '800' }}>
+                    ✓ {spotImages.length} Photo{spotImages.length > 1 ? 's' : ''} Added
+                  </Text>
                 </View>
               ) : null}
             </View>
             <Text style={{ fontSize: 12, color: '#94a3b8', lineHeight: 18, marginBottom: 12 }}>
               {isVehicleStorageYard
-                ? 'Upload clear photos of your 1+ Acre land, boundary wall, security cabin, or gate so banks & auto finance companies can verify your yard easily.'
-                : 'Upload clear photos of your parking spot, driveway, or garage so drivers and seekers can easily identify and navigate to it.'}
+                ? 'Upload multiple clear photos of your land, compound wall, gate, and security cabin (Up to 8 photos). Seekers can scroll through all photos.'
+                : 'Upload multiple photos of your parking bay, entrance, and driveway (Up to 8 photos). The first photo will be the main cover photo.'}
             </Text>
 
-            {spotImage ? (
-              <View style={{ marginBottom: 8, borderRadius: 12, overflow: 'hidden' }}>
-                <Image
-                  source={{ uri: spotImage }}
-                  style={{ width: '100%', height: 180, borderRadius: 12 }}
-                  resizeMode="cover"
-                />
-                <View style={{ flexDirection: 'row', gap: 10, marginTop: 10 }}>
+            {spotImages.length > 0 ? (
+              <View>
+                {/* Horizontal Scrollable Thumbnails */}
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={{ gap: 10, paddingVertical: 4 }}
+                >
+                  {spotImages.map((imgUri, idx) => (
+                    <View
+                      key={idx}
+                      style={{
+                        width: 140,
+                        height: 120,
+                        borderRadius: 12,
+                        overflow: 'hidden',
+                        backgroundColor: '#0f172a',
+                        borderWidth: 1.5,
+                        borderColor: idx === 0 ? COLORS.ownerAccent : '#334155',
+                        position: 'relative',
+                      }}
+                    >
+                      <Image
+                        source={{ uri: imgUri }}
+                        style={{ width: '100%', height: '100%' }}
+                        resizeMode="cover"
+                      />
+
+                      {/* Cover Badge or Make Cover Action */}
+                      {idx === 0 ? (
+                        <View style={{
+                          position: 'absolute',
+                          bottom: 6,
+                          left: 6,
+                          backgroundColor: 'rgba(124, 58, 237, 0.9)',
+                          paddingHorizontal: 6,
+                          paddingVertical: 2,
+                          borderRadius: 4,
+                        }}>
+                          <Text style={{ color: '#fff', fontSize: 9, fontWeight: '800' }}>⭐ Primary Cover</Text>
+                        </View>
+                      ) : (
+                        <TouchableOpacity
+                          style={{
+                            position: 'absolute',
+                            bottom: 6,
+                            left: 6,
+                            backgroundColor: 'rgba(15, 23, 42, 0.85)',
+                            paddingHorizontal: 6,
+                            paddingVertical: 2,
+                            borderRadius: 4,
+                            borderWidth: 0.5,
+                            borderColor: '#94a3b8',
+                          }}
+                          onPress={() => handleSetPrimaryCover(idx)}
+                        >
+                          <Text style={{ color: '#38bdf8', fontSize: 9, fontWeight: '700' }}>Set Cover</Text>
+                        </TouchableOpacity>
+                      )}
+
+                      {/* Remove Single Photo Button */}
+                      <TouchableOpacity
+                        style={{
+                          position: 'absolute',
+                          top: 6,
+                          right: 6,
+                          backgroundColor: 'rgba(239, 68, 68, 0.9)',
+                          width: 22,
+                          height: 22,
+                          borderRadius: 11,
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                        onPress={() => handleRemoveImage(idx)}
+                      >
+                        <Text style={{ color: '#fff', fontSize: 11, fontWeight: '900', lineHeight: 12 }}>✕</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+
+                  {/* Append More Photos Dashed Card */}
+                  {spotImages.length < 8 && (
+                    <TouchableOpacity
+                      style={{
+                        width: 110,
+                        height: 120,
+                        borderRadius: 12,
+                        borderWidth: 2,
+                        borderStyle: 'dashed',
+                        borderColor: '#475569',
+                        backgroundColor: 'rgba(15, 23, 42, 0.5)',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                      onPress={handlePickImage}
+                      activeOpacity={0.75}
+                    >
+                      <Text style={{ fontSize: 24, marginBottom: 4 }}>➕</Text>
+                      <Text style={{ color: '#94a3b8', fontSize: 11, fontWeight: '700' }}>Add More</Text>
+                    </TouchableOpacity>
+                  )}
+                </ScrollView>
+
+                {/* Bottom Action Buttons */}
+                <View style={{ flexDirection: 'row', gap: 10, marginTop: 12 }}>
                   <TouchableOpacity
                     style={{
                       flex: 1,
                       backgroundColor: 'rgba(56, 189, 248, 0.15)',
                       borderWidth: 1,
                       borderColor: '#38bdf8',
-                      paddingVertical: 10,
+                      paddingVertical: 9,
                       borderRadius: 10,
                       alignItems: 'center',
                     }}
                     onPress={handlePickImage}
                   >
-                    <Text style={{ color: '#38bdf8', fontWeight: '800', fontSize: 13 }}>🔄 Change Photo</Text>
+                    <Text style={{ color: '#38bdf8', fontWeight: '800', fontSize: 12 }}>
+                      📸 + Add More Photos ({spotImages.length}/8)
+                    </Text>
                   </TouchableOpacity>
+
                   <TouchableOpacity
                     style={{
-                      flex: 1,
                       backgroundColor: 'rgba(239, 68, 68, 0.15)',
                       borderWidth: 1,
                       borderColor: '#ef4444',
-                      paddingVertical: 10,
+                      paddingVertical: 9,
+                      paddingHorizontal: 12,
                       borderRadius: 10,
                       alignItems: 'center',
                     }}
-                    onPress={() => setSpotImage('')}
+                    onPress={() => setSpotImages([])}
                   >
-                    <Text style={{ color: '#ef4444', fontWeight: '800', fontSize: 13 }}>🗑️ Remove Photo</Text>
+                    <Text style={{ color: '#ef4444', fontWeight: '800', fontSize: 12 }}>🗑️ Clear All</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -1087,7 +1397,7 @@ export default function AddSpotScreen({ route, navigation }) {
                   borderStyle: 'dashed',
                   borderColor: isVehicleStorageYard ? COLORS.storageAccent : COLORS.ownerAccent,
                   borderRadius: 12,
-                  paddingVertical: 20,
+                  paddingVertical: 22,
                   alignItems: 'center',
                   justifyContent: 'center',
                   backgroundColor: 'rgba(15, 23, 42, 0.6)',
@@ -1099,10 +1409,10 @@ export default function AddSpotScreen({ route, navigation }) {
                   {isVehicleStorageYard ? '🏢' : '📷'}
                 </Text>
                 <Text style={{ color: isVehicleStorageYard ? COLORS.storageAccent : COLORS.ownerAccent, fontWeight: '800', fontSize: 14 }}>
-                  {isVehicleStorageYard ? '+ Upload 1+ Acre Land / Yard Photo' : '+ Upload Parking Spot Photo'}
+                  {isVehicleStorageYard ? '+ Upload 1+ Acre Land Photos (Select Multiple)' : '+ Upload Parking Spot Photos (Select Multiple)'}
                 </Text>
                 <Text style={{ color: '#64748b', fontSize: 11, marginTop: 4 }}>
-                  Tap to select from device gallery
+                  Select multiple photos from device gallery (Up to 8 photos)
                 </Text>
               </TouchableOpacity>
             )}
@@ -1233,10 +1543,22 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     color: COLORS.white,
     fontSize: 14,
+    width: '100%',
+    ...Platform.select({
+      web: {
+        outlineStyle: 'none',
+        boxSizing: 'border-box',
+      },
+    }),
   },
   row: {
     flexDirection: 'row',
     gap: 12,
+    width: '100%',
+  },
+  col: {
+    flex: 1,
+    minWidth: 0,
   },
   switchRow: {
     flexDirection: 'row',

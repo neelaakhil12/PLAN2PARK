@@ -8,6 +8,7 @@ import {
   Alert,
   TouchableOpacity,
   Switch,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -200,7 +201,7 @@ export default function RegisterScreen({ route, navigation }) {
           <Text style={styles.label}>Password</Text>
           <View style={styles.passwordContainer}>
             <TextInput
-              style={[styles.input, { flex: 1, borderWidth: 0, paddingRight: 0 }]}
+              style={styles.passwordInput}
               placeholder="••••••••"
               placeholderTextColor={COLORS.textMuted}
               value={password}
@@ -328,6 +329,11 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     color: COLORS.white,
     fontSize: 15,
+    ...Platform.select({
+      web: {
+        outlineStyle: 'none',
+      },
+    }),
   },
   passwordContainer: {
     flexDirection: 'row',
@@ -337,6 +343,22 @@ const styles = StyleSheet.create({
     borderColor: COLORS.border,
     borderRadius: 12,
     paddingHorizontal: 14,
+  },
+  passwordInput: {
+    flex: 1,
+    backgroundColor: 'transparent',
+    borderWidth: 0,
+    borderColor: 'transparent',
+    borderRadius: 0,
+    paddingVertical: 12,
+    paddingHorizontal: 0,
+    color: COLORS.white,
+    fontSize: 15,
+    ...Platform.select({
+      web: {
+        outlineStyle: 'none',
+      },
+    }),
   },
   eyeBtn: {
     padding: 8,

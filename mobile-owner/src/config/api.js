@@ -25,12 +25,16 @@ export let API_URL = PUBLIC_ONLINE_URL;
 
 export const getImageUrl = (url) => {
   if (!url) return 'https://images.unsplash.com/photo-1506015391300-4802dc74de2e?w=1200&q=80';
-  if (url.startsWith('data:') || url.startsWith('http://') || url.startsWith('https://')) return url;
+  if (url.startsWith('data:')) return url;
+  if (url.startsWith('http://') || url.startsWith('https://')) {
+    if (url.includes('localhost:5000') || url.includes('127.0.0.1:5000')) {
+      return url.replace(/https?:\/\/(localhost|127\.0\.0\.1):5000/, 'http://43.204.235.124:5000');
+    }
+    return url;
+  }
   if (url.startsWith('/uploads/') || url.startsWith('uploads/')) {
     const cleanPath = url.startsWith('/') ? url : `/${url}`;
-    const isLocal = Platform.OS === 'web' && typeof window !== 'undefined' && window?.location && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
-    const baseUrl = isLocal ? 'http://localhost:5000' : 'https://api.plantopark.com';
-    return `${baseUrl}${cleanPath}`;
+    return `http://43.204.235.124:5000${cleanPath}`;
   }
   return url;
 };
@@ -53,6 +57,7 @@ export const endpoints = {
   updateSpace: (id) => `${API_URL}/spaces/${id}`,
   deleteSpace: (id) => `${API_URL}/spaces/${id}`,
   toggleSpaceStatus: (id) => `${API_URL}/spaces/${id}/toggle`,
+  parseMapsLink: `${API_URL}/spaces/parse-maps-link`,
 
   // Bookings
   createBooking: `${API_URL}/bookings`,

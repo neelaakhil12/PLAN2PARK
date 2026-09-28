@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useContext, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -12,6 +12,7 @@ import {
   Platform,
   ActivityIndicator,
   Image,
+  useWindowDimensions,
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { AuthContext } from '../../context/AuthContext';
@@ -46,6 +47,28 @@ const loadRazorpayScript = () => {
 export default function SpotDetailsScreen({ route, navigation }) {
   const space = route.params?.space || {};
   const { user, token } = useContext(AuthContext);
+
+  const { width: windowWidth } = useWindowDimensions();
+  const imageScrollRef = useRef(null);
+  const [activeImgIndex, setActiveImgIndex] = useState(0);
+
+  const spotImagesList = useMemo(() => {
+    let list = [];
+    if (space.images && Array.isArray(space.images) && space.images.length > 0) {
+      list = space.images;
+    } else if (typeof space.images === 'string') {
+      try {
+        const parsed = JSON.parse(space.images);
+        if (Array.isArray(parsed)) list = parsed;
+      } catch (e) {
+        list = space.images.split(',').map((s) => s.trim()).filter(Boolean);
+      }
+    }
+    if (list.length === 0 && (space.image || space.imageUrl)) {
+      list = [space.image || space.imageUrl];
+    }
+    return list.filter(Boolean);
+  }, [space.images, space.image, space.imageUrl]);
 
   const [vehicleNumber, setVehicleNumber] = useState('TS07AB1234');
   const [vehicleType, setVehicleType] = useState('4-wheeler');
@@ -277,13 +300,184 @@ export default function SpotDetailsScreen({ route, navigation }) {
             {space.hasEvCharger && <Text style={styles.evBadge}>⚡ EV CHARGING</Text>}
           </View>
 
-          {(space.image || space.imageUrl) ? (
+          {/* Horizontal Scrollable Images of Parking Spot */}
+          {spotImagesList.length > 1 ? (
+            <View style={{ marginVertical: 10 }}>
+              <View style={{ position: 'relative', borderRadius: 14, overflow: 'hidden' }}>
+                <ScrollView
+                  ref={imageScrollRef}
+                  horizontal
+                  pagingEnabled
+                  showsHorizontalScrollIndicator={false}
+                  onScroll={(e) => {
+                    const contentOffset = e.nativeEvent.contentOffset.x;
+                    const viewWidth = e.nativeEvent.layoutMeasurement.width;
+                    if (viewWidth > 0) {
+                      const idx = Math.round(contentOffset / viewWidth);
+                      setActiveImgIndex(idx);
+                    }
+                  }}
+                  scrollEventThrottle={16}
+                >
+                  {spotImagesList.map((imgItem, idx) => (
+                    <View
+                      key={idx}
+                      style={{
+                        width: Math.min(windowWidth - 32, 400),
+                        height: 200,
+                        backgroundColor: '#0f172a',
+                      }}
+                    >
+                      <Image
+                        source={{ uri: getImageUrl(imgItem) }}
+                        style={{ width: '100%', height: '100%' }}
+                        resizeMode="cover"
+                      />
+                    </View>
+                  ))}
+                </ScrollView>
+
+                {/* Floating Photo Counter Badge */}
+                <View
+                  style={{
+                    position: 'absolute',
+                    top: 10,
+                    right: 10,
+                    backgroundColor: 'rgba(15, 23, 42, 0.85)',
+                    paddingHorizontal: 10,
+                    paddingVertical: 4,
+                    borderRadius: 14,
+                    borderWidth: 1,
+                    borderColor: 'rgba(255, 255, 255, 0.25)',
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 4,
+                  }}
+                >
+                  <Text style={{ color: '#fff', fontSize: 11, fontWeight: '800' }}>
+                    📷 {activeImgIndex + 1} / {spotImagesList.length}
+                  </Text>
+                </View>
+
+                {/* Left / Right Chevron arrows */}
+                {activeImgIndex > 0 && (
+                  <TouchableOpacity
+                    style={{
+                      position: 'absolute',
+                      left: 8,
+                      top: '42%',
+                      backgroundColor: 'rgba(15, 23, 42, 0.75)',
+                      width: 28,
+                      height: 28,
+                      borderRadius: 14,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                    onPress={() => {
+                      const prevIdx = activeImgIndex - 1;
+                      setActiveImgIndex(prevIdx);
+                      const targetWidth = Math.min(windowWidth - 32, 400);
+                      imageScrollRef.current?.scrollTo({ x: prevIdx * targetWidth, animated: true });
+                    }}
+                  >
+                    <Text style={{ color: '#fff', fontSize: 13, fontWeight: '900' }}>‹</Text>
+                  </TouchableOpacity>
+                )}
+
+                {activeImgIndex < spotImagesList.length - 1 && (
+                  <TouchableOpacity
+                    style={{
+                      position: 'absolute',
+                      right: 8,
+                      top: '42%',
+                      backgroundColor: 'rgba(15, 23, 42, 0.75)',
+                      width: 28,
+                      height: 28,
+                      borderRadius: 14,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                    onPress={() => {
+                      const nextIdx = activeImgIndex + 1;
+                      setActiveImgIndex(nextIdx);
+                      const targetWidth = Math.min(windowWidth - 32, 400);
+                      imageScrollRef.current?.scrollTo({ x: nextIdx * targetWidth, animated: true });
+                    }}
+                  >
+                    <Text style={{ color: '#fff', fontSize: 13, fontWeight: '900' }}>›</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+
+              {/* Pagination Dots Indicator */}
+              <View
+                style={{
+                  flexDirection: 'row',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  gap: 6,
+                  marginTop: 8,
+                }}
+              >
+                {spotImagesList.map((_, idx) => (
+                  <TouchableOpacity
+                    key={idx}
+                    onPress={() => {
+                      setActiveImgIndex(idx);
+                      const targetWidth = Math.min(windowWidth - 32, 400);
+                      imageScrollRef.current?.scrollTo({ x: idx * targetWidth, animated: true });
+                    }}
+                    style={{
+                      width: idx === activeImgIndex ? 18 : 6,
+                      height: 6,
+                      borderRadius: 3,
+                      backgroundColor: idx === activeImgIndex ? '#38bdf8' : '#475569',
+                    }}
+                  />
+                ))}
+              </View>
+
+              {/* Quick Thumbnails Row */}
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ gap: 8, marginTop: 8 }}
+              >
+                {spotImagesList.map((imgItem, idx) => (
+                  <TouchableOpacity
+                    key={idx}
+                    onPress={() => {
+                      setActiveImgIndex(idx);
+                      const targetWidth = Math.min(windowWidth - 32, 400);
+                      imageScrollRef.current?.scrollTo({ x: idx * targetWidth, animated: true });
+                    }}
+                    style={{
+                      width: 52,
+                      height: 42,
+                      borderRadius: 8,
+                      overflow: 'hidden',
+                      borderWidth: 2,
+                      borderColor: idx === activeImgIndex ? '#38bdf8' : 'transparent',
+                      opacity: idx === activeImgIndex ? 1 : 0.65,
+                    }}
+                    activeOpacity={0.8}
+                  >
+                    <Image
+                      source={{ uri: getImageUrl(imgItem) }}
+                      style={{ width: '100%', height: '100%' }}
+                      resizeMode="cover"
+                    />
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          ) : (
             <Image
-              source={{ uri: getImageUrl(space.image || space.imageUrl) }}
+              source={{ uri: getImageUrl(spotImagesList[0] || space.image || space.imageUrl) }}
               style={{ width: '100%', height: 190, borderRadius: 12, marginVertical: 10 }}
               resizeMode="cover"
             />
-          ) : null}
+          )}
 
           <Text style={styles.spotTitle}>{space.title || 'Central Safe Parking'}</Text>
           <Text style={styles.spotAddress}>📍 {space.address || 'Hitech City Road'}, {space.city || 'Hyderabad'}</Text>

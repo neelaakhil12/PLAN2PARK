@@ -7,6 +7,7 @@ import {
   ScrollView,
   Alert,
   TouchableOpacity,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -140,7 +141,7 @@ export default function ResetPasswordScreen({ route, navigation }) {
           <Text style={styles.label}>New Password</Text>
           <View style={styles.passwordContainer}>
             <TextInput
-              style={[styles.input, { flex: 1, borderWidth: 0, paddingRight: 0 }]}
+              style={styles.passwordInput}
               placeholder="••••••••"
               placeholderTextColor={COLORS.textMuted}
               value={newPassword}
@@ -165,7 +166,7 @@ export default function ResetPasswordScreen({ route, navigation }) {
           <Text style={styles.label}>Confirm New Password</Text>
           <View style={styles.passwordContainer}>
             <TextInput
-              style={[styles.input, { flex: 1, borderWidth: 0, paddingRight: 0 }]}
+              style={styles.passwordInput}
               placeholder="••••••••"
               placeholderTextColor={COLORS.textMuted}
               value={confirmPassword}
@@ -300,7 +301,23 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.borderDark,
     borderRadius: 12,
-    paddingRight: 10,
+    paddingHorizontal: 14,
+  },
+  passwordInput: {
+    flex: 1,
+    backgroundColor: 'transparent',
+    borderWidth: 0,
+    borderColor: 'transparent',
+    borderRadius: 0,
+    paddingVertical: 12,
+    paddingHorizontal: 0,
+    color: COLORS.white,
+    fontSize: 15,
+    ...Platform.select({
+      web: {
+        outlineStyle: 'none',
+      },
+    }),
   },
   eyeBtn: {
     padding: 8,

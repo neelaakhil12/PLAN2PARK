@@ -227,11 +227,6 @@ export default function SeekerHomeScreen({ navigation }) {
     // Hide offline spaces from seeker list
     if (item.isActive === false) return false;
 
-    // Distance Radius Filter
-    if (selectedRadius !== null && item.calculatedDist !== null && item.calculatedDist > selectedRadius) {
-      return false;
-    }
-
     // Commercial Storage vs Standard Parking Filter - Strictly separated!
     if (isBankSeeker) {
       if (item.spaceCategory !== 'commercial_vehicle_storage') return false;
@@ -239,22 +234,60 @@ export default function SeekerHomeScreen({ navigation }) {
       if (item.spaceCategory === 'commercial_vehicle_storage') return false;
     }
 
-    const queryLower = searchQuery.toLowerCase();
-    const matchesSearch =
-      !searchQuery ||
-      item.title?.toLowerCase().includes(queryLower) ||
-      item.address?.toLowerCase().includes(queryLower) ||
-      item.location?.toLowerCase().includes(queryLower) ||
-      item.city?.toLowerCase().includes(queryLower);
+    // Distance Radius Filter (1 km, 5 km, 10 km, etc.)
+    if (selectedRadius !== null) {
+      if (item.calculatedDist === null || item.calculatedDist === undefined || item.calculatedDist > selectedRadius) {
+        return false;
+      }
+    }
 
-    const matchesEv = filterEv ? item.hasEvCharger : true;
+    // Vehicle Size / Car Fit Filter (hatchback, sedan, suv)
+    let rawVehicles = item.suitableVehicles || [];
+    if (typeof rawVehicles === 'string') {
+      try {
+        rawVehicles = JSON.parse(rawVehicles);
+      } catch (e) {
+        rawVehicles = rawVehicles.split(',').map((s) => s.trim());
+      }
+    }
+    const normalizedVehicles = (Array.isArray(rawVehicles) ? rawVehicles : []).map((v) =>
+      (v || '').toLowerCase().trim()
+    );
 
-    // Vehicle Size / Car Fit Filter
     let matchesVehicle = true;
     if (selectedVehicleType !== 'all') {
-      const sv = item.suitableVehicles || [];
-      matchesVehicle = sv.includes(selectedVehicleType) || sv.includes('4-wheeler') || sv.length === 0;
+      const targetVehicle = selectedVehicleType.toLowerCase();
+      const hasSpecificCarTypes = normalizedVehicles.some((v) =>
+        ['hatchback', 'sedan', 'suv'].includes(v)
+      );
+
+      if (hasSpecificCarTypes) {
+        // Owner explicitly chose vehicle types — strictly enforce!
+        matchesVehicle = normalizedVehicles.includes(targetVehicle);
+      } else {
+        // Legacy spot with generic ['4-wheeler'] or unspecified:
+        // '4-wheeler' fits standard cars (hatchback, sedan), but not large SUVs
+        if (targetVehicle === 'suv') {
+          matchesVehicle = false;
+        } else {
+          matchesVehicle = normalizedVehicles.includes('4-wheeler') || normalizedVehicles.length === 0;
+        }
+      }
     }
+
+    // Search query matching (checks title, address, location, city, and vehicle types)
+    const queryLower = searchQuery.toLowerCase().trim();
+    let matchesSearch = true;
+    if (queryLower) {
+      matchesSearch =
+        (item.title && item.title.toLowerCase().includes(queryLower)) ||
+        (item.address && item.address.toLowerCase().includes(queryLower)) ||
+        (item.location && item.location.toLowerCase().includes(queryLower)) ||
+        (item.city && item.city.toLowerCase().includes(queryLower)) ||
+        normalizedVehicles.some((v) => v.includes(queryLower));
+    }
+
+    const matchesEv = filterEv ? !!item.hasEvCharger : true;
 
     return matchesSearch && matchesEv && matchesVehicle;
   });
@@ -293,13 +326,11 @@ export default function SeekerHomeScreen({ navigation }) {
           <Text style={[styles.spotTitle, { fontSize: 17 }]}>{item.title || 'Bank Vehicle Stockyard'}</Text>
           <Text style={styles.spotAddress}>📍 {item.address || item.location || ''}</Text>
 
-          {(item.image || item.imageUrl) ? (
-            <Image
-              source={{ uri: getImageUrl(item.image || item.imageUrl) }}
-              style={{ width: '100%', height: 135, borderRadius: 10, marginTop: 8 }}
-              resizeMode="cover"
-            />
-          ) : null}
+          <Image
+            source={{ uri: getImageUrl(item.image || item.imageUrl) }}
+            style={{ width: '100%', height: 135, borderRadius: 10, marginTop: 8 }}
+            resizeMode="cover"
+          />
 
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginVertical: 8 }}>
             <View style={{ backgroundColor: '#1e293b', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 }}>
@@ -364,13 +395,11 @@ export default function SeekerHomeScreen({ navigation }) {
         <Text style={styles.spotTitle}>{item.title || item.location || 'Owner Parking Space'}</Text>
         <Text style={styles.spotAddress}>📍 {item.address || item.location || ''}</Text>
 
-        {(item.image || item.imageUrl) ? (
-          <Image
-            source={{ uri: getImageUrl(item.image || item.imageUrl) }}
-            style={{ width: '100%', height: 130, borderRadius: 10, marginTop: 8 }}
-            resizeMode="cover"
-          />
-        ) : null}
+        <Image
+          source={{ uri: getImageUrl(item.image || item.imageUrl) }}
+          style={{ width: '100%', height: 135, borderRadius: 10, marginTop: 8 }}
+          resizeMode="cover"
+        />
 
         {/* Distance + Live Demand Badges Row */}
         <View style={styles.distanceRow}>
@@ -387,8 +416,19 @@ export default function SeekerHomeScreen({ navigation }) {
 
         {/* Vehicle Size Compatibility Badges */}
         <View style={styles.vehicleBadgesRow}>
-          {(item.suitableVehicles && item.suitableVehicles.length > 0 && !item.suitableVehicles.includes('4-wheeler')) ? (
-            item.suitableVehicles.filter((v) => ['hatchback', 'sedan', 'suv'].includes(v)).map((v) => {
+          {(() => {
+            let sv = item.suitableVehicles || [];
+            if (typeof sv === 'string') {
+              try { sv = JSON.parse(sv); } catch (e) { sv = sv.split(',').map((s) => s.trim()); }
+            }
+            const normalized = (Array.isArray(sv) ? sv : []).map((v) => (v || '').toLowerCase().trim());
+            const hasExplicitCars = normalized.some((v) => ['hatchback', 'sedan', 'suv'].includes(v));
+
+            const listToShow = hasExplicitCars
+              ? normalized.filter((v) => ['hatchback', 'sedan', 'suv'].includes(v))
+              : ['hatchback', 'sedan'];
+
+            return listToShow.map((v) => {
               const isMatch = selectedVehicleType === v;
               return (
                 <View key={v} style={[styles.carFitBadge, isMatch && styles.carFitBadgeMatch]}>
@@ -397,20 +437,8 @@ export default function SeekerHomeScreen({ navigation }) {
                   </Text>
                 </View>
               );
-            })
-          ) : (
-            <>
-              <View style={[styles.carFitBadge, selectedVehicleType === 'hatchback' && styles.carFitBadgeMatch]}>
-                <Text style={[styles.carFitBadgeTxt, selectedVehicleType === 'hatchback' && styles.carFitBadgeTxtMatch]}>🚗 Hatchback</Text>
-              </View>
-              <View style={[styles.carFitBadge, selectedVehicleType === 'sedan' && styles.carFitBadgeMatch]}>
-                <Text style={[styles.carFitBadgeTxt, selectedVehicleType === 'sedan' && styles.carFitBadgeTxtMatch]}>🚘 Sedan</Text>
-              </View>
-              <View style={[styles.carFitBadge, selectedVehicleType === 'suv' && styles.carFitBadgeMatch]}>
-                <Text style={[styles.carFitBadgeTxt, selectedVehicleType === 'suv' && styles.carFitBadgeTxtMatch]}>🚙 SUV</Text>
-              </View>
-            </>
-          )}
+            });
+          })()}
         </View>
 
         <Text style={styles.cardTagline}>Helps users decide before traveling.</Text>
@@ -735,13 +763,39 @@ export default function SeekerHomeScreen({ navigation }) {
             <View style={styles.emptyContainer}>
               <Text style={styles.emptyEmoji}>{isBankSeeker ? '🏢' : '🅿️'}</Text>
               <Text style={styles.emptyTitle}>
-                {isBankSeeker ? 'No 1+ Acre Repo Yards Found' : 'No Owner Parking Spots Found'}
+                {searchQuery || selectedRadius !== null || selectedVehicleType !== 'all'
+                  ? 'No Spots Match Current Filters'
+                  : (isBankSeeker ? 'No 1+ Acre Repo Yards Found' : 'No Owner Parking Spots Found')}
               </Text>
               <Text style={styles.emptySub}>
-                {isBankSeeker
-                  ? 'No 1+ Acre vehicle storage yards added in this area yet.'
-                  : 'No owner has added parking spaces in this area yet.'}
+                {searchQuery || selectedRadius !== null || selectedVehicleType !== 'all'
+                  ? `No parking spots found for ${selectedVehicleType !== 'all' ? selectedVehicleType.toUpperCase() : 'selected vehicle'}${selectedRadius ? ` within ${selectedRadius} km` : ''}${searchQuery ? ` matching "${searchQuery}"` : ''}.`
+                  : (isBankSeeker
+                    ? 'No 1+ Acre vehicle storage yards added in this area yet.'
+                    : 'No owner has added parking spaces in this area yet.')}
               </Text>
+              {(searchQuery || selectedRadius !== null || selectedVehicleType !== 'all' || filterEv) && (
+                <TouchableOpacity
+                  style={{
+                    marginTop: 14,
+                    paddingHorizontal: 16,
+                    paddingVertical: 10,
+                    borderRadius: 10,
+                    backgroundColor: COLORS.primary,
+                  }}
+                  onPress={() => {
+                    setSearchQuery('');
+                    setSelectedRadius(null);
+                    setSelectedVehicleType('all');
+                    setFilterEv(false);
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Text style={{ color: '#fff', fontWeight: '800', fontSize: 13 }}>
+                    🔄 Clear All Filters
+                  </Text>
+                </TouchableOpacity>
+              )}
             </View>
           }
         />

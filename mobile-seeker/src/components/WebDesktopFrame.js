@@ -50,6 +50,24 @@ export default function WebDesktopFrame({ children, downloadUrl = "https://expo.
             border: none !important;
             display: block !important;
           }
+          *::-webkit-scrollbar {
+            width: 5px;
+            height: 5px;
+          }
+          *::-webkit-scrollbar-track {
+            background: transparent;
+          }
+          *::-webkit-scrollbar-thumb {
+            background: rgba(148, 163, 184, 0.35);
+            border-radius: 9999px;
+          }
+          *::-webkit-scrollbar-thumb:hover {
+            background: rgba(148, 163, 184, 0.6);
+          }
+          * {
+            scrollbar-width: thin;
+            scrollbar-color: rgba(148, 163, 184, 0.35) transparent;
+          }
         `;
         document.head.appendChild(style);
       }
@@ -157,9 +175,9 @@ const styles = StyleSheet.create({
     fontFamily: 'system-ui, -apple-system, sans-serif',
   },
   phoneContainer: {
-    width: 420,
+    width: 430,
     maxWidth: '94%',
-    height: 840,
+    height: 850,
     maxHeight: '94vh',
     backgroundColor: COLORS.darkBg,
     borderRadius: 44,

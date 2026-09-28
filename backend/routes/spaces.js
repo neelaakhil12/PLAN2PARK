@@ -247,7 +247,27 @@ router.post('/', protect, ownerOnly, upload.single('imageFile'), async (req, res
       });
     }
 
-    const finalImageUrl = formatImageUrl(req, req.file, image || imageUrl);
+    // Parse multiple images if provided
+    let finalImages = [];
+    if (req.body.images) {
+      let rawImages = req.body.images;
+      if (typeof rawImages === 'string') {
+        try {
+          rawImages = JSON.parse(rawImages);
+        } catch (e) {
+          rawImages = rawImages.split(',').map((s) => s.trim()).filter(Boolean);
+        }
+      }
+      if (Array.isArray(rawImages)) {
+        finalImages = rawImages.map((img) => formatImageUrl(req, null, img)).filter(Boolean);
+      }
+    }
+
+    const finalImageUrl = formatImageUrl(req, req.file, image || imageUrl || (finalImages.length > 0 ? finalImages[0] : ''));
+    if (finalImageUrl && !finalImages.includes(finalImageUrl)) {
+      finalImages.unshift(finalImageUrl);
+    }
+
     const finalTotalSlots = Number(totalSlots || totalSpots || (isCommercial ? 100 : 5));
     const finalRate = Number(pricePerHour || hourlyRate || 50);
     const finalAddress = address || location || 'Hyderabad';
@@ -315,6 +335,7 @@ router.post('/', protect, ownerOnly, upload.single('imageFile'), async (req, res
       landAcres: acres,
       securityFacilities: parsedSecurity,
       image: finalImageUrl,
+      images: finalImages,
       coordinates: {
         lat: lat ? parseFloat(lat) : 17.385044,
         lng: lng ? parseFloat(lng) : 78.486671,
@@ -517,6 +538,41 @@ router.put('/admin/reject/:id', protect, adminOnly, async (req, res) => {
   }
 });
 
+// ─── PUT /api/spaces/admin/toggle/:id  (Admin toggle active) ──────────────────
+router.put('/admin/toggle/:id', protect, adminOnly, async (req, res) => {
+  try {
+    const space = await ParkingSpace.findById(req.params.id);
+    if (!space) return res.status(404).json({ message: 'Space not found' });
+
+    space.isActive = req.body.isActive !== undefined ? Boolean(req.body.isActive) : !space.isActive;
+    await space.save();
+    res.json({ message: `Space is now ${space.isActive ? 'active' : 'inactive'}`, space });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// ─── PUT /api/spaces/:id/approve  (Admin alias) ──────────────────────────────
+router.put('/:id/approve', protect, adminOnly, async (req, res) => {
+  try {
+    const space = await ParkingSpace.findById(req.params.id);
+    if (!space) return res.status(404).json({ message: 'Space not found' });
+
+    space.status = req.body.status || 'approved';
+    if (req.body.slotPrefix && space.slots) {
+      const prefix = req.body.slotPrefix;
+      space.slots = space.slots.map((s, idx) => ({
+        ...s.toObject(),
+        slotId: `${prefix}${idx + 1}`
+      }));
+    }
+    await space.save();
+    res.json({ message: `Space ${space.status} successfully`, space });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
 // ─── PUT & PATCH /api/spaces/:id/toggle  (Owner — toggle space active/inactive) ───
 const toggleHandler = async (req, res) => {
   try {
@@ -541,9 +597,22 @@ const toggleHandler = async (req, res) => {
 router.put('/:id/toggle', protect, ownerOnly, toggleHandler);
 router.patch('/:id/toggle', protect, ownerOnly, toggleHandler);
 
+// ─── GET /api/spaces/pending (Alias for Admin) ──────────────────────────────
+router.get('/pending', protect, adminOnly, async (req, res) => {
+  try {
+    const spaces = await ParkingSpace.find({ status: 'pending' }).populate('ownerId', 'name email contact');
+    res.json(spaces);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
 // ─── GET /api/spaces/:id  (Public / Seeker) ──────────────────────────────────
 router.get('/:id', async (req, res) => {
   try {
+    if (!req.params.id || req.params.id === 'pending' || req.params.id === 'undefined' || req.params.id.length !== 24) {
+      return res.status(404).json({ message: 'Invalid space ID' });
+    }
     const space = await ParkingSpace.findById(req.params.id).populate('ownerId', 'name email contact');
     if (!space) return res.status(404).json({ message: 'Space not found' });
     const [enriched] = await enrichSpaceWithSlotAvailability([space]);
@@ -575,6 +644,23 @@ router.put('/:id', protect, ownerOnly, upload.single('imageFile'), async (req, r
       space.image = `/uploads/${req.file.filename}`;
     } else if (req.body.image || req.body.imageUrl) {
       space.image = formatImageUrl(req, null, req.body.image || req.body.imageUrl);
+    }
+
+    if (req.body.images) {
+      let rawImages = req.body.images;
+      if (typeof rawImages === 'string') {
+        try {
+          rawImages = JSON.parse(rawImages);
+        } catch (e) {
+          rawImages = rawImages.split(',').map((s) => s.trim()).filter(Boolean);
+        }
+      }
+      if (Array.isArray(rawImages)) {
+        space.images = rawImages.map((img) => formatImageUrl(req, null, img)).filter(Boolean);
+        if (space.images.length > 0 && !space.image) {
+          space.image = space.images[0];
+        }
+      }
     }
 
     // ── Other field updates ──────────────────────────────────────────────────

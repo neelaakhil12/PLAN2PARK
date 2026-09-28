@@ -92,8 +92,12 @@ const parkingSpaceSchema = new mongoose.Schema(
       isGated: { type: Boolean, default: true },
     },
     image: {
-      type: String, // Stores Cloudinary URL or placeholder URL
+      type: String, // Stores primary image URL
       default: '',
+    },
+    images: {
+      type: [String], // Stores array of image URLs for gallery/horizontal scroll
+      default: [],
     },
     status: {
       type: String,

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, Platform, TouchableOpacity, Linking } from 'react-native';
 import { COLORS } from '../theme/colors';
 
@@ -18,6 +18,37 @@ const GooglePlayLogo = () => {
 };
 
 export default function WebDesktopFrame({ children, downloadUrl = "https://expo.dev/accounts/sailaksh123/projects/plantopark-owner/builds/9cc00d17-30bd-4906-a5cd-d92707e963ca" }) {
+  useEffect(() => {
+    if (Platform.OS === 'web' && typeof document !== 'undefined') {
+      const styleId = 'plan2park-web-scrollbars';
+      if (!document.getElementById(styleId)) {
+        const style = document.createElement('style');
+        style.id = styleId;
+        style.innerHTML = `
+          *::-webkit-scrollbar {
+            width: 5px;
+            height: 5px;
+          }
+          *::-webkit-scrollbar-track {
+            background: transparent;
+          }
+          *::-webkit-scrollbar-thumb {
+            background: rgba(148, 163, 184, 0.35);
+            border-radius: 9999px;
+          }
+          *::-webkit-scrollbar-thumb:hover {
+            background: rgba(148, 163, 184, 0.6);
+          }
+          * {
+            scrollbar-width: thin;
+            scrollbar-color: rgba(148, 163, 184, 0.35) transparent;
+          }
+        `;
+        document.head.appendChild(style);
+      }
+    }
+  }, []);
+
   if (Platform.OS !== 'web') {
     return <>{children}</>;
   }
@@ -123,9 +154,9 @@ const styles = StyleSheet.create({
     fontFamily: 'system-ui, -apple-system, sans-serif',
   },
   phoneContainer: {
-    width: 420,
+    width: 430,
     maxWidth: '94%',
-    height: 840,
+    height: 850,
     maxHeight: '94vh',
     backgroundColor: COLORS.darkBg,
     borderRadius: 44,
