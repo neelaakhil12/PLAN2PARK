@@ -573,14 +573,14 @@ router.put('/:id/approve', protect, adminOnly, async (req, res) => {
   }
 });
 
-// ─── PUT & PATCH /api/spaces/:id/toggle  (Owner — toggle space active/inactive) ───
+// ─── PUT & PATCH /api/spaces/:id/toggle  (Owner or Admin — toggle space active/inactive) ───
 const toggleHandler = async (req, res) => {
   try {
     const space = await ParkingSpace.findById(req.params.id);
     if (!space) return res.status(404).json({ message: 'Parking space not found' });
 
-    if (space.ownerId.toString() !== req.user._id.toString()) {
-      return res.status(401).json({ message: 'Not authorized to toggle this space' });
+    if (req.user.role !== 'admin' && space.ownerId.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: 'Not authorized to toggle this space' });
     }
 
     if (req.body && typeof req.body.isActive === 'boolean') {
@@ -594,8 +594,8 @@ const toggleHandler = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
-router.put('/:id/toggle', protect, ownerOnly, toggleHandler);
-router.patch('/:id/toggle', protect, ownerOnly, toggleHandler);
+router.put('/:id/toggle', protect, toggleHandler);
+router.patch('/:id/toggle', protect, toggleHandler);
 
 // ─── GET /api/spaces/pending (Alias for Admin) ──────────────────────────────
 router.get('/pending', protect, adminOnly, async (req, res) => {
@@ -622,14 +622,14 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// ─── PUT /api/spaces/:id  (Owner update — supports image file replace) ────────
-router.put('/:id', protect, ownerOnly, upload.single('imageFile'), async (req, res) => {
+// ─── PUT /api/spaces/:id  (Owner or Admin update — supports image file replace) ──
+router.put('/:id', protect, upload.single('imageFile'), async (req, res) => {
   try {
     const space = await ParkingSpace.findById(req.params.id);
     if (!space) return res.status(404).json({ message: 'Parking space not found' });
 
-    if (space.ownerId.toString() !== req.user._id.toString()) {
-      return res.status(401).json({ message: 'Not authorized to update this space' });
+    if (req.user.role !== 'admin' && space.ownerId.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: 'Not authorized to update this space' });
     }
 
     // ── Image handling ───────────────────────────────────────────────────────
@@ -735,26 +735,22 @@ router.put('/:id', protect, ownerOnly, upload.single('imageFile'), async (req, r
   }
 });
 
-// ─── PUT /api/spaces/:id/toggle  (Owner toggle Active/Offline) ────────────────
-router.put('/:id/toggle', protect, ownerOnly, async (req, res) => {
+// ─── DELETE /api/spaces/admin/:id  (Admin only) ──────────────────────────────
+router.delete('/admin/:id', protect, adminOnly, async (req, res) => {
   try {
     const space = await ParkingSpace.findById(req.params.id);
     if (!space) return res.status(404).json({ message: 'Parking space not found' });
 
-    if (space.ownerId.toString() !== req.user._id.toString()) {
-      return res.status(401).json({ message: 'Not authorized to update this space' });
+    if (space.image && space.image.startsWith('/uploads/')) {
+      const imgPath = path.join(__dirname, '..', space.image);
+      if (fs.existsSync(imgPath)) {
+        try { fs.unlinkSync(imgPath); } catch (e) { console.warn(e.message); }
+      }
     }
 
-    if (req.body.isActive !== undefined) {
-      space.isActive = req.body.isActive === true || req.body.isActive === 'true' || req.body.isActive === 1 || req.body.isActive === '1';
-    } else {
-      space.isActive = !space.isActive;
-    }
-
-    const updated = await space.save();
-    res.json({ message: 'Space status toggled successfully', space: updated, isActive: space.isActive });
+    await space.deleteOne();
+    res.json({ message: 'Parking space removed successfully by admin' });
   } catch (error) {
-    console.error('Toggle error:', error);
     res.status(500).json({ message: error.message });
   }
 });
@@ -766,7 +762,7 @@ router.delete('/:id', protect, async (req, res) => {
     if (!space) return res.status(404).json({ message: 'Parking space not found' });
 
     if (req.user.role !== 'admin' && space.ownerId.toString() !== req.user._id.toString()) {
-      return res.status(401).json({ message: 'Not authorized to delete this space' });
+      return res.status(403).json({ message: 'Not authorized to delete this space' });
     }
 
     if (space.image && space.image.startsWith('/uploads/')) {

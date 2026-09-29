@@ -428,15 +428,21 @@ const AdminDashboard = () => {
   const handleDeleteSpace = async (spaceId, spaceTitle) => {
     if (!window.confirm(`Are you sure you want to delete parking space "${spaceTitle || 'Space'}"?`)) return;
     try {
-      const res = await fetch(`${API_URL}/spaces/${spaceId}`, {
+      let res = await fetch(`${API_URL}/spaces/admin/${spaceId}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` }
       });
+      if (!res.ok) {
+        res = await fetch(`${API_URL}/spaces/${spaceId}`, {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${token}` }
+        });
+      }
       if (res.ok) {
         alert('Parking space deleted successfully.');
         setSpaces(prev => prev.filter(s => s._id !== spaceId));
       } else {
-        const err = await res.json();
+        const err = await res.json().catch(() => ({}));
         alert(err.message || 'Failed to delete parking space');
       }
     } catch (e) {
@@ -1918,14 +1924,26 @@ const AdminDashboard = () => {
                                   <td className="px-6 py-4"><StatusBadge status={u.status} /></td>
                                   <td className="px-6 py-4 text-slate-400 text-xs">{new Date(u.createdAt).toLocaleDateString()}</td>
                                   <td className="px-6 py-4 text-right">
-                                    {u.status === 'pending' ? (
-                                      <div className="flex items-center justify-end gap-2">
-                                        <button onClick={() => handleUserVerify(u._id, 'verified')} className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold px-3 py-1.5 rounded-lg text-xs transition-colors">Approve</button>
-                                        <button onClick={() => handleUserVerify(u._id, 'rejected')} className="bg-rose-50 text-rose-600 border border-rose-200 hover:bg-rose-100 font-bold px-3 py-1.5 rounded-lg text-xs transition-colors">Reject</button>
-                                      </div>
-                                    ) : (
-                                      <span className="text-slate-400 text-xs font-medium">Reviewed</span>
-                                    )}
+                                    <div className="flex items-center justify-end gap-2">
+                                      {u.status === 'pending' ? (
+                                        <>
+                                          <button onClick={() => handleUserVerify(u._id, 'verified')} className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold px-3 py-1.5 rounded-lg text-xs transition-colors">Approve</button>
+                                          <button onClick={() => handleUserVerify(u._id, 'rejected')} className="bg-rose-50 text-rose-600 border border-rose-200 hover:bg-rose-100 font-bold px-3 py-1.5 rounded-lg text-xs transition-colors">Reject</button>
+                                        </>
+                                      ) : (
+                                        <span className="text-slate-400 text-xs font-medium">Reviewed</span>
+                                      )}
+                                      {u.role !== 'admin' && (
+                                        <button
+                                          type="button"
+                                          onClick={() => handleDeleteUser(u._id, u.name)}
+                                          className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 border border-rose-200 rounded-lg transition-colors"
+                                          title="Delete User Account"
+                                        >
+                                          <Trash2 className="h-3.5 w-3.5" />
+                                        </button>
+                                      )}
+                                    </div>
                                   </td>
                                 </tr>
                               ))

@@ -4,6 +4,7 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const User = require('../models/User');
 const ParkingSpace = require('../models/ParkingSpace');
+const Booking = require('../models/Booking');
 const { protect, adminOnly } = require('../middleware/auth');
 const { sendVerificationEmail, sendPasswordResetEmail } = require('../utils/mailer');
 const { generateUniqueId } = require('../utils/generateId');
@@ -473,7 +474,7 @@ router.put('/admin/users/:id/verify', protect, adminOnly, async (req, res) => {
   }
 });
 
-// @desc    Delete user account and all their listed spaces (Admin only)
+// @desc    Delete user account and all their listed spaces / bookings (Admin only)
 // @route   DELETE /api/auth/admin/users/:id
 // @access  Private (Admin only)
 router.delete('/admin/users/:id', protect, adminOnly, async (req, res) => {
@@ -485,9 +486,19 @@ router.delete('/admin/users/:id', protect, adminOnly, async (req, res) => {
       return res.status(400).json({ message: 'Root system admin cannot be deleted' });
     }
 
-    // If owner, remove their spaces
+    // If owner (Space Host or Vehicle Storage Land Owner), remove all their spaces and related bookings
     if (user.role === 'owner') {
-      await ParkingSpace.deleteMany({ ownerId: user._id });
+      const userSpaces = await ParkingSpace.find({ ownerId: user._id });
+      const spaceIds = userSpaces.map(s => s._id);
+      if (spaceIds.length > 0) {
+        await Booking.deleteMany({ spaceId: { $in: spaceIds } });
+        await ParkingSpace.deleteMany({ ownerId: user._id });
+      }
+    }
+
+    // If seeker (or has bookings), remove their bookings
+    if (user.role === 'seeker') {
+      await Booking.deleteMany({ seekerId: user._id });
     }
 
     await User.findByIdAndDelete(req.params.id);
