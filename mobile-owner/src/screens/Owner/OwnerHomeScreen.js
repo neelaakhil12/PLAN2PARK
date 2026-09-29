@@ -173,12 +173,16 @@ export default function OwnerHomeScreen({ navigation }) {
       >
         {/* Metric Cards */}
         <View style={styles.metricsRow}>
-          <View style={styles.metricCard}>
+          <TouchableOpacity
+            style={styles.metricCard}
+            onPress={() => navigation.navigate('Wallet')}
+            activeOpacity={0.8}
+          >
             <Text style={styles.metricVal}>
               ₹{Number(totalEarnings).toFixed(2).replace(/\.00$/, '')}
             </Text>
-            <Text style={styles.metricLabel}>Total Earnings (100% Payout)</Text>
-          </View>
+            <Text style={styles.metricLabel}>Wallet & Payouts →</Text>
+          </TouchableOpacity>
           <TouchableOpacity
             style={styles.metricCard}
             onPress={() => navigation.navigate('Orders')}

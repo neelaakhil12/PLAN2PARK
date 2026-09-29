@@ -8,6 +8,7 @@ const { protect, adminOnly, ownerOnly, seekerOnly } = require('../middleware/aut
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const { getCommissionRate } = require('./wallet');
 
 const uploadsDir = path.join(__dirname, '../uploads');
 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
@@ -20,6 +21,63 @@ const diskStorage = multer.diskStorage({
   },
 });
 const upload = multer({ storage: diskStorage });
+
+// Helper to calculate commission split and credit net earnings to owner's wallet
+const processBookingPaymentAndCreditOwner = async (booking) => {
+  try {
+    const grossAmount = (booking.totalAmount || 0) + (booking.walletAmountUsed || 0);
+    if (grossAmount <= 0) return;
+
+    const commissionRate = await getCommissionRate();
+    const adminCommission = Math.round(grossAmount * (commissionRate / 100) * 100) / 100;
+    const ownerEarnings = Math.max(0, Math.round((grossAmount - adminCommission) * 100) / 100);
+
+    booking.adminCommission = adminCommission;
+    booking.ownerEarnings = ownerEarnings;
+    booking.paidAt = booking.paidAt || new Date();
+    await booking.save();
+
+    // Credit Space / Yard Owner's Wallet
+    const space = await ParkingSpace.findById(booking.spaceId);
+    if (space && space.ownerId) {
+      const owner = await User.findById(space.ownerId);
+      if (owner) {
+        owner.walletBalance = Number(((owner.walletBalance || 0) + ownerEarnings).toFixed(2));
+        if (!owner.walletTransactions) owner.walletTransactions = [];
+        owner.walletTransactions.push({
+          type: 'credit',
+          amount: ownerEarnings,
+          description: `Booking #${booking._id.toString().slice(-6).toUpperCase()} at ${space.title || 'Spot'} (Gross: ₹${grossAmount} - ${commissionRate}% Platform Fee: ₹${adminCommission})`,
+          bookingId: booking._id,
+          date: new Date(),
+        });
+        await owner.save();
+
+        // Send Real-Time Notification to Owner
+        try {
+          await Notification.create({
+            userId: owner._id,
+            targetRole: 'owner',
+            type: 'wallet_credit',
+            title: '💰 Wallet Credited!',
+            message: `₹${ownerEarnings} credited to your wallet for booking at ${space.title || 'your parking spot'} (Net after ${commissionRate}% fee).`,
+            data: {
+              bookingId: booking._id,
+              spaceId: space._id,
+              amount: ownerEarnings,
+              grossAmount,
+              adminCommission,
+            },
+          });
+        } catch (notifErr) {
+          console.warn('Owner credit notification error:', notifErr.message);
+        }
+      }
+    }
+  } catch (err) {
+    console.error('Error crediting owner wallet for booking:', err);
+  }
+};
 
 // @desc    Create a parking booking request (Seeker)
 // @route   POST /api/bookings
@@ -155,6 +213,10 @@ router.post('/', protect, seekerOnly, upload.single('driverImageFile'), async (r
       paymentStatus: isFullyPaidByWallet ? 'paid' : 'unpaid',
       paidAt: isFullyPaidByWallet ? new Date() : null,
     });
+
+    if (isFullyPaidByWallet) {
+      await processBookingPaymentAndCreditOwner(booking);
+    }
 
     try {
       await Notification.create({
@@ -641,9 +703,8 @@ router.post('/:id/verify-payment', protect, seekerOnly, async (req, res) => {
       booking.paymentStatus = 'paid';
       booking.status = 'paid';
       booking.transactionReference = razorpay_payment_id || 'pay_mock_' + crypto.randomBytes(8).toString('hex');
-      booking.adminCommission = 0;
-      booking.ownerEarnings = Number(booking.totalAmount.toFixed(2));
       await booking.save();
+      await processBookingPaymentAndCreditOwner(booking);
 
       // Deduct wallet amount upon verified payment success
       if (booking.walletAmountUsed > 0) {
@@ -691,9 +752,8 @@ router.post('/:id/verify-payment', protect, seekerOnly, async (req, res) => {
     booking.paymentStatus = 'paid';
     booking.status = 'paid';
     booking.transactionReference = razorpay_payment_id;
-    booking.adminCommission = 0;
-    booking.ownerEarnings = Number(booking.totalAmount.toFixed(2));
     await booking.save();
+    await processBookingPaymentAndCreditOwner(booking);
 
     // Deduct wallet amount upon verified payment success
     if (booking.walletAmountUsed > 0) {

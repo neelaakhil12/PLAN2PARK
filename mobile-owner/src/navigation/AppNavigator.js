@@ -18,6 +18,7 @@ import ResetPasswordScreen from '../screens/Auth/ResetPasswordScreen';
 import OwnerHomeScreen from '../screens/Owner/OwnerHomeScreen';
 import OwnerBookingsScreen from '../screens/Owner/OwnerBookingsScreen';
 import AddSpotScreen from '../screens/Owner/AddSpotScreen';
+import WalletScreen from '../screens/Owner/WalletScreen';
 import ProfileScreen from '../screens/Owner/ProfileScreen';
 
 const Stack = createNativeStackNavigator();
@@ -60,6 +61,13 @@ function OwnerTabs() {
         component={AddSpotScreen}
         options={{
           tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 18 }}>➕</Text>,
+        }}
+      />
+      <Tab.Screen
+        name="Wallet"
+        component={WalletScreen}
+        options={{
+          tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 18 }}>👛</Text>,
         }}
       />
       <Tab.Screen

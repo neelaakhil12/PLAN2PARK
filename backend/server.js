@@ -19,6 +19,7 @@ const analyticsRoutes = require('./routes/analytics');
 const reviewRoutes = require('./routes/reviews');
 const complaintRoutes = require('./routes/complaints');
 const notificationRoutes = require('./routes/notifications');
+const { router: walletRoutes } = require('./routes/wallet');
 
 // Connect to Database
 connectDB();
@@ -37,6 +38,7 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use('/api/auth', authRoutes);
 app.use('/api/spaces', spaceRoutes);
 app.use('/api/bookings', bookingRoutes);
+app.use('/api/wallet', walletRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/reviews', reviewRoutes);
 app.use('/api/complaints', complaintRoutes);

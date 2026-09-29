@@ -71,6 +71,7 @@ const userSchema = new mongoose.Schema(
       accountNumber: { type: String, default: '' },
       ifscCode: { type: String, default: '' },
       bankName: { type: String, default: '' },
+      upiId: { type: String, default: '' },
     },
     contact: {
       type: String,

@@ -6,7 +6,8 @@ import {
   UserX, CheckCircle, XCircle, Activity, Layers, BarChart3,
   Bell, ChevronDown, Calendar, Search, LogOut, Settings,
   AlertTriangle, ShieldAlert, Heart, ClipboardList, HelpCircle, Star, MessageSquare,
-  Menu, X, Send, Tag, Sparkles, Megaphone, FileText, Edit2, Trash2, Plus
+  Menu, X, Send, Tag, Sparkles, Megaphone, FileText, Edit2, Trash2, Plus,
+  Percent, Upload, Eye, Landmark, Smartphone, Check, ExternalLink
 } from 'lucide-react';
 import Invoice from './Invoice';
 
@@ -63,6 +64,20 @@ const AdminDashboard = () => {
   const [promoValidUntil, setPromoValidUntil] = useState('');
   const [broadcastingPromo, setBroadcastingPromo] = useState(false);
   const bellRef = useRef(null);
+
+  // ── Wallet & Payout Management States ──
+  const [payoutRequests, setPayoutRequests] = useState([]);
+  const [commissionRate, setCommissionRate] = useState(10);
+  const [commissionInput, setCommissionInput] = useState('10');
+  const [savingCommission, setSavingCommission] = useState(false);
+  const [approvingPayout, setApprovingPayout] = useState(null);
+  const [payoutReceiptFile, setPayoutReceiptFile] = useState(null);
+  const [payoutReceiptPreview, setPayoutReceiptPreview] = useState('');
+  const [payoutUtr, setPayoutUtr] = useState('');
+  const [payoutNotes, setPayoutNotes] = useState('');
+  const [submittingApproval, setSubmittingApproval] = useState(false);
+  const [viewingReceiptUrl, setViewingReceiptUrl] = useState(null);
+  const [payoutsFilter, setPayoutsFilter] = useState('all');
 
   const unreadCount = notifications.filter(n => !n.read).length;
 
@@ -239,6 +254,23 @@ const AdminDashboard = () => {
       if (rComplaints.ok) setComplaints(await rComplaints.json());
       if (rReviews.ok) setReviews(await rReviews.json());
       if (rTerms && rTerms.ok) setTerms(await rTerms.json());
+
+      // Fetch wallet payouts & commission
+      try {
+        const [rPayouts, rComm] = await Promise.all([
+          fetch(`${API_URL}/wallet/admin/requests`, { headers }),
+          fetch(`${API_URL}/wallet/admin/commission`, { headers }),
+        ]);
+        if (rPayouts.ok) {
+          const pData = await rPayouts.json();
+          setPayoutRequests(pData.requests || []);
+        }
+        if (rComm.ok) {
+          const cData = await rComm.json();
+          setCommissionRate(cData.commissionPercentage || 10);
+          setCommissionInput(String(cData.commissionPercentage || 10));
+        }
+      } catch (e) {}
 
       // Generate actual live dynamic notifications based on real DB records
       const dynamicNotifs = [];
@@ -466,6 +498,85 @@ const AdminDashboard = () => {
     if (res.ok) { alert('Complaint ticket marked resolved.'); setResolvingId(null); setReplyText(''); fetchData(); }
   };
 
+  const handleSaveCommission = async (e) => {
+    e.preventDefault();
+    setSavingCommission(true);
+    try {
+      const res = await fetch(`${API_URL}/wallet/admin/commission`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ commissionPercentage: Number(commissionInput) }),
+      });
+      if (res.ok) {
+        setCommissionRate(Number(commissionInput));
+        alert(`Platform commission rate updated to ${commissionInput}% successfully!`);
+      } else {
+        const err = await res.json();
+        alert(err.message || 'Failed to update commission rate.');
+      }
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setSavingCommission(false);
+    }
+  };
+
+  const handleApprovePayoutSubmit = async (e) => {
+    e.preventDefault();
+    if (!approvingPayout) return;
+    setSubmittingApproval(true);
+    try {
+      const fd = new FormData();
+      if (payoutUtr) fd.append('transactionReference', payoutUtr.trim());
+      if (payoutNotes) fd.append('adminNotes', payoutNotes.trim());
+      if (payoutReceiptFile) fd.append('receiptImage', payoutReceiptFile);
+
+      const res = await fetch(`${API_URL}/wallet/admin/approve/${approvingPayout._id}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: fd,
+      });
+
+      if (res.ok) {
+        alert('Payout request approved and marked paid successfully!');
+        setApprovingPayout(null);
+        setPayoutReceiptFile(null);
+        setPayoutReceiptPreview('');
+        setPayoutUtr('');
+        setPayoutNotes('');
+        fetchData();
+      } else {
+        const err = await res.json();
+        alert(err.message || 'Failed to approve payout request.');
+      }
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setSubmittingApproval(false);
+    }
+  };
+
+  const handleRejectPayout = async (requestId, ownerName, amount) => {
+    const reason = window.prompt(`Please enter the rejection reason for ${ownerName}'s ₹${amount} withdrawal request:`, 'Bank details or UPI ID could not be verified.');
+    if (reason === null) return;
+    try {
+      const res = await fetch(`${API_URL}/wallet/admin/reject/${requestId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ reason }),
+      });
+      if (res.ok) {
+        alert('Payout request rejected. Funds refunded back to owner wallet.');
+        fetchData();
+      } else {
+        const err = await res.json();
+        alert(err.message || 'Failed to reject payout request.');
+      }
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
   const fetchPromotions = async () => {
     try {
       const res = await fetch(`${API_URL}/notifications/admin/history`, {
@@ -624,6 +735,7 @@ const AdminDashboard = () => {
     users: 'All Registered Platform Users',
     bookings: 'Platform Bookings',
     revenue: 'Revenue Reports & Ledger',
+    payouts: '💸 Owner Withdrawals & Payout Requests',
     promotions: 'Promotional Offers & Push Broadcasts',
     terms: '📜 Terms & Conditions Management',
     complaints: 'Complaints',
@@ -640,6 +752,7 @@ const AdminDashboard = () => {
     { id: 'users', path: '/admin/users', label: '👥 Users Management', icon: <Users className="h-4.5 w-4.5 text-emerald-400" /> },
     { id: 'bookings', path: '/admin/bookings', label: 'Platform Bookings', icon: <ClipboardList className="h-4.5 w-4.5" /> },
     { id: 'revenue', path: '/admin/revenue', label: 'Revenue & Invoices', icon: <DollarSign className="h-4.5 w-4.5 text-emerald-400" /> },
+    { id: 'payouts', path: '/admin/payouts', label: '💸 Owner Withdrawals', icon: <DollarSign className="h-4.5 w-4.5 text-amber-400" /> },
     { id: 'promotions', path: '/admin/promotions', label: '📢 Promotional Offers', icon: <Megaphone className="h-4.5 w-4.5 text-amber-400" /> },
     { id: 'terms', path: '/admin/terms', label: '📜 Terms & Conditions', icon: <FileText className="h-4.5 w-4.5 text-indigo-400" /> },
     { id: 'complaints', path: '/admin/complaints', label: 'Complaints', icon: <AlertTriangle className="h-4.5 w-4.5 text-rose-400" /> },
@@ -698,6 +811,8 @@ const AdminDashboard = () => {
               ? users.filter(u => u.role === 'seeker' && u.status === 'pending').length
               : item.id === 'users'
               ? users.filter(u => u.status === 'pending').length
+              : item.id === 'payouts'
+              ? payoutRequests.filter(r => r.status === 'pending').length
               : item.id === 'notifications'
               ? unreadCount
               : 0;
@@ -3665,6 +3780,312 @@ const AdminDashboard = () => {
                 </div>
               )}
 
+              {/* ── VIEW: OWNER WITHDRAWALS & PAYOUTS ─────────────────── */}
+              {currentView === 'payouts' && (
+                <div className="space-y-6 animate-fadeIn">
+                  {/* Top Stats & Quick Commission Card */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                    {/* Pending Requests Stat */}
+                    <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-sm flex items-center justify-between">
+                      <div>
+                        <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Pending Payouts</p>
+                        <h4 className="text-3xl font-black text-amber-500 mt-1">
+                          {payoutRequests.filter(p => p.status === 'pending').length}
+                        </h4>
+                        <p className="text-xs font-semibold text-slate-500 mt-1">
+                          Totaling ₹{payoutRequests.filter(p => p.status === 'pending').reduce((sum, p) => sum + (p.amount || 0), 0).toLocaleString('en-IN')}
+                        </p>
+                      </div>
+                      <div className="h-14 w-14 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-center">
+                        <DollarSign className="h-7 w-7 text-amber-500" />
+                      </div>
+                    </div>
+
+                    {/* Cleared Payouts Stat */}
+                    <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-sm flex items-center justify-between">
+                      <div>
+                        <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Cleared Payouts</p>
+                        <h4 className="text-3xl font-black text-emerald-600 mt-1">
+                          {payoutRequests.filter(p => p.status === 'approved').length}
+                        </h4>
+                        <p className="text-xs font-semibold text-slate-500 mt-1">
+                          Totaling ₹{payoutRequests.filter(p => p.status === 'approved').reduce((sum, p) => sum + (p.amount || 0), 0).toLocaleString('en-IN')}
+                        </p>
+                      </div>
+                      <div className="h-14 w-14 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center justify-center">
+                        <CheckCircle className="h-7 w-7 text-emerald-600" />
+                      </div>
+                    </div>
+
+                    {/* Platform Commission Rate Config Box */}
+                    <div className="bg-gradient-to-br from-indigo-900 via-slate-900 to-slate-950 text-white rounded-3xl p-6 shadow-md border border-slate-800 flex flex-col justify-between">
+                      <div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px] font-black uppercase tracking-wider text-indigo-300 flex items-center gap-1.5">
+                            <Percent className="h-3.5 w-3.5" /> Platform Commission
+                          </span>
+                          <span className="text-xs px-2.5 py-0.5 rounded-full bg-indigo-500/30 text-indigo-300 font-extrabold border border-indigo-400/30">
+                            Active: {commissionRate}%
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-300 mt-1.5 leading-relaxed">
+                          Deducted on every seeker payment before crediting host wallet.
+                        </p>
+                      </div>
+                      <form onSubmit={handleSaveCommission} className="flex items-center gap-2 mt-4">
+                        <div className="relative flex-1">
+                          <input
+                            type="number"
+                            min="0"
+                            max="100"
+                            step="0.5"
+                            value={commissionInput}
+                            onChange={(e) => setCommissionInput(e.target.value)}
+                            className="w-full bg-white/10 border border-white/20 rounded-xl px-3 py-2 text-sm text-white font-bold placeholder-slate-400 focus:outline-none focus:border-indigo-400 pr-7"
+                          />
+                          <span className="absolute right-3 top-2 text-sm text-slate-300 font-bold">%</span>
+                        </div>
+                        <button
+                          type="submit"
+                          disabled={savingCommission}
+                          className="px-4 py-2 bg-indigo-500 hover:bg-indigo-600 active:scale-95 disabled:opacity-50 text-white text-xs font-black rounded-xl transition shadow flex items-center gap-1"
+                        >
+                          {savingCommission ? 'Saving...' : 'Update'}
+                        </button>
+                      </form>
+                    </div>
+                  </div>
+
+                  {/* Main Payout Requests Container */}
+                  <div className="bg-white border border-slate-200/90 rounded-3xl overflow-hidden shadow-sm">
+                    {/* Header & Tabs */}
+                    <div className="px-6 py-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                      <div>
+                        <h3 className="font-extrabold text-slate-800 text-lg flex items-center gap-2">
+                          Owner Withdrawal Requests
+                        </h3>
+                        <p className="text-xs text-slate-400 mt-0.5">
+                          Review payout requests from Space Hosts and Vehicle Storage Land Owners. Approve with UTR &amp; receipt proof screenshot.
+                        </p>
+                      </div>
+
+                      {/* Filter Tabs */}
+                      <div className="flex bg-slate-100 p-1 rounded-2xl gap-1 shrink-0 self-start sm:self-auto">
+                        {[
+                          { id: 'all', label: `All (${payoutRequests.length})` },
+                          { id: 'pending', label: `Pending (${payoutRequests.filter(p => p.status === 'pending').length})` },
+                          { id: 'approved', label: `Approved (${payoutRequests.filter(p => p.status === 'approved').length})` },
+                          { id: 'rejected', label: `Rejected (${payoutRequests.filter(p => p.status === 'rejected').length})` },
+                        ].map((tab) => (
+                          <button
+                            key={tab.id}
+                            onClick={() => setPayoutsFilter(tab.id)}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-extrabold transition-all ${
+                              payoutsFilter === tab.id
+                                ? 'bg-white text-slate-900 shadow-sm'
+                                : 'text-slate-500 hover:text-slate-800'
+                            }`}
+                          >
+                            {tab.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Table View */}
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-sm border-collapse">
+                        <thead>
+                          <tr className="bg-slate-50/75 border-b border-slate-100 text-[11px] font-black uppercase tracking-wider text-slate-400">
+                            <th className="px-6 py-4">Owner / Host</th>
+                            <th className="px-6 py-4">Amount</th>
+                            <th className="px-6 py-4">Payout Method</th>
+                            <th className="px-6 py-4">Transfer Details</th>
+                            <th className="px-6 py-4">Date Requested</th>
+                            <th className="px-6 py-4">Status</th>
+                            <th className="px-6 py-4">Proof &amp; Ref</th>
+                            <th className="px-6 py-4 text-right">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 font-medium">
+                          {payoutRequests
+                            .filter(p => payoutsFilter === 'all' || p.status === payoutsFilter)
+                            .map((payout) => {
+                              const owner = payout.ownerId || {};
+                              const isPending = payout.status === 'pending';
+                              const isApproved = payout.status === 'approved';
+                              const isRejected = payout.status === 'rejected';
+
+                              return (
+                                <tr key={payout._id} className="hover:bg-slate-50/50 transition-colors">
+                                  {/* Owner Column */}
+                                  <td className="px-6 py-4">
+                                    <div className="font-extrabold text-slate-800">
+                                      {owner.name || 'Unknown Host'}
+                                    </div>
+                                    <div className="text-xs text-slate-400 font-normal">
+                                      {owner.email || 'No email'} • {owner.phone || 'No phone'}
+                                    </div>
+                                    <div className="mt-1">
+                                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 border border-slate-200">
+                                        Wallet: ₹{Number(owner.walletBalance || 0).toLocaleString('en-IN')}
+                                      </span>
+                                    </div>
+                                  </td>
+
+                                  {/* Amount */}
+                                  <td className="px-6 py-4">
+                                    <div className="text-base font-black text-slate-900">
+                                      ₹{Number(payout.amount).toLocaleString('en-IN')}
+                                    </div>
+                                  </td>
+
+                                  {/* Method */}
+                                  <td className="px-6 py-4">
+                                    {payout.payoutMethod === 'upi' ? (
+                                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-extrabold bg-purple-50 text-purple-700 border border-purple-200">
+                                        <Smartphone className="h-3.5 w-3.5 text-purple-600" /> UPI
+                                      </span>
+                                    ) : (
+                                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-extrabold bg-blue-50 text-blue-700 border border-blue-200">
+                                        <Landmark className="h-3.5 w-3.5 text-blue-600" /> Bank Transfer
+                                      </span>
+                                    )}
+                                  </td>
+
+                                  {/* Details */}
+                                  <td className="px-6 py-4">
+                                    {payout.payoutMethod === 'upi' ? (
+                                      <div>
+                                        <p className="text-[11px] text-slate-400 font-bold uppercase">UPI ID</p>
+                                        <p className="font-mono text-xs font-bold text-slate-800 bg-slate-100 px-2 py-0.5 rounded border border-slate-200 inline-block mt-0.5">
+                                          {payout.payoutDetails?.upiId || 'Not provided'}
+                                        </p>
+                                      </div>
+                                    ) : (
+                                      <div className="text-xs space-y-0.5">
+                                        <p><span className="text-slate-400 font-bold">A/C:</span> <span className="font-mono font-bold text-slate-800">{payout.payoutDetails?.accountNumber || '—'}</span></p>
+                                        <p><span className="text-slate-400 font-bold">IFSC:</span> <span className="font-mono font-bold text-slate-800">{payout.payoutDetails?.ifscCode || '—'}</span></p>
+                                        <p><span className="text-slate-400 font-bold">Name:</span> {payout.payoutDetails?.accountHolderName || '—'}</p>
+                                        {payout.payoutDetails?.bankName && (
+                                          <p><span className="text-slate-400 font-bold">Bank:</span> {payout.payoutDetails.bankName}</p>
+                                        )}
+                                      </div>
+                                    )}
+                                  </td>
+
+                                  {/* Date */}
+                                  <td className="px-6 py-4 text-xs text-slate-500 whitespace-nowrap">
+                                    {new Date(payout.createdAt).toLocaleDateString('en-IN', {
+                                      day: 'numeric',
+                                      month: 'short',
+                                      year: 'numeric'
+                                    })}
+                                    <div className="text-[10px] text-slate-400">
+                                      {new Date(payout.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                    </div>
+                                  </td>
+
+                                  {/* Status */}
+                                  <td className="px-6 py-4">
+                                    {isPending && (
+                                      <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200 inline-flex items-center gap-1">
+                                        <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse"></span>
+                                        Pending
+                                      </span>
+                                    )}
+                                    {isApproved && (
+                                      <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 inline-flex items-center gap-1">
+                                        <CheckCircle className="h-3.5 w-3.5 text-emerald-600" />
+                                        Approved
+                                      </span>
+                                    )}
+                                    {isRejected && (
+                                      <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-rose-50 text-rose-700 border border-rose-200 inline-flex items-center gap-1">
+                                        <XCircle className="h-3.5 w-3.5 text-rose-600" />
+                                        Rejected
+                                      </span>
+                                    )}
+                                  </td>
+
+                                  {/* Proof & Ref */}
+                                  <td className="px-6 py-4">
+                                    {isApproved && (
+                                      <div className="space-y-1">
+                                        {payout.transactionReference && (
+                                          <div className="text-[11px] text-slate-600">
+                                            <span className="text-slate-400 font-bold">UTR: </span>
+                                            <span className="font-mono font-bold text-slate-800">{payout.transactionReference}</span>
+                                          </div>
+                                        )}
+                                        {payout.adminReceiptImage ? (
+                                          <button
+                                            type="button"
+                                            onClick={() => setViewingReceiptUrl(payout.adminReceiptImage.startsWith('http') ? payout.adminReceiptImage : `${API_URL}${payout.adminReceiptImage}`)}
+                                            className="inline-flex items-center gap-1 text-[11px] font-bold text-indigo-600 hover:text-indigo-800 hover:underline bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-200"
+                                          >
+                                            <Eye className="h-3 w-3" /> View Receipt
+                                          </button>
+                                        ) : (
+                                          <span className="text-[10px] text-slate-400 italic">No receipt attached</span>
+                                        )}
+                                      </div>
+                                    )}
+                                    {isRejected && payout.adminNotes && (
+                                      <p className="text-xs text-rose-600 italic max-w-xs truncate" title={payout.adminNotes}>
+                                        "{payout.adminNotes}"
+                                      </p>
+                                    )}
+                                    {isPending && (
+                                      <span className="text-xs text-slate-400">—</span>
+                                    )}
+                                  </td>
+
+                                  {/* Actions */}
+                                  <td className="px-6 py-4 text-right whitespace-nowrap">
+                                    {isPending ? (
+                                      <div className="flex items-center justify-end gap-2">
+                                        <button
+                                          onClick={() => {
+                                            setApprovingPayout(payout);
+                                            setPayoutUtr('');
+                                            setPayoutNotes('');
+                                            setPayoutReceiptFile(null);
+                                            setPayoutReceiptPreview('');
+                                          }}
+                                          className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-extrabold text-xs rounded-xl shadow-sm transition flex items-center gap-1.5"
+                                        >
+                                          <Check className="h-3.5 w-3.5" /> Approve &amp; Clear
+                                        </button>
+                                        <button
+                                          onClick={() => handleRejectPayout(payout._id, owner.name || 'Owner', payout.amount)}
+                                          className="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 active:scale-95 text-rose-700 font-bold text-xs rounded-xl border border-rose-200 transition"
+                                        >
+                                          Reject
+                                        </button>
+                                      </div>
+                                    ) : (
+                                      <span className="text-xs font-semibold text-slate-400">Processed</span>
+                                    )}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                        </tbody>
+                      </table>
+
+                      {payoutRequests.filter(p => payoutsFilter === 'all' || p.status === payoutsFilter).length === 0 && (
+                        <div className="text-center py-12">
+                          <DollarSign className="h-10 w-10 text-slate-300 mx-auto mb-2" />
+                          <p className="text-slate-500 font-extrabold text-sm">No payout requests found.</p>
+                          <p className="text-slate-400 text-xs mt-1">When space or land owners withdraw their wallet balance, requests will appear here.</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* ── VIEW: SUPPORT REVIEWS ──────────────────────────────────── */}
               {currentView === 'reviews' && (
                 <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm animate-fadeIn">
@@ -3807,6 +4228,210 @@ const AdminDashboard = () => {
                 {payoutLoading ? 'Recording...' : 'Record Payout'}
               </button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── APPROVE PAYOUT & UPLOAD RECEIPT MODAL ───────────────────────── */}
+      {approvingPayout && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 overflow-y-auto">
+          <div className="w-full max-w-lg bg-white rounded-3xl shadow-2xl p-6 sm:p-8 relative text-left my-8">
+            <button
+              onClick={() => {
+                setApprovingPayout(null);
+                setPayoutReceiptFile(null);
+                setPayoutReceiptPreview('');
+              }}
+              className="absolute top-5 right-5 text-slate-400 hover:text-slate-700"
+            >
+              <X className="h-6 w-6" />
+            </button>
+
+            <div className="flex items-center gap-3 mb-4">
+              <div className="h-12 w-12 bg-emerald-50 rounded-2xl flex items-center justify-center border border-emerald-200">
+                <CheckCircle className="h-6 w-6 text-emerald-600" />
+              </div>
+              <div>
+                <h3 className="text-xl font-black text-slate-900">Approve &amp; Clear Payout</h3>
+                <p className="text-xs text-slate-400">Upload payment proof screenshot and enter UTR reference.</p>
+              </div>
+            </div>
+
+            {/* Payout Details Summary Card */}
+            <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 mb-5 space-y-2">
+              <div className="flex justify-between items-center pb-2 border-b border-slate-200/60">
+                <span className="text-xs text-slate-500 font-bold">Owner:</span>
+                <span className="text-xs font-black text-slate-800">{approvingPayout.ownerId?.name || 'Owner'}</span>
+              </div>
+              <div className="flex justify-between items-center pb-2 border-b border-slate-200/60">
+                <span className="text-xs text-slate-500 font-bold">Payout Amount:</span>
+                <span className="text-base font-black text-emerald-600">₹{Number(approvingPayout.amount).toLocaleString('en-IN')}</span>
+              </div>
+              <div className="flex justify-between items-start pb-2 border-b border-slate-200/60">
+                <span className="text-xs text-slate-500 font-bold">Transfer Mode:</span>
+                <span className="text-xs font-black uppercase tracking-wider text-slate-800">
+                  {approvingPayout.payoutMethod === 'upi' ? 'UPI Transfer' : 'Bank NEFT/IMPS'}
+                </span>
+              </div>
+              <div>
+                <span className="text-[11px] text-slate-400 uppercase font-black tracking-wider block mb-1">
+                  Destination Info:
+                </span>
+                {approvingPayout.payoutMethod === 'upi' ? (
+                  <div className="bg-white p-2 rounded-xl border border-slate-200 text-xs font-mono font-bold text-slate-800">
+                    UPI ID: {approvingPayout.payoutDetails?.upiId || 'N/A'}
+                  </div>
+                ) : (
+                  <div className="bg-white p-2.5 rounded-xl border border-slate-200 text-xs space-y-0.5">
+                    <p><span className="text-slate-400">A/C:</span> <strong className="font-mono">{approvingPayout.payoutDetails?.accountNumber}</strong></p>
+                    <p><span className="text-slate-400">IFSC:</span> <strong className="font-mono">{approvingPayout.payoutDetails?.ifscCode}</strong></p>
+                    <p><span className="text-slate-400">Holder:</span> <strong>{approvingPayout.payoutDetails?.accountHolderName}</strong></p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <form onSubmit={handleApprovePayoutSubmit} className="space-y-4">
+              {/* UTR / Transaction Reference Input */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                  UTR / Reference Number <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={payoutUtr}
+                  onChange={(e) => setPayoutUtr(e.target.value)}
+                  placeholder="e.g. 427819381029 or UPI-REF-9921"
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-mono font-bold focus:outline-none focus:bg-white focus:border-emerald-500"
+                />
+              </div>
+
+              {/* Upload Screenshot / Receipt */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                  Proof of Payment Screenshot (PhonePe / GPay / Bank Receipt)
+                </label>
+                
+                {payoutReceiptPreview ? (
+                  <div className="relative border border-slate-200 rounded-2xl overflow-hidden bg-slate-100 p-2 flex items-center justify-between">
+                    <img src={payoutReceiptPreview} alt="Receipt Preview" className="h-20 w-20 object-cover rounded-xl" />
+                    <div className="flex-1 px-3">
+                      <p className="text-xs font-bold text-slate-700 truncate">{payoutReceiptFile?.name}</p>
+                      <p className="text-[10px] text-slate-400">{(payoutReceiptFile?.size / 1024).toFixed(1)} KB</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPayoutReceiptFile(null);
+                        setPayoutReceiptPreview('');
+                      }}
+                      className="text-rose-500 hover:text-rose-700 p-2"
+                    >
+                      <X className="h-5 w-5" />
+                    </button>
+                  </div>
+                ) : (
+                  <label className="border-2 border-dashed border-slate-200 hover:border-emerald-400 bg-slate-50 hover:bg-emerald-50/20 rounded-2xl p-5 flex flex-col items-center justify-center cursor-pointer transition">
+                    <Upload className="h-7 w-7 text-slate-400 mb-1" />
+                    <span className="text-xs font-bold text-slate-700">Click to upload payment screenshot</span>
+                    <span className="text-[10px] text-slate-400 mt-0.5">PNG, JPG, JPEG accepted</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          setPayoutReceiptFile(file);
+                          setPayoutReceiptPreview(URL.createObjectURL(file));
+                        }
+                      }}
+                    />
+                  </label>
+                )}
+              </div>
+
+              {/* Admin Notes */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                  Remarks / Notes (Optional)
+                </label>
+                <input
+                  type="text"
+                  value={payoutNotes}
+                  onChange={(e) => setPayoutNotes(e.target.value)}
+                  placeholder="e.g. Cleared via PhonePe UPI transfer"
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:bg-white focus:border-emerald-500"
+                />
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex items-center gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setApprovingPayout(null);
+                    setPayoutReceiptFile(null);
+                    setPayoutReceiptPreview('');
+                  }}
+                  className="flex-1 py-3 px-4 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submittingApproval}
+                  className="flex-1 py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 disabled:opacity-50 text-white text-xs font-black shadow-lg shadow-emerald-600/20 transition flex items-center justify-center gap-2"
+                >
+                  {submittingApproval ? (
+                    <span>Processing...</span>
+                  ) : (
+                    <>
+                      <Check className="h-4 w-4" />
+                      <span>Confirm &amp; Clear Payout</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── FULL RECEIPT PREVIEW MODAL ────────────────────────────────────── */}
+      {viewingReceiptUrl && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
+          <div className="relative max-w-2xl w-full bg-slate-900 rounded-3xl overflow-hidden shadow-2xl p-4 flex flex-col items-center">
+            <div className="w-full flex items-center justify-between pb-3 px-2 border-b border-slate-800">
+              <span className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                <Eye className="h-4 w-4 text-emerald-400" /> Payment Proof Receipt Screenshot
+              </span>
+              <div className="flex items-center gap-2">
+                <a
+                  href={viewingReceiptUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  download
+                  className="text-xs text-indigo-400 hover:underline flex items-center gap-1"
+                >
+                  <ExternalLink className="h-3.5 w-3.5" /> Open original
+                </a>
+                <button
+                  onClick={() => setViewingReceiptUrl(null)}
+                  className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+            </div>
+            <div className="p-4 flex items-center justify-center max-h-[75vh] overflow-auto">
+              <img
+                src={viewingReceiptUrl}
+                alt="Receipt screenshot"
+                className="max-h-[70vh] w-auto rounded-xl object-contain shadow-lg"
+              />
+            </div>
           </div>
         </div>
       )}

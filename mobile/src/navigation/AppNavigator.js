@@ -24,6 +24,7 @@ import HelpAssistantScreen from '../screens/Seeker/HelpAssistantScreen';
 // Owner Screens
 import OwnerHomeScreen from '../screens/Owner/OwnerHomeScreen';
 import AddSpotScreen from '../screens/Owner/AddSpotScreen';
+import OwnerWalletScreen from '../screens/Owner/WalletScreen';
 
 // Admin Screens
 import AdminHomeScreen from '../screens/Admin/AdminHomeScreen';
@@ -97,6 +98,7 @@ function OwnerStack() {
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="OwnerMain" component={OwnerHomeScreen} />
       <Stack.Screen name="AddSpot" component={AddSpotScreen} />
+      <Stack.Screen name="OwnerWallet" component={OwnerWalletScreen} />
     </Stack.Navigator>
   );
 }
