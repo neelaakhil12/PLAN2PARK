@@ -24,17 +24,17 @@ export const getBaseApiUrl = async () => {
 export let API_URL = PUBLIC_ONLINE_URL;
 
 export const getImageUrl = (url) => {
-  if (!url) return 'https://images.unsplash.com/photo-1506015391300-4802dc74de2e?w=1200&q=80';
+  if (!url) return '';
   if (url.startsWith('data:')) return url;
   if (url.startsWith('http://') || url.startsWith('https://')) {
-    if (url.includes('localhost:5000') || url.includes('127.0.0.1:5000')) {
-      return url.replace(/https?:\/\/(localhost|127\.0\.0\.1):5000/, 'http://43.204.235.124:5000');
+    if (url.includes('localhost:5000') || url.includes('127.0.0.1:5000') || url.includes('43.204.235.124:5000')) {
+      return url.replace(/https?:\/\/(localhost|127\.0\.0\.1|43\.204\.235\.124):5000/, 'https://api.plantopark.com');
     }
     return url;
   }
   if (url.startsWith('/uploads/') || url.startsWith('uploads/')) {
     const cleanPath = url.startsWith('/') ? url : `/${url}`;
-    return `http://43.204.235.124:5000${cleanPath}`;
+    return `https://api.plantopark.com${cleanPath}`;
   }
   return url;
 };

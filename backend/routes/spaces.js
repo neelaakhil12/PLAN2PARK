@@ -59,7 +59,7 @@ const formatImageUrl = (req, file, fallbackUrl) => {
     }
     return trimmed;
   }
-  return 'https://images.unsplash.com/photo-1506015391300-4802dc74de2e?w=1200&q=80';
+  return '';
 };
 
 // @desc    Parse Google Maps link to extract address, city, and coordinates

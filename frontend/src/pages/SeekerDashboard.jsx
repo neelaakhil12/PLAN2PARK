@@ -1642,9 +1642,10 @@ const SeekerDashboard = () => {
                 <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-5">
                   <div className="relative h-48 sm:h-56 w-full rounded-2xl overflow-hidden border border-slate-100">
                     <img
-                      src={selectedSpace.image || 'https://images.unsplash.com/photo-1506015391300-4802dc74de2e?w=1200'}
+                      src={getImageUrl ? getImageUrl(selectedSpace.images?.[0] || selectedSpace.image) : (selectedSpace.images?.[0] || selectedSpace.image)}
                       alt={selectedSpace.address}
                       className="w-full h-full object-cover"
+                      onError={(e) => { e.target.style.display = 'none'; }}
                     />
                     <div className="absolute top-3 left-3 flex items-center gap-2">
                       <span className="bg-emerald-500/90 backdrop-blur text-white text-[11px] font-black px-3 py-1 rounded-full tracking-wider uppercase shadow-md">
@@ -2522,7 +2523,12 @@ const SeekerDashboard = () => {
                   const freeSlots = space.slots?.filter(sl => sl.isAvailable).length || 0;
                   return (
                     <div key={space._id} className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm relative">
-                      <img src={space.image} alt="" className="w-full h-36 object-cover" />
+                      <img
+                        src={getImageUrl ? getImageUrl(space.images?.[0] || space.image) : (space.images?.[0] || space.image)}
+                        alt={space.title || space.address || ''}
+                        className="w-full h-36 object-cover"
+                        onError={(e) => { e.target.style.display = 'none'; }}
+                      />
                       <button onClick={() => handleToggleFavorite(space._id)} className="absolute top-3 right-3 h-8 w-8 bg-white/90 rounded-full flex items-center justify-center text-rose-500 shadow border hover:scale-110 transition-transform">
                         <Heart className="h-4 w-4 fill-rose-500" />
                       </button>

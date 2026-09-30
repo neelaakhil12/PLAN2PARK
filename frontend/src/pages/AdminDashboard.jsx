@@ -12,7 +12,7 @@ import {
 import Invoice from './Invoice';
 
 const AdminDashboard = () => {
-  const { token, logout, API_URL, user } = useContext(AuthContext);
+  const { token, logout, API_URL, user, getImageUrl } = useContext(AuthContext);
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -1335,10 +1335,10 @@ const AdminDashboard = () => {
                                     <td className="px-6 py-4">
                                       <div className="flex items-center gap-3">
                                         <img
-                                          src={sp.image || 'https://images.unsplash.com/photo-1506015391300-4802dc74de2e?w=200&q=80'}
+                                          src={getImageUrl ? getImageUrl(sp.image || (sp.images && sp.images[0])) : (sp.image || '')}
                                           alt={sp.title || sp.address}
                                           className="w-12 h-12 rounded-xl object-cover border border-slate-200 shrink-0"
-                                          onError={(e) => { e.target.src = 'https://images.unsplash.com/photo-1506015391300-4802dc74de2e?w=200&q=80'; }}
+                                          onError={(e) => { e.target.style.display = 'none'; }}
                                         />
                                         <div>
                                           <p className="font-bold text-slate-900 leading-snug">{sp.title || sp.address}</p>
@@ -1993,7 +1993,7 @@ const AdminDashboard = () => {
                                   <td className="px-6 py-4">
                                     <div className="flex items-center gap-3">
                                       {u.profileImage ? (
-                                        <img src={u.profileImage} alt="Profile" className="w-10 h-10 rounded-full object-cover border border-slate-200 shrink-0" />
+                                        <img src={getImageUrl ? getImageUrl(u.profileImage) : u.profileImage} alt="Profile" className="w-10 h-10 rounded-full object-cover border border-slate-200 shrink-0" />
                                       ) : (
                                         <div className={`w-10 h-10 rounded-full flex items-center justify-center font-black uppercase text-sm shrink-0 ${
                                           u.role === 'owner' ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800'
@@ -2005,7 +2005,7 @@ const AdminDashboard = () => {
                                         <p className="font-bold text-slate-900">{u.name}</p>
                                         <p className="text-xs text-slate-400">{u.email}</p>
                                         {u.driverLicenseImage && (
-                                          <a href={u.driverLicenseImage} target="_blank" rel="noopener noreferrer" className="text-[10px] text-blue-600 font-bold hover:underline mt-0.5 inline-block">
+                                          <a href={getImageUrl ? getImageUrl(u.driverLicenseImage) : u.driverLicenseImage} target="_blank" rel="noopener noreferrer" className="text-[10px] text-blue-600 font-bold hover:underline mt-0.5 inline-block">
                                             View License
                                           </a>
                                         )}
@@ -2225,10 +2225,10 @@ const AdminDashboard = () => {
                                   <div className="flex gap-4">
                                     <div className="w-28 h-28 rounded-2xl bg-slate-100 overflow-hidden shrink-0 relative">
                                       <img
-                                        src={sp.image || (sp.images && sp.images[0]) || 'https://images.unsplash.com/photo-1506015391300-4802dc74de2e?w=600&q=80'}
+                                        src={getImageUrl ? getImageUrl(sp.image || (sp.images && sp.images[0])) : (sp.image || '')}
                                         alt={sp.title || sp.address}
                                         className="w-full h-full object-cover"
-                                        onError={(e) => { e.target.src = 'https://images.unsplash.com/photo-1506015391300-4802dc74de2e?w=600&q=80'; }}
+                                        onError={(e) => { e.target.style.display = 'none'; }}
                                       />
                                       {sp.hasEvCharger && (
                                         <span className="absolute bottom-1.5 left-1.5 bg-emerald-600 text-white text-[8px] font-black px-1.5 py-0.5 rounded shadow">
@@ -2621,10 +2621,10 @@ const AdminDashboard = () => {
                                   <div className="flex gap-4">
                                     <div className="w-28 h-28 rounded-2xl bg-slate-100 overflow-hidden shrink-0 relative">
                                       <img
-                                        src={sp.image || (sp.images && sp.images[0]) || 'https://images.unsplash.com/photo-1590674899484-d5640e854abe?w=600&q=80'}
+                                        src={getImageUrl ? getImageUrl(sp.image || (sp.images && sp.images[0])) : (sp.image || '')}
                                         alt={sp.title || sp.address}
                                         className="w-full h-full object-cover"
-                                        onError={(e) => { e.target.src = 'https://images.unsplash.com/photo-1590674899484-d5640e854abe?w=600&q=80'; }}
+                                        onError={(e) => { e.target.style.display = 'none'; }}
                                       />
                                       <span className="absolute top-1.5 left-1.5 bg-black/70 backdrop-blur-md text-white text-[8px] font-black px-1.5 py-0.5 rounded">
                                         🚜 YARD
@@ -3281,10 +3281,10 @@ const AdminDashboard = () => {
                           <div key={space._id} className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm flex flex-col sm:flex-row hover:shadow-md transition-shadow">
                             <div className="sm:w-48 h-48 sm:h-auto relative shrink-0 bg-slate-100">
                               <img
-                                src={space.image || (space.images && space.images[0]) || 'https://images.unsplash.com/photo-1506015391300-4802dc74de2e?w=600&q=80'}
+                                src={getImageUrl ? getImageUrl(space.image || (space.images && space.images[0])) : (space.image || '')}
                                 alt={space.title || space.address}
                                 className="w-full h-full object-cover"
-                                onError={(e) => { e.target.src = 'https://images.unsplash.com/photo-1506015391300-4802dc74de2e?w=600&q=80'; }}
+                                onError={(e) => { e.target.style.display = 'none'; }}
                               />
                               <span className="absolute top-3 left-3 bg-black/60 backdrop-blur-md text-white text-[10px] font-black px-2 py-0.5 rounded-full">
                                 {space.city || 'Hyderabad'}
@@ -4427,7 +4427,7 @@ const AdminDashboard = () => {
             </div>
             <div className="p-4 flex items-center justify-center max-h-[75vh] overflow-auto">
               <img
-                src={viewingReceiptUrl}
+                src={getImageUrl ? getImageUrl(viewingReceiptUrl) : viewingReceiptUrl}
                 alt="Receipt screenshot"
                 className="max-h-[70vh] w-auto rounded-xl object-contain shadow-lg"
               />

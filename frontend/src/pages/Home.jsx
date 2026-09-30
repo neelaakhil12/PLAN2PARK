@@ -11,7 +11,7 @@ import ScrollReveal from '../components/ScrollReveal';
 const DURATIONS = ['1 Hour', '2 Hours', '3 Hours', '4 Hours', '6 Hours', '12 Hours', 'Full Day'];
 
 const Home = () => {
-  const { user, token, API_URL } = useContext(AuthContext);
+  const { user, token, API_URL, getImageUrl } = useContext(AuthContext);
   const navigate = useNavigate();
   const [spaces, setSpaces] = useState([]);
   const [search, setSearch] = useState('');
@@ -366,8 +366,13 @@ const Home = () => {
                 return (
                   <ScrollReveal key={space._id} direction="up" delay={idx * 100} className="h-full">
                     <div className="bg-white rounded-3xl overflow-hidden border border-slate-200/60 flex flex-col hover:border-emerald-300 hover:shadow-lg transition-all duration-300 group h-full">
-                      <div className="relative overflow-hidden h-40 sm:h-44">
-                        <img src={space.image} alt="Parking spot" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                      <div className="relative overflow-hidden h-40 sm:h-44 bg-slate-100 flex items-center justify-center">
+                        <img
+                          src={getImageUrl ? getImageUrl(space.images?.[0] || space.image) : space.image}
+                          alt={space.title || space.address || 'Parking spot'}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                          onError={(e) => { e.target.style.display = 'none'; }}
+                        />
                         <div className="absolute top-2.5 left-2.5">
                           <span className="bg-white/90 backdrop-blur-sm text-emerald-600 text-[10px] font-black px-2 py-0.5 rounded-full border border-emerald-100 flex items-center gap-1">
                             <MapPin className="h-2.5 w-2.5" /> {space.location}

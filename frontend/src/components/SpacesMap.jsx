@@ -150,9 +150,14 @@ const SpacesMap = ({
 
       const marker = L.marker([lat, lng], { icon }).addTo(map);
 
+      const rawImg = (space.images && space.images[0]) || space.image || '';
+      const resolvedImg = rawImg.startsWith('http://') || rawImg.startsWith('https://') || rawImg.startsWith('data:')
+        ? rawImg
+        : (rawImg ? `https://api.plantopark.com${rawImg.startsWith('/') ? '' : '/'}${rawImg}` : '');
+
       const popupContent = `
         <div style="font-family: system-ui, sans-serif; min-width: 200px; padding: 4px;">
-          <img src="${space.image || 'https://images.unsplash.com/photo-1506015391300-4802dc74de2e?w=600'}" style="width: 100%; height: 95px; object-fit: cover; border-radius: 8px; margin-bottom: 8px;" />
+          ${resolvedImg ? `<img src="${resolvedImg}" style="width: 100%; height: 95px; object-fit: cover; border-radius: 8px; margin-bottom: 8px;" onerror="this.style.display='none'" />` : ''}
           <div style="font-weight: 800; font-size: 13px; color: #0f172a; margin-bottom: 2px;">${space.title || space.address || 'Parking'}</div>
           <div style="font-size: 11px; color: #64748b; margin-bottom: 8px;">📍 ${space.address || 'Location'}</div>
           <div style="display: flex; align-items: center; justify-content: space-between;">

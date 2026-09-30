@@ -9,17 +9,25 @@ export const AuthProvider = ({ children }) => {
 
   const API_URL = import.meta.env.VITE_API_URL || 'https://api.plantopark.com/api';
 
-  // Helper to format image URLs (converts /uploads/... to full AWS EC2 server URL)
+  // Helper to format image URLs (converts /uploads/... to full server URL)
   const getImageUrl = (url) => {
-    if (!url) return 'https://images.unsplash.com/photo-1506015391300-4802dc74de2e?w=1200&q=80';
+    if (!url) return '';
     if (typeof url !== 'string') return url;
     if (url.startsWith('data:')) return url;
-    if (url.startsWith('http://') || url.startsWith('https://')) return url;
+
+    const baseBackend = API_URL ? API_URL.replace(/\/api\/?$/, '') : 'https://api.plantopark.com';
+
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      if (url.includes('43.204.235.124:5000') || (typeof window !== 'undefined' && window.location.protocol === 'https:' && (url.includes('localhost:5000') || url.includes('127.0.0.1:5000')))) {
+        return url.replace(/https?:\/\/(localhost|127\.0\.0\.1|43\.204\.235\.124):5000/, 'https://api.plantopark.com');
+      }
+      return url;
+    }
     if (url.startsWith('/uploads/')) {
-      return `https://api.plantopark.com${url}`;
+      return `${baseBackend}${url}`;
     }
     if (url.startsWith('uploads/')) {
-      return `https://api.plantopark.com/${url}`;
+      return `${baseBackend}/${url}`;
     }
     return url;
   };
