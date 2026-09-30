@@ -32,8 +32,29 @@ export default function RegisterScreen({ route, navigation }) {
 
   // Storage Landowner specific fields
   const [landAcres, setLandAcres] = useState('1.0');
-  const [fencingType, setFencingType] = useState('Compound Wall');
+  const FENCING_OPTIONS = ['Compound Wall', 'Barbed Wire Fencing', 'Chain Link Mesh'];
+  const [fencingTypes, setFencingTypes] = useState(['Compound Wall']);
   const [hasSecurityGuards, setHasSecurityGuards] = useState(true);
+
+  const toggleFencingType = (fType) => {
+    if (fencingTypes.includes(fType)) {
+      if (fencingTypes.length === 1) {
+        Alert.alert('Selection Required', 'Please select at least one boundary security/fencing feature.');
+        return;
+      }
+      setFencingTypes(fencingTypes.filter((t) => t !== fType));
+    } else {
+      setFencingTypes([...fencingTypes, fType]);
+    }
+  };
+
+  const toggleSelectAllFencing = () => {
+    if (fencingTypes.length === FENCING_OPTIONS.length) {
+      setFencingTypes([FENCING_OPTIONS[0]]);
+    } else {
+      setFencingTypes([...FENCING_OPTIONS]);
+    }
+  };
 
   const roleTitle = isStorageOwner ? 'Register Vehicle Storage Land Owner' : 'Register Space Owner';
   const themeColor = isStorageOwner ? COLORS.storageAccent : COLORS.ownerAccent;
@@ -64,7 +85,7 @@ export default function RegisterScreen({ route, navigation }) {
     try {
       const extraData = {
         accountCategory: category,
-        ...(isStorageOwner ? { landAcres: parseFloat(landAcres), fencingType, hasSecurityGuards } : {}),
+        ...(isStorageOwner ? { landAcres: parseFloat(landAcres), fencingType: fencingTypes.join(', '), hasSecurityGuards } : {}),
       };
 
       // Always register as role 'owner' in Owner App
@@ -163,22 +184,40 @@ export default function RegisterScreen({ route, navigation }) {
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Boundary Security / Fencing Type</Text>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <Text style={styles.label}>Boundary Security / Fencing Type</Text>
+                <TouchableOpacity onPress={toggleSelectAllFencing} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <Text style={{ color: COLORS.storageAccent, fontSize: 12, fontWeight: '800' }}>
+                    {fencingTypes.length === FENCING_OPTIONS.length ? '✓ Deselect All' : 'Select All'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
               <View style={styles.fencingRow}>
-                {['Compound Wall', 'Barbed Wire Fencing', 'Chain Link Mesh'].map((fType) => (
-                  <TouchableOpacity
-                    key={fType}
-                    style={[
-                      styles.fencingOption,
-                      fencingType === fType && { borderColor: COLORS.storageAccent, backgroundColor: 'rgba(245, 158, 11, 0.15)' },
-                    ]}
-                    onPress={() => setFencingType(fType)}
-                  >
-                    <Text style={[styles.fencingTxt, fencingType === fType && { color: COLORS.storageAccent, fontWeight: '700' }]}>
-                      {fType}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
+                {FENCING_OPTIONS.map((fType) => {
+                  const isChecked = fencingTypes.includes(fType);
+                  return (
+                    <TouchableOpacity
+                      key={fType}
+                      style={[
+                        styles.fencingOption,
+                        isChecked && { borderColor: COLORS.storageAccent, backgroundColor: 'rgba(245, 158, 11, 0.12)' },
+                      ]}
+                      onPress={() => toggleFencingType(fType)}
+                      activeOpacity={0.7}
+                    >
+                      <View style={[
+                        styles.checkboxBox,
+                        isChecked && { backgroundColor: COLORS.storageAccent, borderColor: COLORS.storageAccent }
+                      ]}>
+                        {isChecked && <Text style={styles.checkMark}>✓</Text>}
+                      </View>
+                      <Text style={[styles.fencingTxt, isChecked && { color: COLORS.storageAccent, fontWeight: '700' }]}>
+                        {fType}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
             </View>
 
@@ -367,15 +406,35 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   fencingOption: {
-    padding: 10,
-    borderRadius: 8,
-    borderWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+    borderWidth: 1.5,
     borderColor: '#334155',
     backgroundColor: '#1e293b',
+    gap: 12,
+  },
+  checkboxBox: {
+    width: 20,
+    height: 20,
+    borderRadius: 5,
+    borderWidth: 2,
+    borderColor: '#64748b',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'transparent',
+  },
+  checkMark: {
+    color: '#0f172a',
+    fontSize: 13,
+    fontWeight: '900',
+    lineHeight: 14,
   },
   fencingTxt: {
     color: '#cbd5e1',
-    fontSize: 12.5,
+    fontSize: 13.5,
   },
   switchRow: {
     flexDirection: 'row',

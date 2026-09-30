@@ -21,8 +21,26 @@ const OwnerRegister = () => {
   
   // Storage Yard fields
   const [landAcres, setLandAcres] = useState('1.0');
-  const [fencingType, setFencingType] = useState('Compound Wall');
+  const FENCING_OPTIONS = ['Compound Wall', 'Barbed Wire Fencing', 'Chain Link Mesh'];
+  const [fencingTypes, setFencingTypes] = useState(['Compound Wall']);
   const [hasSecurityGuards, setHasSecurityGuards] = useState(true);
+
+  const toggleFencingType = (fType) => {
+    if (fencingTypes.includes(fType)) {
+      if (fencingTypes.length === 1) return;
+      setFencingTypes(fencingTypes.filter(t => t !== fType));
+    } else {
+      setFencingTypes([...fencingTypes, fType]);
+    }
+  };
+
+  const toggleSelectAllFencing = () => {
+    if (fencingTypes.length === FENCING_OPTIONS.length) {
+      setFencingTypes([FENCING_OPTIONS[0]]);
+    } else {
+      setFencingTypes([...FENCING_OPTIONS]);
+    }
+  };
 
   const [agreed, setAgreed] = useState(false);
   const [error, setError] = useState('');
@@ -48,7 +66,7 @@ const OwnerRegister = () => {
       };
       if (isStorageYard) {
         extra.landAcres = parseFloat(landAcres);
-        extra.fencingType = fencingType;
+        extra.fencingType = fencingTypes.join(', ');
         extra.hasSecurityGuards = hasSecurityGuards;
       }
 
@@ -206,19 +224,42 @@ const OwnerRegister = () => {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-amber-950 mb-1.5">
-                    Boundary / Fencing Type
-                  </label>
-                  <select
-                    value={fencingType}
-                    onChange={e => setFencingType(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-white border border-amber-300 rounded-xl text-slate-800 text-sm focus:outline-none focus:border-amber-500"
-                  >
-                    <option value="Compound Wall">Concrete Compound Wall (Recommended)</option>
-                    <option value="High Chain-link Fencing">High Chain-link Steel Fencing</option>
-                    <option value="Barbed Wire & Post">Barbed Wire with Posts</option>
-                    <option value="Other Secured Boundary">Other Secured Boundary</option>
-                  </select>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-xs font-bold uppercase tracking-wider text-amber-950">
+                      Boundary Security / Fencing Type
+                    </label>
+                    <button
+                      type="button"
+                      onClick={toggleSelectAllFencing}
+                      className="text-xs font-bold text-amber-700 hover:text-amber-800"
+                    >
+                      {fencingTypes.length === FENCING_OPTIONS.length ? '✓ Deselect All' : 'Select All'}
+                    </button>
+                  </div>
+                  <div className="space-y-2">
+                    {FENCING_OPTIONS.map((fType) => {
+                      const isChecked = fencingTypes.includes(fType);
+                      return (
+                        <div
+                          key={fType}
+                          onClick={() => toggleFencingType(fType)}
+                          className={`flex items-center gap-3 p-3 rounded-xl border text-sm font-semibold cursor-pointer transition-all select-none ${
+                            isChecked
+                              ? 'border-amber-500 bg-amber-50/80 text-amber-950 shadow-sm'
+                              : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={() => {}}
+                            className="rounded border-slate-300 text-amber-600 focus:ring-amber-500 h-4 w-4 pointer-events-none"
+                          />
+                          <span>{fType}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
 
                 <div className="flex items-center gap-2 pt-1">

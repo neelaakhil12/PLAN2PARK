@@ -119,7 +119,7 @@ router.post('/owner/signup', async (req, res) => {
       role: 'owner',
       accountCategory: accountCategory || 'standard',
       landAcres: landAcres ? Number(landAcres) : 0,
-      fencingType: fencingType || '',
+      fencingType: Array.isArray(fencingType) ? fencingType.join(', ') : (fencingType || ''),
       hasSecurityGuards: Boolean(hasSecurityGuards),
       contact,
       status: 'verified',
