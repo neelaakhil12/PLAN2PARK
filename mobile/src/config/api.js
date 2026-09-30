@@ -25,7 +25,7 @@ export let API_URL = PUBLIC_ONLINE_URL;
 
 export const getImageUrl = (url) => {
   if (!url) return '';
-  if (url.startsWith('data:') || url.startsWith('http://') || url.startsWith('https://')) return url;
+  if (url.startsWith('data:') || url.startsWith('blob:') || url.startsWith('http://') || url.startsWith('https://')) return url;
   if (url.startsWith('/uploads/') || url.startsWith('uploads/')) {
     const cleanPath = url.startsWith('/') ? url : `/${url}`;
     const isLocal = Platform.OS === 'web' && typeof window !== 'undefined' && window?.location && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');

@@ -25,7 +25,7 @@ export let API_URL = PUBLIC_ONLINE_URL;
 
 export const getImageUrl = (url) => {
   if (!url) return '';
-  if (url.startsWith('data:')) return url;
+  if (url.startsWith('data:') || url.startsWith('blob:')) return url;
   if (url.startsWith('http://') || url.startsWith('https://')) {
     if (url.includes('localhost:5000') || url.includes('127.0.0.1:5000') || url.includes('43.204.235.124:5000')) {
       return url.replace(/https?:\/\/(localhost|127\.0\.0\.1|43\.204\.235\.124):5000/, 'https://api.plantopark.com');

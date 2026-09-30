@@ -54,6 +54,9 @@ const formatImageUrl = (req, file, fallbackUrl) => {
   }
   if (fallbackUrl && typeof fallbackUrl === 'string' && fallbackUrl.trim()) {
     const trimmed = fallbackUrl.trim();
+    if (trimmed.startsWith('blob:')) {
+      return '';
+    }
     if (trimmed.startsWith('data:image/')) {
       return saveBase64Image(trimmed);
     }

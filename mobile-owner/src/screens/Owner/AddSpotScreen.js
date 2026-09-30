@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { AuthContext } from '../../context/AuthContext';
-import { endpoints, getBaseApiUrl } from '../../config/api';
+import { endpoints, getBaseApiUrl, getImageUrl } from '../../config/api';
 import { COLORS } from '../../theme/colors';
 import Header from '../../components/Header';
 import Button from '../../components/Button';
@@ -116,10 +116,33 @@ export default function AddSpotScreen({ route, navigation }) {
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        const newImgs = result.assets.map((asset) =>
-          asset.base64 ? `data:image/jpeg;base64,${asset.base64}` : asset.uri
+        const newImgs = await Promise.all(
+          result.assets.map(async (asset) => {
+            if (asset.base64) {
+              return `data:image/jpeg;base64,${asset.base64}`;
+            }
+            if (asset.uri) {
+              if (Platform.OS === 'web' || typeof window !== 'undefined') {
+                try {
+                  const response = await fetch(asset.uri);
+                  const blob = await response.blob();
+                  return new Promise((resolve) => {
+                    const reader = new FileReader();
+                    reader.onloadend = () => resolve(reader.result);
+                    reader.onerror = () => resolve(asset.uri);
+                    reader.readAsDataURL(blob);
+                  });
+                } catch (e) {
+                  return asset.uri;
+                }
+              }
+              return asset.uri;
+            }
+            return null;
+          })
         );
-        setSpotImages((prev) => [...prev, ...newImgs].slice(0, 10));
+        const validImgs = newImgs.filter(Boolean);
+        setSpotImages((prev) => [...prev, ...validImgs].slice(0, 10));
       }
     } catch (err) {
       console.error('Image picker error:', err);
@@ -1275,7 +1298,7 @@ export default function AddSpotScreen({ route, navigation }) {
                       }}
                     >
                       <Image
-                        source={{ uri: imgUri }}
+                        source={{ uri: getImageUrl(imgUri) || imgUri }}
                         style={{ width: '100%', height: '100%' }}
                         resizeMode="cover"
                       />
