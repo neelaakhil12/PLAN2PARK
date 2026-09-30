@@ -113,10 +113,10 @@ export default function RegisterScreen({ route, navigation }) {
         )}
 
         <View style={styles.inputGroup}>
-          <Text style={styles.label}>{isStorageOwner ? 'Landowner / Company Name' : 'Full Name'}</Text>
+          <Text style={styles.label}>{isStorageOwner ? 'Vehicle Storage Yard Name' : 'Full Name'}</Text>
           <TextInput
             style={styles.input}
-            placeholder={isStorageOwner ? 'e.g. Ramesh Reddy (Landowner)' : 'e.g. Ramesh Reddy'}
+            placeholder={isStorageOwner ? 'e.g. Sri Sai Vehicle Storage Yard' : 'e.g. Ramesh Reddy'}
             placeholderTextColor={COLORS.textMuted}
             value={name}
             onChangeText={setName}
