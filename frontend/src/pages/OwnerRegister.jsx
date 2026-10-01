@@ -142,10 +142,10 @@ const OwnerRegister = () => {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Full Name */}
+            {/* Name */}
             <div>
               <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
-                {isStorageYard ? 'Vehicle Storage Yard Name' : 'Full Name'}
+                Name
               </label>
               <div className="relative">
                 <User className="absolute left-3.5 top-3.5 h-4 w-4 text-slate-400" />
@@ -154,7 +154,7 @@ const OwnerRegister = () => {
                   required
                   value={name}
                   onChange={e => setName(e.target.value)}
-                  placeholder={isStorageYard ? 'e.g. Sri Sai Vehicle Storage Yard' : 'e.g. Rajesh Reddy'}
+                  placeholder="Name"
                   className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl text-slate-800 placeholder-slate-300 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all text-sm"
                 />
               </div>
