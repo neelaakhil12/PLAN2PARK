@@ -22,11 +22,17 @@ export default function WebDesktopFrame({ children, downloadUrl = "https://expo.
   const showSidePanel = width >= 980;
   useEffect(() => {
     if (Platform.OS === 'web' && typeof document !== 'undefined') {
+      document.body.style.backgroundColor = '#0b0f19';
       const styleId = 'plan2park-web-scrollbars';
       if (!document.getElementById(styleId)) {
         const style = document.createElement('style');
         style.id = styleId;
         style.innerHTML = `
+          html, body {
+            background-color: #0b0f19 !important;
+            margin: 0;
+            padding: 0;
+          }
           *::-webkit-scrollbar {
             width: 5px;
             height: 5px;
@@ -99,7 +105,7 @@ const styles = StyleSheet.create({
     flex: 1,
     minHeight: '100vh',
     width: '100vw',
-    backgroundColor: '#ffffff',
+    backgroundColor: '#0b0f19',
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 20,
@@ -116,28 +122,29 @@ const styles = StyleSheet.create({
   panelTitle: {
     fontSize: 20,
     fontWeight: '900',
-    color: '#0f172a',
+    color: '#ffffff',
     marginBottom: 4,
+    letterSpacing: 0.3,
   },
   panelSubtitle: {
     fontSize: 13,
-    color: '#64748b',
+    color: '#94a3b8',
     marginBottom: 16,
     fontWeight: '500',
   },
   downloadBtnBig: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#000000',
+    backgroundColor: '#050811',
     paddingHorizontal: 28,
     paddingVertical: 16,
     borderRadius: 16,
     borderWidth: 1.5,
-    borderColor: '#27272a',
+    borderColor: '#334155',
     shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.25,
-    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.6,
+    shadowRadius: 24,
     elevation: 12,
     cursor: 'pointer',
   },
@@ -145,7 +152,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   btnSubBig: {
-    color: '#a1a1aa',
+    color: '#94a3b8',
     fontSize: 11,
     fontWeight: '800',
     letterSpacing: 1,
@@ -164,14 +171,14 @@ const styles = StyleSheet.create({
     maxHeight: '94vh',
     backgroundColor: COLORS.darkBg,
     borderRadius: 44,
-    borderWidth: 10,
-    borderColor: '#1e293b',
+    borderWidth: 8,
+    borderColor: '#334155',
     overflow: 'hidden',
-    shadowColor: '#0f172a',
-    shadowOffset: { width: 0, height: 25 },
-    shadowOpacity: 0.2,
-    shadowRadius: 40,
-    elevation: 20,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 30 },
+    shadowOpacity: 0.7,
+    shadowRadius: 50,
+    elevation: 25,
     position: 'relative',
   },
   phoneNotch: {
@@ -180,7 +187,7 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     width: 120,
     height: 18,
-    backgroundColor: '#1e293b',
+    backgroundColor: '#334155',
     borderBottomLeftRadius: 12,
     borderBottomRightRadius: 12,
     zIndex: 100,
