@@ -551,8 +551,8 @@ router.get('/:id/pay-webview', async (req, res) => {
       return res.status(404).send('<h3>Booking not found.</h3>');
     }
 
-    const keyId = process.env.RAZORPAY_KEY_ID || 'rzp_test_TRbpfgVeLqTOdb';
-    const keySecret = process.env.RAZORPAY_KEY_SECRET || '6hvk04JdO3lgV0j9DYXezC8R';
+    const keyId = process.env.RAZORPAY_KEY_ID || 'rzp_live_TidhMuvoj4fV3b';
+    const keySecret = process.env.RAZORPAY_KEY_SECRET || 'w94G6QL64Q8y9RIOBOXZZE2r';
 
     let orderId = '';
     try {
@@ -727,7 +727,7 @@ router.post('/:id/verify-payment', protect, seekerOnly, async (req, res) => {
     }
 
     // Signature verification (handles both production HMAC and verified Razorpay test tokens)
-    const keySecret = process.env.RAZORPAY_KEY_SECRET || '6hvk04JdO3lgV0j9DYXezC8R';
+    const keySecret = process.env.RAZORPAY_KEY_SECRET || 'w94G6QL64Q8y9RIOBOXZZE2r';
     let isValidSignature = isMock || isRazorpayMock();
 
     if (!isValidSignature && razorpay_signature && razorpay_order_id && razorpay_payment_id) {

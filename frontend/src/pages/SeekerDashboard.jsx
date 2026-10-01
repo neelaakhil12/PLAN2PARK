@@ -454,7 +454,7 @@ const SeekerDashboard = () => {
 
       // Real Razorpay checkout flow
       const options = {
-        key: keyId || 'rzp_test_TRbpfgVeLqTOdb',
+        key: keyId || 'rzp_live_TidhMuvoj4fV3b',
         amount: amount,
         currency: currency || 'INR',
         name: 'PlantoPark Safe P2P',

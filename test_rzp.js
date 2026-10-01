@@ -1,8 +1,8 @@
 const Razorpay = require('/home/ubuntu/PLAN2PARK/backend/node_modules/razorpay');
 
 const rzp = new Razorpay({
-  key_id: 'rzp_test_TMLHMiwE70n6U3',
-  key_secret: 'oLI2jLM98oF9Lc6Tym6EPxJJ'
+  key_id: 'rzp_live_TidhMuvoj4fV3b',
+  key_secret: 'w94G6QL64Q8y9RIOBOXZZE2r'
 });
 
 rzp.orders.create({

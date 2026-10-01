@@ -160,7 +160,7 @@ export default function SpotDetailsScreen({ route, navigation }) {
           },
         });
 
-        let orderData = { orderId: 'order_' + Math.random().toString(36).substring(2, 9), amount: finalPayablePrice * 100, keyId: 'rzp_test_TRbpfgVeLqTOdb' };
+        let orderData = { orderId: 'order_' + Math.random().toString(36).substring(2, 9), amount: finalPayablePrice * 100, keyId: 'rzp_live_TidhMuvoj4fV3b' };
         if (orderRes.ok) {
           orderData = await orderRes.json();
         }
@@ -173,7 +173,7 @@ export default function SpotDetailsScreen({ route, navigation }) {
         });
       } catch (orderErr) {
         // Fallback open Razorpay Sheet
-        let orderData = { orderId: 'order_' + Math.random().toString(36).substring(2, 9), amount: finalPayablePrice * 100, keyId: 'rzp_test_TRbpfgVeLqTOdb' };
+        let orderData = { orderId: 'order_' + Math.random().toString(36).substring(2, 9), amount: finalPayablePrice * 100, keyId: 'rzp_live_TidhMuvoj4fV3b' };
         try {
           const res = await fetch(`${baseUrl}/bookings/${newBooking._id}/razorpay-order`, {
             method: 'POST',
@@ -190,7 +190,7 @@ export default function SpotDetailsScreen({ route, navigation }) {
         setRazorpayModal({
           visible: true,
           bookingId: newBooking._id,
-          orderData: { orderId: 'order_' + Math.random().toString(36).substring(2, 9), amount: finalPayablePrice * 100, keyId: 'rzp_test_TRbpfgVeLqTOdb', ...orderData },
+          orderData: { orderId: 'order_' + Math.random().toString(36).substring(2, 9), amount: finalPayablePrice * 100, keyId: 'rzp_live_TidhMuvoj4fV3b', ...orderData },
           finalPayablePrice: finalPayablePrice,
           actualHours,
           booking: newBooking
