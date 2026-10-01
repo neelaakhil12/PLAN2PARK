@@ -1058,7 +1058,7 @@ export default function AddSpotScreen({ route, navigation }) {
 
               {/* Staging Capacity */}
               <View style={{ marginBottom: 16 }}>
-                <Text style={styles.label}>Total Holding Capacity (Cars / Staging Bays)</Text>
+                <Text style={styles.label}>Total Holding Capacity (Cars / Slots)</Text>
                 <TextInput
                   style={styles.input}
                   placeholder={String(Math.round(Math.max(1, parseFloat(landAcres) || 1) * 80))}

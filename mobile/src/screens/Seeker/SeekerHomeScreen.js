@@ -319,7 +319,7 @@ export default function SeekerHomeScreen({ navigation }) {
             <View style={styles.metaCol}>
               <Text style={styles.metaLabel}>Repossession Capacity</Text>
               <Text style={[styles.metaVal, { color: '#fbbf24', fontWeight: '800' }]} numberOfLines={1}>
-                🟢 ~{availableSlots || Math.round((item.landAcres || 1) * 80)} Staging Bays Ready
+                🟢 ~{availableSlots || Math.round((item.landAcres || 1) * 80)} Slots Ready
               </Text>
             </View>
             <TouchableOpacity

@@ -688,7 +688,7 @@ const OwnerDashboard = () => {
                             </p>
                             {isCommercial ? (
                               <p className="text-xs font-bold text-amber-950 mt-2">
-                                Monthly: <span className="text-amber-600 font-black">₹{spot.monthlyStorageRate || 1500}/car</span> • ~{spotSlots} Staging Bays
+                                Monthly: <span className="text-amber-600 font-black">₹{spot.monthlyStorageRate || 1500}/car</span> • {spotSlots} slots
                               </p>
                             ) : (
                               <p className="text-xs font-bold text-slate-700 mt-2">

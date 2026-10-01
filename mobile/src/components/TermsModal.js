@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   TextInput,
   SafeAreaView,
+  Platform,
 } from 'react-native';
 import { COLORS } from '../theme/colors';
 import { endpoints } from '../config/api';

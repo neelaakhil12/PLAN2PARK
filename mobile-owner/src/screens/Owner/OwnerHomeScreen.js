@@ -290,7 +290,7 @@ export default function OwnerHomeScreen({ navigation }) {
                     <Text style={styles.spotAddress}>📍 {spot.address || 'Address'}, {spot.city || 'Hyderabad'}</Text>
                     {isCommercial ? (
                       <Text style={[styles.spotPrice, { color: '#fbbf24', fontWeight: '700' }]}>
-                        Monthly Fee: ₹{spot.monthlyStorageRate || 1500}/car • ~{spotSlots} Staging Bays
+                        Monthly Fee: ₹{spot.monthlyStorageRate || 1500}/car • {spotSlots} slots
                       </Text>
                     ) : (
                       <Text style={styles.spotPrice}>

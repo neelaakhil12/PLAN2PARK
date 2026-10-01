@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, Platform, TouchableOpacity, Linking } from 'react-native';
+import { View, Text, StyleSheet, Platform, TouchableOpacity, Linking, useWindowDimensions } from 'react-native';
 import { COLORS } from '../theme/colors';
 
 // Official Google Play Multi-Colored Vector Logo for Web
@@ -18,6 +18,8 @@ const GooglePlayLogo = () => {
 };
 
 export default function WebDesktopFrame({ children, downloadUrl = "https://expo.dev/accounts/sailaksh123/projects/plantopark-owner/builds/9cc00d17-30bd-4906-a5cd-d92707e963ca" }) {
+  const { width } = useWindowDimensions();
+  const showSidePanel = width >= 980;
   useEffect(() => {
     if (Platform.OS === 'web' && typeof document !== 'undefined') {
       const styleId = 'plan2park-web-scrollbars';
@@ -73,19 +75,21 @@ export default function WebDesktopFrame({ children, downloadUrl = "https://expo.
         </View>
       </View>
 
-      {/* Big Right-Side Vertically Centered Play Store Download Card */}
-      <View style={styles.rightSidePanel}>
-        <Text style={styles.panelTitle}>Get Plan2Park Owner App</Text>
-        <Text style={styles.panelSubtitle}>Install directly on your Android phone</Text>
+      {/* Big Right-Side Vertically Centered Play Store Download Card (Shown on Wide Desktops) */}
+      {showSidePanel && (
+        <View style={styles.rightSidePanel}>
+          <Text style={styles.panelTitle}>Get Plan2Park Owner App</Text>
+          <Text style={styles.panelSubtitle}>Install directly on your Android phone</Text>
 
-        <TouchableOpacity style={styles.downloadBtnBig} onPress={handleDownload} activeOpacity={0.85}>
-          <GooglePlayLogo />
-          <View style={styles.btnTextColBig}>
-            <Text style={styles.btnSubBig}>GET IT ON</Text>
-            <Text style={styles.btnMainBig}>Google Play</Text>
-          </View>
-        </TouchableOpacity>
-      </View>
+          <TouchableOpacity style={styles.downloadBtnBig} onPress={handleDownload} activeOpacity={0.85}>
+            <GooglePlayLogo />
+            <View style={styles.btnTextColBig}>
+              <Text style={styles.btnSubBig}>GET IT ON</Text>
+              <Text style={styles.btnMainBig}>Google Play</Text>
+            </View>
+          </TouchableOpacity>
+        </View>
+      )}
     </View>
   );
 }
