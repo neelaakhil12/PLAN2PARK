@@ -270,8 +270,12 @@ export default function SpotDetailsScreen({ route, navigation }) {
         {/* Banner Card */}
         <View style={styles.spotCard}>
           <View style={styles.badgeRow}>
-            <Text style={styles.verifiedBadge}>VERIFIED PARKING</Text>
-            {space.hasEvCharger && <Text style={styles.evBadge}>⚡ EV CHARGING</Text>}
+            <Text style={styles.verifiedBadge}>
+              {space.spaceCategory === 'commercial_vehicle_storage' ? '🏢 1+ ACRE REPO STOCKYARD' : 'VERIFIED PARKING'}
+            </Text>
+            {space.hasEvCharger && space.spaceCategory !== 'commercial_vehicle_storage' && (
+              <Text style={styles.evBadge}>⚡ EV CHARGING</Text>
+            )}
           </View>
 
           <Text style={styles.spotTitle}>{space.title || 'Central Safe Parking'}</Text>
@@ -386,8 +390,17 @@ export default function SpotDetailsScreen({ route, navigation }) {
           <View style={styles.amenitiesGrid}>
             <View style={styles.amenityChip}><Text style={styles.amenityTxt}>🛡️ 24/7 CCTV</Text></View>
             <View style={styles.amenityChip}><Text style={styles.amenityTxt}>🔒 Gated Guarded</Text></View>
-            {space.hasEvCharger && <View style={styles.amenityChip}><Text style={styles.amenityTxt}>⚡ Fast Charger</Text></View>}
-            <View style={styles.amenityChip}><Text style={styles.amenityTxt}>☂️ Covered Parking</Text></View>
+            {space.spaceCategory === 'commercial_vehicle_storage' ? (
+              <>
+                <View style={styles.amenityChip}><Text style={styles.amenityTxt}>🧱 Compound Wall</Text></View>
+                <View style={styles.amenityChip}><Text style={styles.amenityTxt}>💡 Floodlights</Text></View>
+              </>
+            ) : (
+              <>
+                {space.hasEvCharger && <View style={styles.amenityChip}><Text style={styles.amenityTxt}>⚡ Fast Charger</Text></View>}
+                <View style={styles.amenityChip}><Text style={styles.amenityTxt}>☂️ Covered Parking</Text></View>
+              </>
+            )}
           </View>
         </View>
 

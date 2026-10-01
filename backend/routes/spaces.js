@@ -730,6 +730,28 @@ router.put('/:id', protect, upload.single('imageFile'), async (req, res) => {
       space.maxWalletDiscount = Number(req.body.maxWalletDiscount);
     }
 
+    if (req.body.monthlyStorageRate !== undefined) {
+      space.monthlyStorageRate = Number(req.body.monthlyStorageRate);
+    }
+
+    if (req.body.landAcres !== undefined) {
+      space.landAcres = Number(req.body.landAcres);
+    }
+
+    if (req.body.spaceCategory) {
+      space.spaceCategory = req.body.spaceCategory;
+    }
+
+    if (req.body.securityFacilities) {
+      let sec = req.body.securityFacilities;
+      if (typeof sec === 'string') {
+        try { sec = JSON.parse(sec); } catch (e) {}
+      }
+      if (typeof sec === 'object' && sec !== null) {
+        space.securityFacilities = { ...space.securityFacilities, ...sec };
+      }
+    }
+
     const updated = await space.save();
     res.json({ message: 'Space updated successfully', space: updated });
   } catch (error) {

@@ -84,6 +84,19 @@ export default function AddSpotScreen({ route, navigation }) {
       setHasEvCharger(Boolean(s.hasEvCharger));
       setIsActive(s.isActive !== false);
       setCancellationPolicy(s.cancellationPolicy || 'full');
+      if (s.landAcres) setLandAcres(String(s.landAcres));
+      if (s.monthlyStorageRate !== undefined && s.monthlyStorageRate !== null) {
+        setMonthlyStorageRate(String(s.monthlyStorageRate));
+      }
+      if (s.securityFacilities) {
+        if (s.securityFacilities.hasCompoundWall !== undefined) setHasCompoundWall(Boolean(s.securityFacilities.hasCompoundWall));
+        if (s.securityFacilities.has24x7Guards !== undefined) setHas24x7Guards(Boolean(s.securityFacilities.has24x7Guards));
+        if (s.securityFacilities.hasCctv !== undefined) setHasCctv(Boolean(s.securityFacilities.hasCctv));
+        if (s.securityFacilities.hasFloodLights !== undefined) setHasFloodLights(Boolean(s.securityFacilities.hasFloodLights));
+      }
+      if (s.spaceCategory) {
+        setIsVehicleStorageYard(s.spaceCategory === 'commercial_vehicle_storage');
+      }
       if (s.images && Array.isArray(s.images) && s.images.length > 0) {
         setSpotImages(s.images);
       } else if (s.image || s.imageUrl) {
@@ -781,7 +794,7 @@ export default function AddSpotScreen({ route, navigation }) {
           pricePerHour: Number(hourlyRate),
           totalSpots: Number(totalSpots),
           totalSlots: Number(totalSpots),
-          hasEvCharger,
+          hasEvCharger: isVehicleStorageYard ? false : Boolean(hasEvCharger),
           isActive,
           cancellationPolicy,
           maxWalletDiscount: Number(maxWalletDiscount || 0),
@@ -1006,30 +1019,128 @@ export default function AddSpotScreen({ route, navigation }) {
           )}
 
           {/* Rate and Capacity */}
-          <View style={styles.row}>
-            <View style={styles.col}>
-              <Text style={styles.label}>Hourly Rate (₹)</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="50"
-                placeholderTextColor={COLORS.textMuted}
-                keyboardType="numeric"
-                value={hourlyRate}
-                onChangeText={setHourlyRate}
-              />
+          {isVehicleStorageYard ? (
+            <>
+              {/* Storage Yard: Land Area & Monthly Fee */}
+              <View style={styles.row}>
+                <View style={styles.col}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                    <Text style={styles.label}>Land Area (Acres)</Text>
+                    <Text style={{ fontSize: 11, color: '#fbbf24', fontWeight: '800' }}>Min 1.0 Ac</Text>
+                  </View>
+                  <TextInput
+                    style={[styles.input, parseFloat(landAcres) < 1.0 && { borderColor: '#ef4444', borderWidth: 2 }]}
+                    placeholder="1.0"
+                    placeholderTextColor={COLORS.textMuted}
+                    keyboardType="numeric"
+                    value={landAcres}
+                    onChangeText={setLandAcres}
+                  />
+                  {parseFloat(landAcres) < 1.0 && (
+                    <Text style={{ color: '#ef4444', fontSize: 11, marginTop: -4, marginBottom: 8, fontWeight: '700' }}>
+                      Minimum 1.0 Acre required!
+                    </Text>
+                  )}
+                </View>
+
+                <View style={styles.col}>
+                  <Text style={styles.label}>Monthly Fee (₹/car/mo)</Text>
+                  <TextInput
+                    style={[styles.input, { borderColor: '#fbbf24', borderWidth: 1.5 }]}
+                    placeholder="1500"
+                    placeholderTextColor={COLORS.textMuted}
+                    keyboardType="numeric"
+                    value={monthlyStorageRate}
+                    onChangeText={setMonthlyStorageRate}
+                  />
+                </View>
+              </View>
+
+              {/* Staging Capacity */}
+              <View style={{ marginBottom: 16 }}>
+                <Text style={styles.label}>Total Holding Capacity (Cars / Staging Bays)</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder={String(Math.round(Math.max(1, parseFloat(landAcres) || 1) * 80))}
+                  placeholderTextColor={COLORS.textMuted}
+                  keyboardType="numeric"
+                  value={totalSpots}
+                  onChangeText={setTotalSpots}
+                />
+                <Text style={{ color: COLORS.textMuted, fontSize: 11, marginTop: 4 }}>
+                  Estimated capacity: ~80 to 120 seized cars per acre.
+                </Text>
+              </View>
+
+              {/* Security & Boundary Facilities for Repo Yards */}
+              <Text style={[styles.label, { marginTop: 4, marginBottom: 8 }]}>🛡️ Security & Boundary Facilities</Text>
+              <View style={{ gap: 8, marginBottom: 16 }}>
+                {[
+                  { label: '🧱 Concrete Compound Wall', val: hasCompoundWall, set: setHasCompoundWall },
+                  { label: '👮 24/7 On-Site Security Guards', val: has24x7Guards, set: setHas24x7Guards },
+                  { label: '📹 Full CCTV Camera Surveillance', val: hasCctv, set: setHasCctv },
+                  { label: '💡 Perimeter Flood Lights', val: hasFloodLights, set: setHasFloodLights },
+                ].map((sec, idx) => (
+                  <TouchableOpacity
+                    key={idx}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      backgroundColor: sec.val ? 'rgba(245, 158, 11, 0.12)' : COLORS.darkBg,
+                      borderWidth: 1.5,
+                      borderColor: sec.val ? '#f59e0b' : '#334155',
+                      borderRadius: 12,
+                      padding: 12,
+                    }}
+                    onPress={() => sec.set(!sec.val)}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={{ color: sec.val ? '#ffffff' : '#94a3b8', fontSize: 13, fontWeight: '700' }}>
+                      {sec.label}
+                    </Text>
+                    <View style={{
+                      width: 22,
+                      height: 22,
+                      borderRadius: 6,
+                      borderWidth: 2,
+                      borderColor: sec.val ? '#f59e0b' : '#475569',
+                      backgroundColor: sec.val ? '#f59e0b' : 'transparent',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}>
+                      {sec.val && <Text style={{ color: '#000', fontSize: 12, fontWeight: '900' }}>✓</Text>}
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </>
+          ) : (
+            <View style={styles.row}>
+              <View style={styles.col}>
+                <Text style={styles.label}>Hourly Rate (₹)</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="50"
+                  placeholderTextColor={COLORS.textMuted}
+                  keyboardType="numeric"
+                  value={hourlyRate}
+                  onChangeText={setHourlyRate}
+                />
+              </View>
+              <View style={styles.col}>
+                <Text style={styles.label}>Total Capacity (Slots)</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="5"
+                  placeholderTextColor={COLORS.textMuted}
+                  keyboardType="numeric"
+                  value={totalSpots}
+                  onChangeText={setTotalSpots}
+                />
+              </View>
             </View>
-            <View style={styles.col}>
-              <Text style={styles.label}>Total Capacity (Slots)</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="5"
-                placeholderTextColor={COLORS.textMuted}
-                keyboardType="numeric"
-                value={totalSpots}
-                onChangeText={setTotalSpots}
-              />
-            </View>
-          </View>
+          )}
 
           {/* Cancellation & Refund Policy Options (Owner Choice) */}
           <View style={{ marginTop: 14, marginBottom: 14 }}>
@@ -1191,32 +1302,34 @@ export default function AddSpotScreen({ route, navigation }) {
             </Text>
           </View>
 
-          <View style={styles.switchRow}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.switchTitle}>⚡ EV Charger Facility</Text>
-              <Text style={styles.switchSub}>Is electric vehicle charging available?</Text>
-            </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <TouchableOpacity
-                style={[
-                  styles.customToggleTrack,
-                  { backgroundColor: hasEvCharger ? '#10b981' : '#334155' }
-                ]}
-                onPress={() => setHasEvCharger((prev) => !prev)}
-                activeOpacity={0.8}
-              >
-                <View
+          {!isVehicleStorageYard && (
+            <View style={styles.switchRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.switchTitle}>⚡ EV Charger Facility</Text>
+                <Text style={styles.switchSub}>Is electric vehicle charging available?</Text>
+              </View>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <TouchableOpacity
                   style={[
-                    styles.customToggleThumb,
-                    { alignSelf: hasEvCharger ? 'flex-end' : 'flex-start' }
+                    styles.customToggleTrack,
+                    { backgroundColor: hasEvCharger ? '#10b981' : '#334155' }
                   ]}
-                />
-              </TouchableOpacity>
-              <Text style={{ fontSize: 12, fontWeight: '800', width: 30, color: hasEvCharger ? '#10b981' : '#94a3b8' }}>
-                {hasEvCharger ? 'ON' : 'OFF'}
-              </Text>
+                  onPress={() => setHasEvCharger((prev) => !prev)}
+                  activeOpacity={0.8}
+                >
+                  <View
+                    style={[
+                      styles.customToggleThumb,
+                      { alignSelf: hasEvCharger ? 'flex-end' : 'flex-start' }
+                    ]}
+                  />
+                </TouchableOpacity>
+                <Text style={{ fontSize: 12, fontWeight: '800', width: 30, color: hasEvCharger ? '#10b981' : '#94a3b8' }}>
+                  {hasEvCharger ? 'ON' : 'OFF'}
+                </Text>
+              </View>
             </View>
-          </View>
+          )}
 
           {editingSpot && (
             <View style={styles.switchRow}>

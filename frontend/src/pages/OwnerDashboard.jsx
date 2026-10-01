@@ -34,6 +34,13 @@ const OwnerDashboard = () => {
   // Edit / Active space state
   const [editingSpot, setEditingSpot] = useState(null);
   const [profileImgError, setProfileImgError] = useState(false);
+  const [showSupportDeskModal, setShowSupportDeskModal] = useState(false);
+  const [supportContacts, setSupportContacts] = useState({
+    supportPhone: '+91 8919360467',
+    supportEmail: 'plantopark@gmail.com',
+    supportWhatsapp: '+91 8919360467',
+    supportHours: '24/7 Dedicated Support Desk',
+  });
 
   // Add / Edit Spot Form
   const [spotForm, setSpotForm] = useState({
@@ -154,6 +161,13 @@ const OwnerDashboard = () => {
           }
         });
       }
+      try {
+        const supportRes = await fetch(`${API_URL}/settings/support`);
+        if (supportRes.ok) {
+          const sData = await supportRes.json();
+          setSupportContacts(prev => ({ ...prev, ...sData }));
+        }
+      } catch (sErr) {}
     } catch (err) {
       console.error('Owner data fetch error:', err);
     } finally {
@@ -353,7 +367,7 @@ const OwnerDashboard = () => {
       fd.append('pricePerMonth', Number(spotForm.pricePerMonth || 6000));
       fd.append('maxWalletDiscount', Number(spotForm.maxWalletDiscount ?? 10));
       fd.append('cancellationPolicy', spotForm.cancellationPolicy || 'full');
-      fd.append('hasEvCharger', spotForm.hasEvCharger);
+      fd.append('hasEvCharger', user?.accountCategory === 'vehicle_storage_owner' ? false : spotForm.hasEvCharger);
       fd.append('hasCctv', spotForm.hasCctv);
       fd.append('isCovered', spotForm.isCovered);
       fd.append('lat', spotForm.lat);
@@ -1320,36 +1334,38 @@ const OwnerDashboard = () => {
                 </div>
               </div>
 
-              {/* 9. EV Charger Facility Switch Toggle */}
-              <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-extrabold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
-                    ⚡ EV Charger Facility
-                  </p>
-                  <p className="text-xs text-slate-500 mt-0.5 font-medium">
-                    Is electric vehicle charging available?
-                  </p>
-                </div>
+              {/* 9. EV Charger Facility Switch Toggle (Hidden for Vehicle Storage Yards) */}
+              {user?.accountCategory !== 'vehicle_storage_owner' && (
+                <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-extrabold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                      ⚡ EV Charger Facility
+                    </p>
+                    <p className="text-xs text-slate-500 mt-0.5 font-medium">
+                      Is electric vehicle charging available?
+                    </p>
+                  </div>
 
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setSpotForm(p => ({ ...p, hasEvCharger: !p.hasEvCharger }))}
-                    className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                      spotForm.hasEvCharger ? 'bg-emerald-500' : 'bg-slate-300'
-                    }`}
-                  >
-                    <span
-                      className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
-                        spotForm.hasEvCharger ? 'translate-x-5' : 'translate-x-0'
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setSpotForm(p => ({ ...p, hasEvCharger: !p.hasEvCharger }))}
+                      className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                        spotForm.hasEvCharger ? 'bg-emerald-500' : 'bg-slate-300'
                       }`}
-                    />
-                  </button>
-                  <span className={`text-xs font-extrabold uppercase ${spotForm.hasEvCharger ? 'text-emerald-700' : 'text-slate-400'}`}>
-                    {spotForm.hasEvCharger ? 'ON' : 'OFF'}
-                  </span>
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                          spotForm.hasEvCharger ? 'translate-x-5' : 'translate-x-0'
+                        }`}
+                      />
+                    </button>
+                    <span className={`text-xs font-extrabold uppercase ${spotForm.hasEvCharger ? 'text-emerald-700' : 'text-slate-400'}`}>
+                      {spotForm.hasEvCharger ? 'ON' : 'OFF'}
+                    </span>
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* Submit Button matching Website Colors */}
               <div className="md:col-span-2">
@@ -1433,19 +1449,28 @@ const OwnerDashboard = () => {
             <div className="space-y-2">
               <h3 className="text-xs font-black uppercase text-slate-400 tracking-wider">Support &amp; Legal</h3>
               <div className="space-y-2.5">
-                <a
-                  href="tel:+918919360467"
+                <button
+                  type="button"
+                  onClick={() => setShowSupportDeskModal(true)}
+                  className="w-full bg-white hover:bg-slate-50 border border-slate-200 rounded-2xl p-4 flex items-center justify-between text-slate-800 font-extrabold text-sm transition-colors text-left cursor-pointer"
+                >
+                  <span className="flex items-center gap-2">📞 24/7 Owner Support Desk</span>
+                  <span className="text-indigo-600 text-xs font-bold">Contact →</span>
+                </button>
+                <Link
+                  to="/terms"
                   className="bg-white hover:bg-slate-50 border border-slate-200 rounded-2xl p-4 flex items-center justify-between text-slate-800 font-extrabold text-sm transition-colors block"
                 >
-                  <span>📞 24/7 Owner Support Desk</span>
-                  <span className="text-slate-400 text-xs font-bold">Call →</span>
-                </a>
-                <div
-                  className="bg-white border border-slate-200 rounded-2xl p-4 flex items-center justify-between text-slate-800 font-extrabold text-sm"
+                  <span className="flex items-center gap-2">🚜 Terms &amp; Conditions for Storage Yard Owner</span>
+                  <span className="text-amber-600 text-xs font-bold">30 Clauses →</span>
+                </Link>
+                <Link
+                  to="/terms"
+                  className="bg-white hover:bg-slate-50 border border-slate-200 rounded-2xl p-4 flex items-center justify-between text-slate-800 font-extrabold text-sm transition-colors block"
                 >
-                  <span>📜 Partner Terms &amp; Privacy Policy</span>
-                  <span className="text-slate-400 text-xs font-bold">Standard</span>
-                </div>
+                  <span className="flex items-center gap-2">🏢 Terms &amp; Conditions for Space Owner</span>
+                  <span className="text-indigo-600 text-xs font-bold">30 Clauses →</span>
+                </Link>
               </div>
             </div>
 
@@ -1456,6 +1481,80 @@ const OwnerDashboard = () => {
             >
               <LogOut className="h-4 w-4" /> Sign Out
             </button>
+          </div>
+        )}
+
+        {/* ── 24/7 OWNER SUPPORT DESK MODAL ── */}
+        {showSupportDeskModal && (
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn">
+            <div className="bg-white rounded-3xl border border-slate-200 max-w-md w-full p-6 shadow-2xl relative">
+              <button
+                onClick={() => setShowSupportDeskModal(false)}
+                className="absolute top-5 right-5 text-slate-400 hover:text-slate-700 h-8 w-8 rounded-full bg-slate-100 flex items-center justify-center"
+              >
+                ✕
+              </button>
+
+              <div className="mb-4">
+                <span className="px-2.5 py-1 rounded-full text-[10px] font-black bg-emerald-50 text-emerald-700 border border-emerald-200">
+                  LIVE 24/7 HELPDESK
+                </span>
+                <h3 className="text-lg font-black text-slate-900 mt-2">📞 24/7 Owner Support Desk</h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Official Plan2Park Support • Immediate assistance for space listings &amp; yard operations.
+                </p>
+              </div>
+
+              <div className="space-y-3 mb-5">
+                <a
+                  href={`tel:${(supportContacts.storageYardSupportPhone || supportContacts.ownerSupportPhone || supportContacts.supportPhone || '+918919360467').replace(/[^\d+]/g, '')}`}
+                  className="flex items-center justify-between p-3.5 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-2xl text-blue-900 font-bold text-xs transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-lg">📞</span>
+                    <div>
+                      <div className="text-[10px] text-blue-600 uppercase font-extrabold">Call Official Phone</div>
+                      <div className="text-sm font-black">{supportContacts.storageYardSupportPhone || supportContacts.ownerSupportPhone || supportContacts.supportPhone || '+91 8919360467'}</div>
+                    </div>
+                  </div>
+                  <span className="text-blue-600 font-black">Call →</span>
+                </a>
+
+                <a
+                  href={`https://wa.me/${(supportContacts.supportWhatsapp || supportContacts.supportPhone || '918919360467').replace(/[^\d]/g, '')}?text=Hello%20Plan2Park%20Support%2C%20I%20am%20a%20host%20requesting%20assistance.`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex items-center justify-between p-3.5 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-2xl text-emerald-900 font-bold text-xs transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-lg">💬</span>
+                    <div>
+                      <div className="text-[10px] text-emerald-600 uppercase font-extrabold">Chat on WhatsApp</div>
+                      <div className="text-sm font-black">{supportContacts.supportWhatsapp || supportContacts.supportPhone || '+91 8919360467'}</div>
+                    </div>
+                  </div>
+                  <span className="text-emerald-600 font-black">Chat →</span>
+                </a>
+
+                <a
+                  href={`mailto:${supportContacts.storageYardSupportEmail || supportContacts.ownerSupportEmail || supportContacts.supportEmail || 'plantopark@gmail.com'}?subject=Host%20Support%20Request`}
+                  className="flex items-center justify-between p-3.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-2xl text-slate-800 font-bold text-xs transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-lg">✉️</span>
+                    <div>
+                      <div className="text-[10px] text-slate-500 uppercase font-extrabold">Support Email</div>
+                      <div className="text-sm font-black">{supportContacts.storageYardSupportEmail || supportContacts.ownerSupportEmail || supportContacts.supportEmail || 'plantopark@gmail.com'}</div>
+                    </div>
+                  </div>
+                  <span className="text-slate-600 font-black">Email →</span>
+                </a>
+              </div>
+
+              <div className="p-3 bg-slate-50 rounded-xl text-[11px] text-slate-600 text-center font-medium border border-slate-100">
+                ⏱️ <strong>Operating Hours:</strong> {supportContacts.supportHours || '24/7 Dedicated Support Desk'}
+              </div>
+            </div>
           </div>
         )}
 

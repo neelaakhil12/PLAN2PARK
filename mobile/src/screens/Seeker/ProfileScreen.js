@@ -9,6 +9,7 @@ import {
   Image,
   ActivityIndicator,
   Alert,
+  Platform,
 } from 'react-native';
 import { AuthContext } from '../../context/AuthContext';
 import { COLORS } from '../../theme/colors';
@@ -18,12 +19,16 @@ import Header from '../../components/Header';
 import Button from '../../components/Button';
 import ProfileEditorModal from '../../components/ProfileEditorModal';
 import TermsModal from '../../components/TermsModal';
+import SupportModal from '../../components/SupportModal';
 import { Linking } from 'react-native';
 
 export default function ProfileScreen({ navigation }) {
   const { user, updateProfile, logout } = useContext(AuthContext);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showTermsModal, setShowTermsModal] = useState(false);
+  const [showSupportModal, setShowSupportModal] = useState(false);
+  const isBankUser = user?.accountCategory === 'bank_finance_seeker';
+  const [selectedTermsType, setSelectedTermsType] = useState(isBankUser ? 'bank_finance' : 'seeker');
   const [uploadingImage, setUploadingImage] = useState(false);
   const [imageLoadError, setImageLoadError] = useState(false);
 
@@ -194,17 +199,40 @@ export default function ProfileScreen({ navigation }) {
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.linkCard}
-          onPress={() => Linking.openURL('tel:+919876543210').catch(() => alert('Contact: support@plantopark.com'))}
+          onPress={() => setShowSupportModal(true)}
           activeOpacity={0.75}
         >
-          <Text style={styles.linkTxt}>📞 24/7 Customer Support Desk</Text>
+          <Text style={styles.linkTxt}>
+            {isBankUser ? '🏦 24/7 Bank & Fleet Support Desk' : '📞 24/7 Customer Support Desk'}
+          </Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.linkCard}
-          onPress={() => setShowTermsModal(true)}
+          onPress={() => {
+            setSelectedTermsType(isBankUser ? 'bank_finance' : 'seeker');
+            setShowTermsModal(true);
+          }}
           activeOpacity={0.75}
         >
-          <Text style={styles.linkTxt}>📜 Terms of Service & Privacy Policy</Text>
+          <Text style={styles.linkTxt}>
+            {isBankUser
+              ? '🏦 Terms & Conditions for Bank & Auto Finance'
+              : '🚗 Terms & Conditions for Parking Seeker'}
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.linkCard}
+          onPress={() => {
+            setSelectedTermsType(isBankUser ? 'seeker' : 'bank_finance');
+            setShowTermsModal(true);
+          }}
+          activeOpacity={0.75}
+        >
+          <Text style={styles.linkTxt}>
+            {isBankUser
+              ? '🚗 Terms & Conditions for Parking Seeker'
+              : '🏦 Terms & Conditions for Bank & Auto Finance'}
+          </Text>
         </TouchableOpacity>
 
         <Button
@@ -227,8 +255,15 @@ export default function ProfileScreen({ navigation }) {
       {/* Dynamic Terms & Conditions Modal */}
       <TermsModal
         visible={showTermsModal}
-        type="seeker"
+        type={selectedTermsType}
         onClose={() => setShowTermsModal(false)}
+      />
+
+      {/* 24/7 Customer / Fleet Help Desk Modal */}
+      <SupportModal
+        visible={showSupportModal}
+        onClose={() => setShowSupportModal(false)}
+        isBankFinance={isBankUser}
       />
     </SafeAreaView>
   );

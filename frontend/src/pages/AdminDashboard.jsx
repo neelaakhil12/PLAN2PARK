@@ -108,8 +108,58 @@ const AdminDashboard = () => {
   const [termClauseInput, setTermClauseInput] = useState('');
   const [termOrderInput, setTermOrderInput] = useState(1);
   const [termSearchQuery, setTermSearchQuery] = useState('');
-  const [termLoading, setTermLoading] = useState(false);
   const [showAddTermModal, setShowAddTermModal] = useState(false);
+
+  const [supportSettings, setSupportSettings] = useState({
+    supportEmail: 'plantopark@gmail.com',
+    supportPhone: '+91 8919360467',
+    supportWhatsapp: '+91 8919360467',
+    supportHours: '24/7 Dedicated Support Desk',
+    ownerSupportEmail: 'plantopark@gmail.com',
+    ownerSupportPhone: '+91 8919360467',
+    seekerSupportEmail: 'plantopark@gmail.com',
+    seekerSupportPhone: '+91 8919360467',
+    storageYardSupportEmail: 'plantopark@gmail.com',
+    storageYardSupportPhone: '+91 8919360467',
+    bankFinanceSupportEmail: 'plantopark@gmail.com',
+    bankFinanceSupportPhone: '+91 8919360467',
+  });
+  const [savingSupportSettings, setSavingSupportSettings] = useState(false);
+  const [supportSettingsSuccess, setSupportSettingsSuccess] = useState(false);
+
+  const fetchSupportSettings = async () => {
+    try {
+      const res = await fetch(`${API_URL}/settings/support`);
+      if (res.ok) {
+        setSupportSettings(await res.json());
+      }
+    } catch (e) {
+      console.error('Fetch support settings error:', e);
+    }
+  };
+
+  const handleSaveSupportSettings = async (e) => {
+    if (e) e.preventDefault();
+    setSavingSupportSettings(true);
+    try {
+      const res = await fetch(`${API_URL}/settings/support`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify(supportSettings),
+      });
+      if (res.ok) {
+        setSupportSettingsSuccess(true);
+        setTimeout(() => setSupportSettingsSuccess(false), 3500);
+      }
+    } catch (err) {
+      alert('Error updating support contacts: ' + err.message);
+    } finally {
+      setSavingSupportSettings(false);
+    }
+  };
 
   const fetchTerms = async () => {
     try {
@@ -254,6 +304,7 @@ const AdminDashboard = () => {
       if (rComplaints.ok) setComplaints(await rComplaints.json());
       if (rReviews.ok) setReviews(await rReviews.json());
       if (rTerms && rTerms.ok) setTerms(await rTerms.json());
+      fetchSupportSettings();
 
       // Fetch wallet payouts & commission
       try {
@@ -1680,32 +1731,58 @@ const AdminDashboard = () => {
                     </div>
 
                     {/* Navigation Filter Tabs & Search */}
-                    <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-                      <div className="flex items-center gap-2 bg-slate-200/60 p-1.5 rounded-2xl w-full sm:w-auto">
+                    <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4">
+                      <div className="flex flex-wrap items-center gap-2 bg-slate-200/60 p-1.5 rounded-2xl">
                         <button
                           onClick={() => setTermsType('owner')}
-                          className={`flex-1 sm:flex-initial px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+                          className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
                             termsType === 'owner'
                               ? 'bg-white text-indigo-700 shadow-sm font-black'
                               : 'text-slate-600 hover:text-slate-900'
                           }`}
                         >
-                          <span>🏢 Place Owner Terms</span>
+                          <span>🏢 Space Owner (30 Pts)</span>
                           <span className="px-2 py-0.5 rounded-full text-[10px] bg-indigo-50 text-indigo-600">
                             {terms.filter(t => t.type === 'owner').length}
                           </span>
                         </button>
                         <button
+                          onClick={() => setTermsType('storage_owner')}
+                          className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                            termsType === 'storage_owner'
+                              ? 'bg-white text-amber-700 shadow-sm font-black'
+                              : 'text-slate-600 hover:text-slate-900'
+                          }`}
+                        >
+                          <span>🚜 Storage Yard Owner (30 Pts)</span>
+                          <span className="px-2 py-0.5 rounded-full text-[10px] bg-amber-50 text-amber-600">
+                            {terms.filter(t => t.type === 'storage_owner').length}
+                          </span>
+                        </button>
+                        <button
                           onClick={() => setTermsType('seeker')}
-                          className={`flex-1 sm:flex-initial px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+                          className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
                             termsType === 'seeker'
                               ? 'bg-white text-blue-700 shadow-sm font-black'
                               : 'text-slate-600 hover:text-slate-900'
                           }`}
                         >
-                          <span>🚗 Parking Seeker Terms</span>
+                          <span>🚗 Parking Seeker (30 Pts)</span>
                           <span className="px-2 py-0.5 rounded-full text-[10px] bg-blue-50 text-blue-600">
                             {terms.filter(t => t.type === 'seeker').length}
+                          </span>
+                        </button>
+                        <button
+                          onClick={() => setTermsType('bank_finance')}
+                          className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                            termsType === 'bank_finance'
+                              ? 'bg-white text-cyan-700 shadow-sm font-black'
+                              : 'text-slate-600 hover:text-slate-900'
+                          }`}
+                        >
+                          <span>🏦 Bank & Auto Finance (30 Pts)</span>
+                          <span className="px-2 py-0.5 rounded-full text-[10px] bg-cyan-50 text-cyan-600">
+                            {terms.filter(t => t.type === 'bank_finance').length}
                           </span>
                         </button>
                       </div>
@@ -1722,12 +1799,158 @@ const AdminDashboard = () => {
                       </div>
                     </div>
 
+                    {/* ── 24/7 SUPPORT HELPLINE & CONCIERGE SETTINGS ── */}
+                    <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-4">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+                        <div>
+                          <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
+                            <span className="text-lg">📞</span> 24/7 Platform Support Desk & Helpline Contacts
+                          </h3>
+                          <p className="text-xs text-slate-500 mt-0.5">
+                            Configure the official Plan2Park support phone number, email, and WhatsApp helpline. Updates reflect instantly across Space Owner App, Seeker App, and Web Dashboards.
+                          </p>
+                        </div>
+                        {supportSettingsSuccess && (
+                          <span className="px-3 py-1 rounded-full text-xs font-black bg-emerald-50 text-emerald-700 border border-emerald-200 animate-fadeIn">
+                            ✓ Support Settings Saved!
+                          </span>
+                        )}
+                      </div>
+
+                      <form onSubmit={handleSaveSupportSettings} className="space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                          <div>
+                            <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                              📞 24/7 General Support Phone
+                            </label>
+                            <input
+                              type="text"
+                              value={supportSettings.supportPhone || ''}
+                              onChange={(e) => setSupportSettings({ ...supportSettings, supportPhone: e.target.value })}
+                              placeholder="+91 8919360467"
+                              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:border-indigo-400"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                              ✉️ Official Support Email
+                            </label>
+                            <input
+                              type="email"
+                              value={supportSettings.supportEmail || ''}
+                              onChange={(e) => setSupportSettings({ ...supportSettings, supportEmail: e.target.value })}
+                              placeholder="plantopark@gmail.com"
+                              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:border-indigo-400"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                              💬 Official WhatsApp Helpline
+                            </label>
+                            <input
+                              type="text"
+                              value={supportSettings.supportWhatsapp || ''}
+                              onChange={(e) => setSupportSettings({ ...supportSettings, supportWhatsapp: e.target.value })}
+                              placeholder="+91 8919360467"
+                              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:border-indigo-400"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                              ⏱️ Support Operating Hours
+                            </label>
+                            <input
+                              type="text"
+                              value={supportSettings.supportHours || ''}
+                              onChange={(e) => setSupportSettings({ ...supportSettings, supportHours: e.target.value })}
+                              placeholder="24/7 Dedicated Support Desk"
+                              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:border-indigo-400"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Role-Specific Hotlines */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 pt-2 border-t border-slate-100">
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-500 mb-1">
+                              🏢 Space Owner Hotline
+                            </label>
+                            <input
+                              type="text"
+                              value={supportSettings.ownerSupportPhone || ''}
+                              onChange={(e) => setSupportSettings({ ...supportSettings, ownerSupportPhone: e.target.value })}
+                              placeholder="+91 8919360467"
+                              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:border-indigo-400"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-500 mb-1">
+                              🚜 Storage Yard Hotline
+                            </label>
+                            <input
+                              type="text"
+                              value={supportSettings.storageYardSupportPhone || ''}
+                              onChange={(e) => setSupportSettings({ ...supportSettings, storageYardSupportPhone: e.target.value })}
+                              placeholder="+91 8919360467"
+                              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:border-indigo-400"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-500 mb-1">
+                              🚗 Parking Seeker Hotline
+                            </label>
+                            <input
+                              type="text"
+                              value={supportSettings.seekerSupportPhone || ''}
+                              onChange={(e) => setSupportSettings({ ...supportSettings, seekerSupportPhone: e.target.value })}
+                              placeholder="+91 8919360467"
+                              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:border-indigo-400"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-500 mb-1">
+                              🏦 Bank & Fleet Hotline
+                            </label>
+                            <input
+                              type="text"
+                              value={supportSettings.bankFinanceSupportPhone || ''}
+                              onChange={(e) => setSupportSettings({ ...supportSettings, bankFinanceSupportPhone: e.target.value })}
+                              placeholder="+91 8919360467"
+                              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:border-indigo-400"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="flex justify-end">
+                          <button
+                            type="submit"
+                            disabled={savingSupportSettings}
+                            className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold px-5 py-2.5 rounded-xl text-xs flex items-center gap-2 shadow-md shadow-emerald-600/20 transition-all cursor-pointer"
+                          >
+                            {savingSupportSettings ? 'Saving Support Settings...' : '💾 Save Support Helpline Settings'}
+                          </button>
+                        </div>
+                      </form>
+                    </div>
+
                     {/* Clauses List Table */}
                     <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm">
                       <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
                         <div>
                           <h3 className="font-extrabold text-slate-800 text-sm">
-                            {termsType === 'owner' ? 'Place Owner (Space Provider)' : 'Parking Seeker (Vehicle Owner)'} Clauses
+                            {termsType === 'storage_owner'
+                              ? '🚜 Storage Yard Owner (1+ Acre Facility Agreement) Clauses'
+                              : termsType === 'owner'
+                              ? '🏢 Parking Space Owner (Host Agreement) Clauses'
+                              : termsType === 'bank_finance'
+                              ? '🏦 Bank & Auto Finance Repossession Staging Clauses'
+                              : '🚗 Parking Seeker (Driver & Commuter) Clauses'}
                           </h3>
                           <p className="text-[11px] text-slate-400">Total {filteredTerms.length} active clauses loaded</p>
                         </div>
@@ -1829,8 +2052,10 @@ const AdminDashboard = () => {
                                 onChange={(e) => setTermsType(e.target.value)}
                                 className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:border-indigo-400"
                               >
-                                <option value="owner">🏢 Place Owner App</option>
-                                <option value="seeker">🚗 Parking Seeker App</option>
+                                <option value="owner">🏢 Space Owner Terms (30 Clauses)</option>
+                                <option value="storage_owner">🚜 Storage Yard Owner Terms (30 Clauses)</option>
+                                <option value="seeker">🚗 Parking Seeker Terms (30 Clauses)</option>
+                                <option value="bank_finance">🏦 Bank & Auto Finance Terms (30 Clauses)</option>
                               </select>
                             </div>
 

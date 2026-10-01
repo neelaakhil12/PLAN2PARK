@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { FileText, CheckCircle, ShieldCheck, Car, Building2, Search, RefreshCw } from 'lucide-react';
+import { FileText, CheckCircle, ShieldCheck, Car, Building2, Search, RefreshCw, Warehouse, Landmark } from 'lucide-react';
 
-const API_BASE = 'https://api.plantopark.com/api';
+const API_BASE = import.meta.env.VITE_API_URL || 'https://api.plantopark.com/api';
 
 const Terms = () => {
   const [activeTab, setActiveTab] = useState('seeker');
@@ -46,7 +46,7 @@ const Terms = () => {
             </div>
             <div>
               <h1 className="text-3xl font-black tracking-tight">Terms & Conditions</h1>
-              <p className="text-emerald-100 text-sm mt-0.5">Official platform agreements and legal obligations</p>
+              <p className="text-emerald-100 text-sm mt-0.5">Official platform agreements and legal obligations across all roles</p>
             </div>
           </div>
           <div className="flex items-center gap-3 mt-4 text-xs font-semibold text-emerald-200">
@@ -59,33 +59,55 @@ const Terms = () => {
         </div>
 
         {/* Tab Switcher & Search Bar */}
-        <div className="p-6 border-b border-slate-100 bg-slate-50/50 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex bg-slate-200/80 p-1 rounded-2xl w-full sm:w-auto">
+        <div className="p-6 border-b border-slate-100 bg-slate-50/50 flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4">
+          <div className="flex flex-wrap bg-slate-200/80 p-1 rounded-2xl gap-1">
             <button
-              onClick={() => setActiveTab('seeker')}
-              className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black transition-all ${
+              onClick={() => { setActiveTab('seeker'); setSearchQuery(''); }}
+              className={`flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl text-xs font-black transition-all ${
                 activeTab === 'seeker'
                   ? 'bg-white text-emerald-700 shadow-sm'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              <Car className="h-4 w-4" />
-              Parking Seeker Terms
+              <Car className="h-3.5 w-3.5" />
+              Parking Seeker (30 Pts)
             </button>
             <button
-              onClick={() => setActiveTab('owner')}
-              className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black transition-all ${
+              onClick={() => { setActiveTab('owner'); setSearchQuery(''); }}
+              className={`flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl text-xs font-black transition-all ${
                 activeTab === 'owner'
                   ? 'bg-white text-emerald-700 shadow-sm'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              <Building2 className="h-4 w-4" />
-              Space Owner Terms
+              <Building2 className="h-3.5 w-3.5" />
+              Space Owner (30 Pts)
+            </button>
+            <button
+              onClick={() => { setActiveTab('storage_owner'); setSearchQuery(''); }}
+              className={`flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl text-xs font-black transition-all ${
+                activeTab === 'storage_owner'
+                  ? 'bg-white text-emerald-700 shadow-sm'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Warehouse className="h-3.5 w-3.5" />
+              Storage Yard Owner (30 Pts)
+            </button>
+            <button
+              onClick={() => { setActiveTab('bank_finance'); setSearchQuery(''); }}
+              className={`flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl text-xs font-black transition-all ${
+                activeTab === 'bank_finance'
+                  ? 'bg-white text-emerald-700 shadow-sm'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Landmark className="h-3.5 w-3.5" />
+              Bank & Finance (30 Pts)
             </button>
           </div>
 
-          <div className="relative w-full sm:w-72">
+          <div className="relative w-full lg:w-64">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
             <input
               type="text"
@@ -105,7 +127,7 @@ const Terms = () => {
               <p className="text-xs font-bold">Loading official clauses from server...</p>
             </div>
           ) : filteredTerms.length === 0 ? (
-            <div className="text-center py-16 text-slate-400 text-xs">
+            <div className="text-center py-16 text-slate-400 text-xs font-semibold">
               No clauses found matching your search.
             </div>
           ) : (

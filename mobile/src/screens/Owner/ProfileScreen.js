@@ -17,9 +17,15 @@ import { COLORS } from '../../theme/colors';
 import { getImageUrl } from '../../config/api';
 import Header from '../../components/Header';
 import Button from '../../components/Button';
+import TermsModal from '../../components/TermsModal';
+import SupportModal from '../../components/SupportModal';
+import { Linking } from 'react-native';
 
 export default function ProfileScreen() {
   const { user, updateProfile, logout } = useContext(AuthContext);
+  const [showTermsModal, setShowTermsModal] = useState(false);
+  const [showSupportModal, setShowSupportModal] = useState(false);
+  const [selectedTermsType, setSelectedTermsType] = useState('storage_owner');
   const [uploadingImage, setUploadingImage] = useState(false);
   const [imageLoadError, setImageLoadError] = useState(false);
 
@@ -154,11 +160,32 @@ export default function ProfileScreen() {
 
         {/* Support & Legal */}
         <Text style={styles.sectionTitle}>Support & Legal</Text>
-        <TouchableOpacity style={styles.linkCard}>
+        <TouchableOpacity
+          style={styles.linkCard}
+          onPress={() => setShowSupportModal(true)}
+          activeOpacity={0.75}
+        >
           <Text style={styles.linkTxt}>📞 24/7 Owner Support Desk</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.linkCard}>
-          <Text style={styles.linkTxt}>📜 Partner Terms & Privacy Policy</Text>
+        <TouchableOpacity
+          style={styles.linkCard}
+          onPress={() => {
+            setSelectedTermsType('storage_owner');
+            setShowTermsModal(true);
+          }}
+          activeOpacity={0.75}
+        >
+          <Text style={styles.linkTxt}>📜 Terms & Conditions for Storage Yard Owner</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.linkCard}
+          onPress={() => {
+            setSelectedTermsType('owner');
+            setShowTermsModal(true);
+          }}
+          activeOpacity={0.75}
+        >
+          <Text style={styles.linkTxt}>🏢 Terms & Conditions for Space Owner</Text>
         </TouchableOpacity>
 
         <Button
@@ -168,6 +195,20 @@ export default function ProfileScreen() {
           style={{ marginTop: 24, marginBottom: 30 }}
         />
       </ScrollView>
+
+      {/* Dynamic Terms & Conditions Modal */}
+      <TermsModal
+        visible={showTermsModal}
+        type={selectedTermsType}
+        onClose={() => setShowTermsModal(false)}
+      />
+
+      {/* 24/7 Owner Help Desk Modal */}
+      <SupportModal
+        visible={showSupportModal}
+        onClose={() => setShowSupportModal(false)}
+        isStorageYard={true}
+      />
     </SafeAreaView>
   );
 }

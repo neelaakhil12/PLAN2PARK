@@ -4,7 +4,7 @@ const termSchema = new mongoose.Schema(
   {
     type: {
       type: String,
-      enum: ['owner', 'seeker'],
+      enum: ['owner', 'storage_owner', 'seeker', 'bank_finance'],
       required: true,
       index: true,
     },

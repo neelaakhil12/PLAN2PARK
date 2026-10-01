@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useContext, useRef } from 'react';
-import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import SpacesMap from '../components/SpacesMap';
 import {
@@ -148,6 +148,13 @@ const SeekerDashboard = () => {
   const [nearMeLoading, setNearMeLoading] = useState(false);
   const [nearMeRadius, setNearMeRadius] = useState(5); // km
   const [activeSpaceId, setActiveSpaceId] = useState(null); // card ↔ map pin hover sync
+  const [showSeekerSupportModal, setShowSeekerSupportModal] = useState(false);
+  const [supportContacts, setSupportContacts] = useState({
+    supportPhone: '+91 8919360467',
+    supportEmail: 'plantopark@gmail.com',
+    supportWhatsapp: '+91 8919360467',
+    supportHours: '24/7 Dedicated Support Desk',
+  });
 
   // Live Navigation & Simulation States
   const [simulationActive, setSimulationActive] = useState(false);
@@ -171,6 +178,14 @@ const SeekerDashboard = () => {
       if (rA.ok) setAnalytics(await rA.json());
       if (rS.ok) setSpaces(await rS.json());
       if (rC.ok) setComplaints(await rC.json());
+
+      try {
+        const supportRes = await fetch(`${API_URL}/settings/support`);
+        if (supportRes.ok) {
+          const sData = await supportRes.json();
+          setSupportContacts(prev => ({ ...prev, ...sData }));
+        }
+      } catch (sErr) {}
 
       const rP = await fetch(`${API_URL}/auth/profile`, { headers: h });
       if (rP.ok) {
@@ -1648,10 +1663,10 @@ const SeekerDashboard = () => {
                       onError={(e) => { e.target.style.display = 'none'; }}
                     />
                     <div className="absolute top-3 left-3 flex items-center gap-2">
-                      <span className="bg-emerald-500/90 backdrop-blur text-white text-[11px] font-black px-3 py-1 rounded-full tracking-wider uppercase shadow-md">
-                        VERIFIED PARKING
+                      <span className={`${selectedSpace.spaceCategory === 'commercial_vehicle_storage' || user?.accountCategory === 'bank_finance_seeker' ? 'bg-amber-500/90' : 'bg-emerald-500/90'} backdrop-blur text-white text-[11px] font-black px-3 py-1 rounded-full tracking-wider uppercase shadow-md`}>
+                        {selectedSpace.spaceCategory === 'commercial_vehicle_storage' || user?.accountCategory === 'bank_finance_seeker' ? '🏢 1+ ACRE REPO STOCKYARD' : 'VERIFIED PARKING'}
                       </span>
-                      {selectedSpace.hasEvCharger && (
+                      {selectedSpace.hasEvCharger && selectedSpace.spaceCategory !== 'commercial_vehicle_storage' && user?.accountCategory !== 'bank_finance_seeker' && (
                         <span className="bg-amber-500/90 backdrop-blur text-white text-[11px] font-black px-3 py-1 rounded-full tracking-wider uppercase shadow-md">
                           ⚡ EV CHARGING
                         </span>
@@ -1668,7 +1683,11 @@ const SeekerDashboard = () => {
                       {selectedSpace.address}, {selectedSpace.location || selectedSpace.city || 'Hyderabad'}
                     </p>
                     <p className="text-sm font-bold text-slate-700 mt-2">
-                      Rate: <span className="text-emerald-600 font-black text-base">₹{selectedSpace.pricePerHour || 40}/hour</span>
+                      Rate: <span className={`${selectedSpace.spaceCategory === 'commercial_vehicle_storage' ? 'text-amber-600' : 'text-emerald-600'} font-black text-base`}>
+                        {selectedSpace.spaceCategory === 'commercial_vehicle_storage'
+                          ? `₹${selectedSpace.monthlyStorageRate || 2500}/car/month`
+                          : `₹${selectedSpace.pricePerHour || 40}/hour`}
+                      </span>
                     </p>
                   </div>
 
@@ -1713,18 +1732,31 @@ const SeekerDashboard = () => {
                       <div className="bg-slate-50 border border-slate-200/70 text-slate-700 text-xs font-bold px-3 py-2 rounded-xl text-center">
                         🔒 Gated Guarded
                       </div>
-                      {selectedSpace.hasEvCharger ? (
-                        <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-bold px-3 py-2 rounded-xl text-center">
-                          ⚡ Fast Charger
-                        </div>
+                      {selectedSpace.spaceCategory === 'commercial_vehicle_storage' || user?.accountCategory === 'bank_finance_seeker' ? (
+                        <>
+                          <div className="bg-slate-50 border border-slate-200/70 text-slate-700 text-xs font-bold px-3 py-2 rounded-xl text-center">
+                            🧱 Compound Wall
+                          </div>
+                          <div className="bg-slate-50 border border-slate-200/70 text-slate-700 text-xs font-bold px-3 py-2 rounded-xl text-center">
+                            💡 Floodlights
+                          </div>
+                        </>
                       ) : (
-                        <div className="bg-slate-50 border border-slate-200/70 text-slate-700 text-xs font-bold px-3 py-2 rounded-xl text-center">
-                          ⚡ Fast Charger
-                        </div>
+                        <>
+                          {selectedSpace.hasEvCharger ? (
+                            <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-bold px-3 py-2 rounded-xl text-center">
+                              ⚡ Fast Charger
+                            </div>
+                          ) : (
+                            <div className="bg-slate-50 border border-slate-200/70 text-slate-700 text-xs font-bold px-3 py-2 rounded-xl text-center">
+                              ⚡ Fast Charger
+                            </div>
+                          )}
+                          <div className="bg-slate-50 border border-slate-200/70 text-slate-700 text-xs font-bold px-3 py-2 rounded-xl text-center">
+                            ☂️ Covered Parking
+                          </div>
+                        </>
                       )}
-                      <div className="bg-slate-50 border border-slate-200/70 text-slate-700 text-xs font-bold px-3 py-2 rounded-xl text-center">
-                        ☂️ Covered Parking
-                      </div>
                     </div>
                   </div>
                 </div>
@@ -2909,16 +2941,27 @@ const SeekerDashboard = () => {
               <h3 className="text-base font-black text-slate-900">Support &amp; Legal</h3>
               <button
                 type="button"
-                onClick={() => setCurrentView('complaints')}
-                className="w-full text-left p-4 bg-slate-50 hover:bg-slate-100 border border-slate-200/80 rounded-2xl text-xs font-bold text-slate-700 flex items-center justify-between transition-colors"
+                onClick={() => setShowSeekerSupportModal(true)}
+                className="w-full text-left p-4 bg-slate-50 hover:bg-slate-100 border border-slate-200/80 rounded-2xl text-xs font-bold text-slate-700 flex items-center justify-between transition-colors cursor-pointer"
               >
-                <span>📞 24/7 Customer Support Desk</span>
-                <span>→</span>
+                <span>
+                  {user?.accountCategory === 'bank_finance_seeker'
+                    ? '🏦 24/7 Bank & Fleet Support Desk'
+                    : '📞 24/7 Customer Support Desk'}
+                </span>
+                <span className="text-blue-600 font-bold">Contact →</span>
               </button>
-              <div className="p-4 bg-slate-50 border border-slate-200/80 rounded-2xl text-xs font-bold text-slate-700 flex items-center justify-between">
-                <span>📜 Terms of Service &amp; Privacy Policy</span>
-                <span className="text-emerald-600 font-extrabold">Standard</span>
-              </div>
+              <Link
+                to="/terms"
+                className="p-4 bg-slate-50 hover:bg-slate-100 border border-slate-200/80 rounded-2xl text-xs font-bold text-slate-700 flex items-center justify-between transition-colors block"
+              >
+                <span>
+                  {user?.accountCategory === 'bank_finance_seeker'
+                    ? '🏦 Terms & Conditions for Bank & Auto Finance'
+                    : '🚗 Terms & Conditions for Parking Seeker'}
+                </span>
+                <span className="text-emerald-600 font-extrabold">30 Clauses →</span>
+              </Link>
             </div>
 
             {/* 5. Sign Out Button */}
@@ -2929,6 +2972,92 @@ const SeekerDashboard = () => {
             >
               Sign Out
             </button>
+          </div>
+        )}
+
+        {/* ── 24/7 SEEKER / BANK SUPPORT DESK MODAL ── */}
+        {showSeekerSupportModal && (
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn">
+            <div className="bg-white rounded-3xl border border-slate-200 max-w-md w-full p-6 shadow-2xl relative">
+              <button
+                onClick={() => setShowSeekerSupportModal(false)}
+                className="absolute top-5 right-5 text-slate-400 hover:text-slate-700 h-8 w-8 rounded-full bg-slate-100 flex items-center justify-center"
+              >
+                ✕
+              </button>
+
+              <div className="mb-4">
+                <span className="px-2.5 py-1 rounded-full text-[10px] font-black bg-emerald-50 text-emerald-700 border border-emerald-200">
+                  LIVE 24/7 HELPDESK
+                </span>
+                <h3 className="text-lg font-black text-slate-900 mt-2">
+                  {user?.accountCategory === 'bank_finance_seeker'
+                    ? '🏦 24/7 Bank & Fleet Support Desk'
+                    : '📞 24/7 Customer Support Desk'}
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Official Plan2Park Support • Instant concierge for navigation, slots, and assistance.
+                </p>
+              </div>
+
+              <div className="space-y-3 mb-5">
+                <a
+                  href={`tel:${(user?.accountCategory === 'bank_finance_seeker' ? (supportContacts.bankFinanceSupportPhone || supportContacts.supportPhone) : (supportContacts.seekerSupportPhone || supportContacts.supportPhone) || '+918919360467').replace(/[^\d+]/g, '')}`}
+                  className="flex items-center justify-between p-3.5 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-2xl text-blue-900 font-bold text-xs transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-lg">📞</span>
+                    <div>
+                      <div className="text-[10px] text-blue-600 uppercase font-extrabold">Call Official Phone</div>
+                      <div className="text-sm font-black">
+                        {user?.accountCategory === 'bank_finance_seeker'
+                          ? (supportContacts.bankFinanceSupportPhone || supportContacts.supportPhone || '+91 8919360467')
+                          : (supportContacts.seekerSupportPhone || supportContacts.supportPhone || '+91 8919360467')}
+                      </div>
+                    </div>
+                  </div>
+                  <span className="text-blue-600 font-black">Call →</span>
+                </a>
+
+                <a
+                  href={`https://wa.me/${(supportContacts.supportWhatsapp || supportContacts.supportPhone || '918919360467').replace(/[^\d]/g, '')}?text=Hello%20Plan2Park%20Support%2C%20I%20am%20a%20customer%20requesting%20assistance.`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex items-center justify-between p-3.5 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-2xl text-emerald-900 font-bold text-xs transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-lg">💬</span>
+                    <div>
+                      <div className="text-[10px] text-emerald-600 uppercase font-extrabold">Chat on WhatsApp</div>
+                      <div className="text-sm font-black">{supportContacts.supportWhatsapp || supportContacts.supportPhone || '+91 8919360467'}</div>
+                    </div>
+                  </div>
+                  <span className="text-emerald-600 font-black">Chat →</span>
+                </a>
+
+                <a
+                  href={`mailto:${user?.accountCategory === 'bank_finance_seeker' ? (supportContacts.bankFinanceSupportEmail || supportContacts.supportEmail) : (supportContacts.seekerSupportEmail || supportContacts.supportEmail) || 'plantopark@gmail.com'}?subject=Customer%20Support%20Request`}
+                  className="flex items-center justify-between p-3.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-2xl text-slate-800 font-bold text-xs transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-lg">✉️</span>
+                    <div>
+                      <div className="text-[10px] text-slate-500 uppercase font-extrabold">Support Email</div>
+                      <div className="text-sm font-black">
+                        {user?.accountCategory === 'bank_finance_seeker'
+                          ? (supportContacts.bankFinanceSupportEmail || supportContacts.supportEmail || 'plantopark@gmail.com')
+                          : (supportContacts.seekerSupportEmail || supportContacts.supportEmail || 'plantopark@gmail.com')}
+                      </div>
+                    </div>
+                  </div>
+                  <span className="text-slate-600 font-black">Email →</span>
+                </a>
+              </div>
+
+              <div className="p-3 bg-slate-50 rounded-xl text-[11px] text-slate-600 text-center font-medium border border-slate-100">
+                ⏱️ <strong>Operating Hours:</strong> {supportContacts.supportHours || '24/7 Dedicated Support Desk'}
+              </div>
+            </div>
           </div>
         )}
 
