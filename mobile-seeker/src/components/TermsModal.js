@@ -214,7 +214,6 @@ export default function TermsModal({ visible, onClose, type = 'seeker' }) {
                 🔒 Legally binding agreement between the Registered User and Plan To Park Technologies. All rights reserved. Hyderabad, Telangana jurisdiction.
               </Text>
             </View>
-            </View>
           </ScrollView>
         )}
         </SafeAreaView>
