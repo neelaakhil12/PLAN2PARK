@@ -25,7 +25,10 @@ export default function ProfileScreen() {
   const { user, updateProfile, logout } = useContext(AuthContext);
   const [showTermsModal, setShowTermsModal] = useState(false);
   const [showSupportModal, setShowSupportModal] = useState(false);
-  const [selectedTermsType, setSelectedTermsType] = useState('storage_owner');
+  const isStorageOwner =
+    user?.accountCategory === 'vehicle_storage_owner' ||
+    (user?.name && user.name.toLowerCase().includes('storage'));
+  const [selectedTermsType, setSelectedTermsType] = useState(isStorageOwner ? 'storage_owner' : 'owner');
   const [uploadingImage, setUploadingImage] = useState(false);
   const [imageLoadError, setImageLoadError] = useState(false);
 
@@ -140,8 +143,10 @@ export default function ProfileScreen() {
             <Text style={styles.userPhone}>📞 {user.contact}</Text>
           ) : null}
 
-          <View style={styles.roleTag}>
-            <Text style={styles.roleTagTxt}>PARKING SPACE OWNER</Text>
+          <View style={[styles.roleTag, isStorageOwner && { backgroundColor: 'rgba(245, 158, 11, 0.15)', borderColor: '#f59e0b' }]}>
+            <Text style={[styles.roleTagTxt, isStorageOwner && { color: '#f59e0b' }]}>
+              {isStorageOwner ? '🚜 VEHICLE STORAGE YARD OWNER' : 'PARKING SPACE OWNER'}
+            </Text>
           </View>
         </View>
 
@@ -154,7 +159,7 @@ export default function ProfileScreen() {
           </View>
           <View style={styles.statBox}>
             <Text style={styles.statVal}>Verified</Text>
-            <Text style={styles.statLbl}>Space Partner</Text>
+            <Text style={styles.statLbl}>{isStorageOwner ? 'Yard Partner' : 'Space Partner'}</Text>
           </View>
         </View>
 
@@ -165,28 +170,34 @@ export default function ProfileScreen() {
           onPress={() => setShowSupportModal(true)}
           activeOpacity={0.75}
         >
-          <Text style={styles.linkTxt}>📞 24/7 Owner Support Desk</Text>
+          <Text style={styles.linkTxt}>
+            {isStorageOwner ? '🚜 24/7 Storage Yard Help Desk' : '📞 24/7 Owner Support Desk'}
+          </Text>
         </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.linkCard}
-          onPress={() => {
-            setSelectedTermsType('storage_owner');
-            setShowTermsModal(true);
-          }}
-          activeOpacity={0.75}
-        >
-          <Text style={styles.linkTxt}>📜 Terms & Conditions for Storage Yard Owner</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.linkCard}
-          onPress={() => {
-            setSelectedTermsType('owner');
-            setShowTermsModal(true);
-          }}
-          activeOpacity={0.75}
-        >
-          <Text style={styles.linkTxt}>🏢 Terms & Conditions for Space Owner</Text>
-        </TouchableOpacity>
+
+        {isStorageOwner ? (
+          <TouchableOpacity
+            style={styles.linkCard}
+            onPress={() => {
+              setSelectedTermsType('storage_owner');
+              setShowTermsModal(true);
+            }}
+            activeOpacity={0.75}
+          >
+            <Text style={styles.linkTxt}>📜 Terms & Conditions for Storage Yard Owner</Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity
+            style={styles.linkCard}
+            onPress={() => {
+              setSelectedTermsType('owner');
+              setShowTermsModal(true);
+            }}
+            activeOpacity={0.75}
+          >
+            <Text style={styles.linkTxt}>🏢 Terms & Conditions for Space Owner</Text>
+          </TouchableOpacity>
+        )}
 
         <Button
           title="Sign Out"
@@ -207,7 +218,7 @@ export default function ProfileScreen() {
       <SupportModal
         visible={showSupportModal}
         onClose={() => setShowSupportModal(false)}
-        isStorageYard={true}
+        isStorageYard={isStorageOwner}
       />
     </SafeAreaView>
   );

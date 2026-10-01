@@ -128,47 +128,28 @@ export default function TermsModal({ visible, onClose, type = 'storage_owner' })
     !searchQuery.trim() || t.clause?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const isStorage = activeTab === 'storage_owner';
+  const isStorage = (type === 'storage_owner' || activeTab === 'storage_owner');
 
   return (
-    <Modal visible={visible} animationType="slide" transparent={false} onRequestClose={onClose}>
-      <SafeAreaView style={styles.container}>
-        {/* Header */}
-        <View style={styles.header}>
-          <View style={{ flex: 1, paddingRight: 10 }}>
-            <Text style={styles.title}>
-              {isStorage ? '🚜 Storage Yard Owner Terms' : '🏢 Parking Space Owner Terms'}
-            </Text>
-            <Text style={styles.subtitle}>
-              {isStorage
-                ? '1+ Acre Commercial Vehicle Staging & Repo Yard Agreement'
-                : 'Driveway, Bay & Commercial Parking Host Agreement'}
-            </Text>
+    <Modal visible={visible} animationType="slide" transparent={true} onRequestClose={onClose}>
+      <View style={styles.modalOverlay}>
+        <SafeAreaView style={styles.container}>
+          {/* Header */}
+          <View style={styles.header}>
+            <View style={{ flex: 1, paddingRight: 10 }}>
+              <Text style={styles.title}>
+                {isStorage ? '🚜 Storage Yard Owner Terms' : '🏢 Parking Space Owner Terms'}
+              </Text>
+              <Text style={styles.subtitle}>
+                {isStorage
+                  ? '1+ Acre Commercial Vehicle Staging & Repo Yard Agreement'
+                  : 'Driveway, Bay & Commercial Parking Host Agreement'}
+              </Text>
+            </View>
+            <TouchableOpacity style={styles.closeBtn} onPress={onClose} activeOpacity={0.7}>
+              <Text style={styles.closeTxt}>✕</Text>
+            </TouchableOpacity>
           </View>
-          <TouchableOpacity style={styles.closeBtn} onPress={onClose} activeOpacity={0.7}>
-            <Text style={styles.closeTxt}>✕</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Tab Switcher */}
-        <View style={styles.tabContainer}>
-          <TouchableOpacity
-            style={[styles.tabBtn, isStorage && styles.activeTabBtn]}
-            onPress={() => { setActiveTab('storage_owner'); setSearchQuery(''); }}
-          >
-            <Text style={[styles.tabTxt, isStorage && styles.activeTabTxt]}>
-              🚜 Storage Yard Owner (30 Pts)
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.tabBtn, !isStorage && styles.activeTabBtn]}
-            onPress={() => { setActiveTab('owner'); setSearchQuery(''); }}
-          >
-            <Text style={[styles.tabTxt, !isStorage && styles.activeTabTxt]}>
-              🏢 Space Owner (30 Pts)
-            </Text>
-          </TouchableOpacity>
-        </View>
 
         {/* Live sync badge & Search */}
         <View style={styles.metaRow}>
@@ -234,15 +215,30 @@ export default function TermsModal({ visible, onClose, type = 'storage_owner' })
             </View>
           </ScrollView>
         )}
-      </SafeAreaView>
+        </SafeAreaView>
+      </View>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  modalOverlay: {
     flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: Platform.OS === 'web' ? 16 : 0,
+  },
+  container: {
+    width: '100%',
+    maxWidth: 420,
+    height: Platform.OS === 'web' ? 820 : '100%',
+    maxHeight: Platform.OS === 'web' ? '92vh' : '100%',
     backgroundColor: '#0b1120',
+    borderRadius: Platform.OS === 'web' ? 28 : 0,
+    borderWidth: Platform.OS === 'web' ? 1.5 : 0,
+    borderColor: '#334155',
+    overflow: 'hidden',
   },
   header: {
     flexDirection: 'row',

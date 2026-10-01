@@ -128,47 +128,28 @@ export default function TermsModal({ visible, onClose, type = 'seeker' }) {
     !searchQuery.trim() || t.clause?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const isBank = activeTab === 'bank_finance';
+  const isBank = (type === 'bank_finance' || activeTab === 'bank_finance');
 
   return (
-    <Modal visible={visible} animationType="slide" transparent={false} onRequestClose={onClose}>
-      <SafeAreaView style={styles.container}>
-        {/* Header */}
-        <View style={styles.header}>
-          <View style={{ flex: 1, paddingRight: 10 }}>
-            <Text style={styles.title}>
-              {isBank ? '🏦 Bank & Auto Finance Terms' : '🚗 Parking Seeker Terms'}
-            </Text>
-            <Text style={styles.subtitle}>
-              {isBank
-                ? 'Lender & Recovery Fleet Staging Bay Legal Agreement'
-                : 'Vehicle Driver & Commuter Parking Terms of Service'}
-            </Text>
+    <Modal visible={visible} animationType="slide" transparent={true} onRequestClose={onClose}>
+      <View style={styles.modalOverlay}>
+        <SafeAreaView style={styles.container}>
+          {/* Header */}
+          <View style={styles.header}>
+            <View style={{ flex: 1, paddingRight: 10 }}>
+              <Text style={styles.title}>
+                {isBank ? '🏦 Bank & Auto Finance Terms' : '🚗 Parking Seeker Terms'}
+              </Text>
+              <Text style={styles.subtitle}>
+                {isBank
+                  ? 'Lender & Recovery Fleet Staging Bay Legal Agreement'
+                  : 'Vehicle Driver & Commuter Parking Terms of Service'}
+              </Text>
+            </View>
+            <TouchableOpacity style={styles.closeBtn} onPress={onClose} activeOpacity={0.7}>
+              <Text style={styles.closeTxt}>✕</Text>
+            </TouchableOpacity>
           </View>
-          <TouchableOpacity style={styles.closeBtn} onPress={onClose} activeOpacity={0.7}>
-            <Text style={styles.closeTxt}>✕</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Tab Switcher */}
-        <View style={styles.tabContainer}>
-          <TouchableOpacity
-            style={[styles.tabBtn, !isBank && styles.activeTabBtn]}
-            onPress={() => { setActiveTab('seeker'); setSearchQuery(''); }}
-          >
-            <Text style={[styles.tabTxt, !isBank && styles.activeTabTxt]}>
-              🚗 Parking Seeker (30 Pts)
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.tabBtn, isBank && styles.activeTabBtnBank]}
-            onPress={() => { setActiveTab('bank_finance'); setSearchQuery(''); }}
-          >
-            <Text style={[styles.tabTxt, isBank && styles.activeTabTxtBank]}>
-              🏦 Bank & Finance (30 Pts)
-            </Text>
-          </TouchableOpacity>
-        </View>
 
         {/* Live sync badge & Search */}
         <View style={styles.metaRow}>
@@ -232,17 +213,33 @@ export default function TermsModal({ visible, onClose, type = 'seeker' }) {
                 🔒 Legally binding agreement between the Registered User and Plan To Park Technologies. All rights reserved. Hyderabad, Telangana jurisdiction.
               </Text>
             </View>
+            </View>
           </ScrollView>
         )}
-      </SafeAreaView>
+        </SafeAreaView>
+      </View>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  modalOverlay: {
     flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: Platform.OS === 'web' ? 16 : 0,
+  },
+  container: {
+    width: '100%',
+    maxWidth: 420,
+    height: Platform.OS === 'web' ? 820 : '100%',
+    maxHeight: Platform.OS === 'web' ? '92vh' : '100%',
     backgroundColor: '#0b1120',
+    borderRadius: Platform.OS === 'web' ? 28 : 0,
+    borderWidth: Platform.OS === 'web' ? 1.5 : 0,
+    borderColor: '#334155',
+    overflow: 'hidden',
   },
   header: {
     flexDirection: 'row',

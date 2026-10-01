@@ -220,20 +220,6 @@ export default function ProfileScreen({ navigation }) {
               : '🚗 Terms & Conditions for Parking Seeker'}
           </Text>
         </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.linkCard}
-          onPress={() => {
-            setSelectedTermsType(isBankUser ? 'seeker' : 'bank_finance');
-            setShowTermsModal(true);
-          }}
-          activeOpacity={0.75}
-        >
-          <Text style={styles.linkTxt}>
-            {isBankUser
-              ? '🚗 Terms & Conditions for Parking Seeker'
-              : '🏦 Terms & Conditions for Bank & Auto Finance'}
-          </Text>
-        </TouchableOpacity>
 
         <Button
           title="Sign Out"
