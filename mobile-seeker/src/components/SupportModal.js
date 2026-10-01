@@ -9,6 +9,7 @@ import {
   Linking,
   ActivityIndicator,
   SafeAreaView,
+  Platform,
 } from 'react-native';
 import { COLORS } from '../theme/colors';
 import { API_URL } from '../config/api';
