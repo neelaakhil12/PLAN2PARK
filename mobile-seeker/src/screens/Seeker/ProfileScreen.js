@@ -27,7 +27,11 @@ export default function ProfileScreen({ navigation }) {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showTermsModal, setShowTermsModal] = useState(false);
   const [showSupportModal, setShowSupportModal] = useState(false);
-  const isBankUser = user?.accountCategory === 'bank_finance_seeker';
+  const isBankUser = user?.accountCategory === 'bank_finance_seeker' ||
+    user?.role === 'bank_finance' ||
+    user?.accountCategory?.includes('bank') ||
+    user?.name?.toLowerCase().includes('bank') ||
+    user?.name?.toLowerCase().includes('finance');
   const [selectedTermsType, setSelectedTermsType] = useState(isBankUser ? 'bank_finance' : 'seeker');
   const [uploadingImage, setUploadingImage] = useState(false);
   const [imageLoadError, setImageLoadError] = useState(false);
@@ -151,8 +155,10 @@ export default function ProfileScreen({ navigation }) {
           <Text style={styles.userEmail}>{user?.email || 'seeker@example.com'}</Text>
           <Text style={styles.userPhone}>📞 {user?.contact || 'Not provided'}</Text>
 
-          <View style={styles.roleTag}>
-            <Text style={styles.roleTagTxt}>PARKING SEEKER</Text>
+          <View style={[styles.roleTag, isBankUser && { backgroundColor: '#0284c725', borderColor: '#0284c7' }]}>
+            <Text style={[styles.roleTagTxt, isBankUser && { color: '#38bdf8' }]}>
+              {isBankUser ? '🏦 BANK & AUTO FINANCE RECOVERY' : 'PARKING SEEKER'}
+            </Text>
           </View>
 
           {/* Edit Profile Button */}
@@ -165,15 +171,30 @@ export default function ProfileScreen({ navigation }) {
           </TouchableOpacity>
         </View>
 
-        {/* Saved Vehicles */}
-        <Text style={styles.sectionTitle}>Saved Vehicle Details</Text>
-        <View style={styles.itemCard}>
-          <View style={styles.vehRow}>
-            <Text style={styles.itemTitle}>🚗 {primaryVehicle.plateNumber}</Text>
-            <Text style={styles.primaryTag}>PRIMARY</Text>
-          </View>
-          <Text style={styles.itemSub}>{primaryVehicle.vehicleType || 'Car'} • Active Parking License</Text>
-        </View>
+        {/* Saved Vehicles (Seekers Only) / Institutional Account (Bank Only) */}
+        {!isBankUser ? (
+          <>
+            <Text style={styles.sectionTitle}>Saved Vehicle Details</Text>
+            <View style={styles.itemCard}>
+              <View style={styles.vehRow}>
+                <Text style={styles.itemTitle}>🚗 {primaryVehicle.plateNumber}</Text>
+                <Text style={styles.primaryTag}>PRIMARY</Text>
+              </View>
+              <Text style={styles.itemSub}>{primaryVehicle.vehicleType || 'Car'} • Active Parking License</Text>
+            </View>
+          </>
+        ) : (
+          <>
+            <Text style={styles.sectionTitle}>Institutional Recovery Profile</Text>
+            <View style={styles.itemCard}>
+              <View style={styles.vehRow}>
+                <Text style={styles.itemTitle}>🏦 Seized Vehicle Custody Partner</Text>
+                <Text style={[styles.primaryTag, { backgroundColor: '#0891b225', color: '#06b6d4', borderColor: '#0891b2' }]}>ACTIVE FLEET</Text>
+              </View>
+              <Text style={styles.itemSub}>Authorized for 1+ Acre Secured Yard Bookings & Repossession Holding</Text>
+            </View>
+          </>
+        )}
 
         {/* Account Quick Stats */}
         <Text style={styles.sectionTitle}>Account Overview</Text>

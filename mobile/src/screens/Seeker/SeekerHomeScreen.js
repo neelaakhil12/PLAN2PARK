@@ -419,17 +419,17 @@ export default function SeekerHomeScreen({ navigation }) {
     <SafeAreaView style={styles.container} edges={['left', 'right']}>
       {/* App Header */}
       <View style={[styles.header, { paddingTop: topPadding + 10 }]}>
-        <View>
-          <Text style={styles.welcomeText}>Hello, {user?.name || 'Seeker'} 👋</Text>
-          <Text style={styles.headerSub}>Find secure owner parking nearby</Text>
+        <View style={{ flex: 1, marginRight: 8, justifyContent: 'center' }}>
+          <Text style={styles.welcomeText} numberOfLines={1}>Hello, {user?.name || 'Seeker'} 👋</Text>
+          <Text style={styles.headerSub} numberOfLines={1} ellipsizeMode="tail">Find secure owner parking nearby</Text>
         </View>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 0 }}>
           <TouchableOpacity
             onPress={() => navigation.navigate('Notifications')}
             style={styles.notifBellBtn}
             activeOpacity={0.75}
           >
-            <Text style={{ fontSize: 20 }}>🔔</Text>
+            <Text style={{ fontSize: 18 }}>🔔</Text>
             {unreadNotifs > 0 && (
               <View style={styles.notifBadge}>
                 <Text style={styles.notifBadgeTxt}>{unreadNotifs > 9 ? '9+' : unreadNotifs}</Text>
@@ -437,7 +437,7 @@ export default function SeekerHomeScreen({ navigation }) {
             )}
           </TouchableOpacity>
 
-          <TouchableOpacity onPress={logout} style={styles.logoutBtn}>
+          <TouchableOpacity onPress={logout} style={styles.logoutBtn} activeOpacity={0.8}>
             <Text style={styles.logoutTxt}>Logout</Text>
           </TouchableOpacity>
         </View>
@@ -690,7 +690,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.darkBg,
   },
   header: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 14,
     paddingBottom: 12,
     flexDirection: 'row',
     alignItems: 'center',
@@ -698,7 +698,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.darkBg,
   },
   welcomeText: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '800',
     color: COLORS.white,
   },
@@ -709,10 +709,11 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   logoutBtn: {
-    paddingHorizontal: 12,
+    paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 8,
     backgroundColor: '#334155',
+    flexShrink: 0,
   },
   logoutTxt: {
     color: COLORS.white,
@@ -720,15 +721,16 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   notifBellBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     backgroundColor: COLORS.cardBg,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
     borderColor: COLORS.borderDark,
     position: 'relative',
+    flexShrink: 0,
   },
   notifBadge: {
     position: 'absolute',

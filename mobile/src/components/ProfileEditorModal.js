@@ -13,13 +13,22 @@ import * as ImagePicker from 'expo-image-picker';
 import { COLORS } from '../theme/colors';
 import Button from './Button';
 
-const AVATAR_OPTIONS = [
+const SEEKER_AVATARS = [
   { id: 'av1', emoji: '👨‍✈️', label: 'Seeker 1' },
   { id: 'av2', emoji: '👩‍✈️', label: 'Seeker 2' },
   { id: 'av3', emoji: '🚗', label: 'Sedan' },
   { id: 'av4', emoji: '🚙', label: 'SUV' },
   { id: 'av5', emoji: '⚡', label: 'EV Rider' },
   { id: 'av6', emoji: '👤', label: 'User' },
+];
+
+const BANK_AVATARS = [
+  { id: 'bv1', emoji: '🏦', label: 'Bank Branch' },
+  { id: 'bv2', emoji: '🏢', label: 'Finance Corp' },
+  { id: 'bv3', emoji: '💼', label: 'Recovery Lead' },
+  { id: 'bv4', emoji: '👨‍💼', label: 'Officer 1' },
+  { id: 'bv5', emoji: '👩‍💼', label: 'Officer 2' },
+  { id: 'bv6', emoji: '🛡️', label: 'Custodian' },
 ];
 
 export default function ProfileEditorModal({
@@ -29,11 +38,19 @@ export default function ProfileEditorModal({
   onSave,
   onClose,
 }) {
+  const isBankUser = currentUser?.accountCategory === 'bank_finance_seeker' ||
+    currentUser?.role === 'bank_finance' ||
+    currentUser?.accountCategory?.includes('bank') ||
+    currentUser?.name?.toLowerCase().includes('bank') ||
+    currentUser?.name?.toLowerCase().includes('finance');
+
+  const avatarOptions = isBankUser ? BANK_AVATARS : SEEKER_AVATARS;
+
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [contact, setContact] = useState('');
   const [vehicleNumber, setVehicleNumber] = useState('');
-  const [selectedAvatar, setSelectedAvatar] = useState('👨‍✈️');
+  const [selectedAvatar, setSelectedAvatar] = useState(isBankUser ? '🏦' : '👨‍✈️');
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
@@ -46,6 +63,8 @@ export default function ProfileEditorModal({
       setVehicleNumber(primaryVeh ? primaryVeh.plateNumber : 'TS 07 AB 1234');
       if (currentUser.profileImage && currentUser.profileImage.length <= 4) {
         setSelectedAvatar(currentUser.profileImage);
+      } else if (isBankUser) {
+        setSelectedAvatar('🏦');
       }
     }
   }, [currentUser, visible]);
@@ -67,18 +86,20 @@ export default function ProfileEditorModal({
       return;
     }
 
-    const finalVehicle = vehicleNumber.trim() || 'TS 07 AB 1234';
-
     try {
       setLoading(true);
-      await onSave({
+      const payload = {
         name: name.trim(),
         email: email.trim(),
         contact: contact.trim(),
-        vehicleNumber: finalVehicle.toUpperCase(),
         passPhoto: selectedAvatar,
         profileImage: selectedAvatar,
-      });
+      };
+      if (!isBankUser) {
+        const finalVehicle = vehicleNumber.trim() || 'TS 07 AB 1234';
+        payload.vehicleNumber = finalVehicle.toUpperCase();
+      }
+      await onSave(payload);
     } catch (err) {
       console.error('Save profile error:', err);
       setErrorMsg(err.message || 'Failed to update profile in database');
@@ -93,12 +114,18 @@ export default function ProfileEditorModal({
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.modalTitle}>
-            {isNewUser ? '📝 Complete Seeker Profile' : '✏️ Edit Profile Details'}
+            {isNewUser
+              ? (isBankUser ? '🏦 Complete Bank & Finance Profile' : '📝 Complete Seeker Profile')
+              : (isBankUser ? '✏️ Edit Bank & Finance Profile' : '✏️ Edit Profile Details')}
           </Text>
           <Text style={styles.modalSub}>
             {isNewUser
-              ? 'Please fill in your details to search and book parking spots.'
-              : 'Update your name, contact, vehicle number, or profile photo.'}
+              ? (isBankUser
+                  ? 'Please confirm your official institution representative details.'
+                  : 'Please fill in your details to search and book parking spots.')
+              : (isBankUser
+                  ? 'Update your name, institution email, or contact number.'
+                  : 'Update your name, contact, vehicle number, or profile photo.')}
           </Text>
         </View>
 
@@ -181,7 +208,7 @@ export default function ProfileEditorModal({
           </View>
 
           <View style={styles.avatarRow}>
-            {AVATAR_OPTIONS.map((item) => {
+            {avatarOptions.map((item) => {
               const isSelected = selectedAvatar === item.emoji;
               return (
                 <TouchableOpacity
@@ -208,7 +235,7 @@ export default function ProfileEditorModal({
             />
           </View>
 
-          {/* Email Input */}
+          {/* Email Address Input */}
           <Text style={styles.fieldLabel}>Email Address *</Text>
           <View style={styles.inputBox}>
             <Text style={styles.inputIcon}>✉️</Text>
@@ -237,19 +264,23 @@ export default function ProfileEditorModal({
             />
           </View>
 
-          {/* Vehicle Number Input */}
-          <Text style={styles.fieldLabel}>Primary Vehicle Number *</Text>
-          <View style={styles.inputBox}>
-            <Text style={styles.inputIcon}>🚗</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="e.g. TS 07 AB 1234"
-              placeholderTextColor={COLORS.textMuted}
-              autoCapitalize="characters"
-              value={vehicleNumber}
-              onChangeText={setVehicleNumber}
-            />
-          </View>
+          {/* Vehicle Number Input (Seekers Only) */}
+          {!isBankUser && (
+            <>
+              <Text style={styles.fieldLabel}>Primary Vehicle Number *</Text>
+              <View style={styles.inputBox}>
+                <Text style={styles.inputIcon}>🚗</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="e.g. TS 07 AB 1234"
+                  placeholderTextColor={COLORS.textMuted}
+                  autoCapitalize="characters"
+                  value={vehicleNumber}
+                  onChangeText={setVehicleNumber}
+                />
+              </View>
+            </>
+          )}
         </ScrollView>
 
         {/* Footer Actions */}
