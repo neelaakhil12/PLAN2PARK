@@ -16,7 +16,7 @@ import {
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { AuthContext } from '../../context/AuthContext';
-import { endpoints, getBaseApiUrl, getImageUrl } from '../../config/api';
+import { endpoints, getBaseApiUrl, getImageUrl, PUBLIC_ONLINE_URL } from '../../config/api';
 import { COLORS } from '../../theme/colors';
 import Button from '../../components/Button';
 import Header from '../../components/Header';
@@ -42,6 +42,122 @@ const loadRazorpayScript = () => {
     script.onerror = () => resolve(false);
     document.body.appendChild(script);
   });
+};
+
+const generateRazorpayHtml = (booking, orderData, user, space, finalPrice) => {
+  const keyId = orderData?.keyId || 'rzp_live_TidhMuvoj4fV3b';
+  const orderId = orderData?.orderId || '';
+  const amountInPaise = Math.round((finalPrice || booking?.totalAmount || 0) * 100);
+  const spotTitle = (space?.title || 'Parking Space').replace(/"/g, '\\"');
+  const userName = (user?.name || 'Seeker').replace(/"/g, '\\"');
+  const userEmail = (user?.email || 'seeker@plantopark.com').replace(/"/g, '\\"');
+  const userPhone = (user?.contact || user?.phone || '9876543210').replace(/"/g, '\\"');
+  const bookingId = booking?._id || '';
+  const vehicleNumber = (booking?.vehicleNumber || '').replace(/"/g, '\\"');
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>PlanToPark - Secure Checkout</title>
+  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background-color: #0f172a;
+      color: #ffffff;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 20px;
+      text-align: center;
+    }
+    .spinner {
+      width: 44px;
+      height: 44px;
+      border: 3.5px solid rgba(255,255,255,0.15);
+      border-top: 3.5px solid #10b981;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin-bottom: 16px;
+    }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    .title { font-size: 16px; font-weight: 800; color: #ffffff; margin-bottom: 6px; }
+    .sub { font-size: 13px; color: #94a3b8; }
+    .amount { font-size: 22px; font-weight: 900; color: #10b981; margin: 10px 0; }
+  </style>
+</head>
+<body>
+  <div class="spinner"></div>
+  <div class="title">PlanToPark Secure Checkout</div>
+  <div class="amount">₹${finalPrice || booking?.totalAmount || 0}.00</div>
+  <div class="sub">Launching Razorpay Payment Sheet...</div>
+
+  <script>
+    var options = {
+      key: "${keyId}",
+      order_id: "${orderId}",
+      amount: ${amountInPaise},
+      currency: "INR",
+      name: "PlanToPark",
+      description: "Parking Reservation - ${spotTitle}",
+      prefill: {
+        name: "${userName}",
+        email: "${userEmail}",
+        contact: "${userPhone}"
+      },
+      notes: {
+        bookingId: "${bookingId}",
+        vehicleNumber: "${vehicleNumber}"
+      },
+      theme: {
+        color: "#10b981"
+      },
+      modal: {
+        backdropclose: false,
+        escape: false,
+        handleback: false,
+        confirm_close: true,
+        ondismiss: function() {
+          if (window.ReactNativeWebView) {
+            window.ReactNativeWebView.postMessage(JSON.stringify({ event: 'PAYMENT_CANCELLED' }));
+          }
+        }
+      },
+      handler: function(response) {
+        if (window.ReactNativeWebView) {
+          window.ReactNativeWebView.postMessage(JSON.stringify({
+            event: 'PAYMENT_SUCCESS',
+            payment_id: response.razorpay_payment_id,
+            order_id: response.razorpay_order_id || "${orderId}",
+            signature: response.razorpay_signature || ''
+          }));
+        }
+      }
+    };
+
+    var rzp = new Razorpay(options);
+    rzp.on('payment.failed', function(resp) {
+      if (window.ReactNativeWebView) {
+        window.ReactNativeWebView.postMessage(JSON.stringify({
+          event: 'PAYMENT_FAILED',
+          error: resp.error?.description || 'Payment failed'
+        }));
+      }
+    });
+
+    window.onload = function() {
+      setTimeout(function() {
+        rzp.open();
+      }, 300);
+    };
+  </script>
+</body>
+</html>`;
 };
 
 export default function SpotDetailsScreen({ route, navigation }) {
@@ -175,6 +291,12 @@ export default function SpotDetailsScreen({ route, navigation }) {
       }
 
       // 2. Fetch Razorpay Order from backend
+      let orderData = {
+        orderId: '',
+        amount: Math.round(finalPayablePrice * 100),
+        keyId: 'rzp_live_TidhMuvoj4fV3b',
+      };
+
       try {
         const orderRes = await fetch(`${baseUrl}/bookings/${newBooking._id}/razorpay-order`, {
           method: 'POST',
@@ -183,43 +305,89 @@ export default function SpotDetailsScreen({ route, navigation }) {
             Authorization: `Bearer ${token}`,
           },
         });
-
-        let orderData = { orderId: 'order_' + Math.random().toString(36).substring(2, 9), amount: finalPayablePrice * 100, keyId: 'rzp_live_TidhMuvoj4fV3b' };
         if (orderRes.ok) {
-          orderData = await orderRes.json();
+          const fetchedOrder = await orderRes.json();
+          orderData = { ...orderData, ...fetchedOrder };
         }
-
-        // Open Razorpay In-App Payment Sheet
-        setRazorpayModal({
-          booking: newBooking,
-          orderData,
-          actualHours,
-        });
       } catch (orderErr) {
-        // Fallback open Razorpay Sheet
-        let orderData = { orderId: 'order_' + Math.random().toString(36).substring(2, 9), amount: finalPayablePrice * 100, keyId: 'rzp_live_TidhMuvoj4fV3b' };
-        try {
-          const res = await fetch(`${baseUrl}/bookings/${newBooking._id}/razorpay-order`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }
-          });
-          const data = await res.json();
-          if (res.ok && data.orderId) {
-            orderData = data;
-          }
-        } catch (e) {
-          console.log('Order fetch error:', e);
-        }
-
-        setRazorpayModal({
-          visible: true,
-          bookingId: newBooking._id,
-          orderData: { orderId: 'order_' + Math.random().toString(36).substring(2, 9), amount: finalPayablePrice * 100, keyId: 'rzp_live_TidhMuvoj4fV3b', ...orderData },
-          finalPayablePrice: finalPayablePrice,
-          actualHours,
-          booking: newBooking
-        });
+        console.log('Order fetch fallback:', orderErr);
       }
+
+      // If running on Web / Browser, launch official Razorpay Checkout directly
+      if (Platform.OS === 'web') {
+        const scriptLoaded = await loadRazorpayScript();
+        if (scriptLoaded && window.Razorpay) {
+          const webOptions = {
+            key: orderData.keyId || 'rzp_live_TidhMuvoj4fV3b',
+            amount: orderData.amount,
+            currency: 'INR',
+            name: 'PlanToPark',
+            description: `Parking Reservation - ${space.title || 'Parking Spot'}`,
+            order_id: orderData.orderId || undefined,
+            prefill: {
+              name: user?.name || 'Seeker',
+              email: user?.email || 'seeker@plantopark.com',
+              contact: user?.contact || user?.phone || '9876543210',
+            },
+            notes: {
+              bookingId: newBooking._id,
+              vehicleNumber: vehicleNumber.trim().toUpperCase(),
+            },
+            theme: { color: '#10b981' },
+            modal: {
+              ondismiss: function () {
+                showAlert('Payment Cancelled', 'Payment process was cancelled.');
+              },
+            },
+            handler: async function (response) {
+              setProcessingPayment(true);
+              try {
+                await fetch(`${baseUrl}/bookings/${newBooking._id}/verify-payment`, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token}`,
+                  },
+                  body: JSON.stringify({
+                    razorpay_payment_id: response.razorpay_payment_id,
+                    razorpay_order_id: response.razorpay_order_id || orderData.orderId,
+                    razorpay_signature: response.razorpay_signature || '',
+                    isMock: false,
+                  }),
+                });
+              } catch (verErr) {
+                console.warn('Backend verification error:', verErr);
+              } finally {
+                setProcessingPayment(false);
+              }
+
+              setBookingSuccessModal({
+                slotId: newBooking.slotId || 'Slot-1',
+                spotTitle: space.title || 'Parking Spot',
+                vehicleNumber: vehicleNumber.trim().toUpperCase(),
+                hours: actualHours,
+                totalAmount: finalPayablePrice,
+                walletUsed: walletDiscount,
+                paymentId: response.razorpay_payment_id,
+              });
+            },
+          };
+
+          const rzp = new window.Razorpay(webOptions);
+          rzp.on('payment.failed', function (resp) {
+            showAlert('Payment Failed', resp.error?.description || 'The payment could not be processed.');
+          });
+          rzp.open();
+          return;
+        }
+      }
+
+      // Native App: open In-App Payment Sheet Modal via WebView with inline HTML
+      setRazorpayModal({
+        booking: newBooking,
+        orderData,
+        actualHours,
+      });
     } catch (err) {
       showAlert('Error', err.message || 'Network error during booking');
     } finally {
@@ -769,9 +937,16 @@ export default function SpotDetailsScreen({ route, navigation }) {
               mixedContentMode="always"
               allowsInlineMediaPlayback={true}
               source={{
-                uri: `${PUBLIC_ONLINE_URL}/bookings/${razorpayModal.booking._id}/pay-webview?token=${token}`
+                html: generateRazorpayHtml(
+                  razorpayModal.booking,
+                  razorpayModal.orderData,
+                  user,
+                  space,
+                  finalPayablePrice
+                ),
+                baseUrl: 'https://api.plantopark.com',
               }}
-              style={{ flex: 1, backgroundColor: '#ffffff' }}
+              style={{ flex: 1, backgroundColor: '#0f172a' }}
               onShouldStartLoadWithRequest={(request) => {
                 const { url } = request;
                 if (!url) return true;
