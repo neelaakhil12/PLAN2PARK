@@ -22,6 +22,7 @@ import { COLORS } from '../../theme/colors';
 import PinLocationModal from '../../components/PinLocationModal';
 import ProfileEditorModal from '../../components/ProfileEditorModal';
 import DynamicParkingMap, { getSpotDemand } from '../../components/DynamicParkingMap';
+import { getDetailedAddressFromCoords } from '../../utils/locationHelper';
 
 // Geocoding distance calculation helper (Haversine Formula)
 function calculateDistanceKm(lat1, lon1, lat2, lon2) {
@@ -76,7 +77,7 @@ export default function SeekerHomeScreen({ navigation }) {
   const [selectedMapSpot, setSelectedMapSpot] = useState(null);
 
   // Location pinning state
-  const [pinnedLocation, setPinnedLocation] = useState('Almasguda (17.3128, 78.5450)');
+  const [pinnedLocation, setPinnedLocation] = useState('');
   const [showPinModal, setShowPinModal] = useState(false);
 
   // Profile completion state (ONLY for newly registered users)
@@ -87,31 +88,28 @@ export default function SeekerHomeScreen({ navigation }) {
     (async () => {
       try {
         const savedLoc = await AsyncStorage.getItem('seeker_pinned_location');
-        if (savedLoc) {
+        if (savedLoc && !savedLoc.includes('Almasguda (17.3128')) {
           setPinnedLocation(savedLoc);
-          return;
         }
 
         const { status } = await Location.requestForegroundPermissionsAsync();
         if (status === 'granted') {
-          const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-          const lat = pos.coords.latitude;
-          const lng = pos.coords.longitude;
-          let area = '';
+          let pos = null;
           try {
-            const rev = await Location.reverseGeocodeAsync({ latitude: lat, longitude: lng });
-            if (rev && rev.length > 0) {
-              const r = rev[0];
-              const parts = [r.name, r.district, r.subregion, r.city].filter(Boolean);
-              area = [...new Set(parts)].slice(0, 2).join(', ') || r.city || 'My Location';
-            }
-          } catch (e) {}
-          if (!area) area = 'Current Location';
-          const newLoc = `🎯 ${area} (${lat.toFixed(4)}, ${lng.toFixed(4)})`;
-          setPinnedLocation(newLoc);
-          await AsyncStorage.setItem('seeker_pinned_location', newLoc);
-        } else {
-          // If permission not yet granted, show pin modal for user choice
+            pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Highest });
+          } catch (posErr) {
+            pos = await Location.getLastKnownPositionAsync({ maxAge: 30000 });
+          }
+
+          if (pos && pos.coords) {
+            const lat = pos.coords.latitude;
+            const lng = pos.coords.longitude;
+            const area = await getDetailedAddressFromCoords(lat, lng);
+            const newLoc = `🎯 ${area} (${lat.toFixed(4)}, ${lng.toFixed(4)})`;
+            setPinnedLocation(newLoc);
+            await AsyncStorage.setItem('seeker_pinned_location', newLoc);
+          }
+        } else if (!savedLoc || savedLoc.includes('Almasguda (17.3128')) {
           setShowPinModal(true);
         }
       } catch (err) {

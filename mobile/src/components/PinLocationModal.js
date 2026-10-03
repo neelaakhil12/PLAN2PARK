@@ -13,9 +13,10 @@ import {
 import * as Location from 'expo-location';
 import { COLORS } from '../theme/colors';
 import Button from './Button';
+import { getDetailedAddressFromCoords, smartGeocodeAddress } from '../utils/locationHelper';
 
 const POPULAR_LOCATIONS = [
-  { name: 'Almasguda, Hyderabad', lat: 17.3128, lng: 78.5450 },
+  { name: 'Chaitanya Hills, Almasguda', lat: 17.3139, lng: 78.5456 },
   { name: 'Hitech City, Hyderabad', lat: 17.4435, lng: 78.3772 },
   { name: 'Madhapur, Hyderabad', lat: 17.4483, lng: 78.3915 },
   { name: 'Gachibowli, Hyderabad', lat: 17.4401, lng: 78.3489 },
@@ -28,7 +29,7 @@ const POPULAR_LOCATIONS = [
 ];
 
 export default function PinLocationModal({ visible, currentLocation, onSelectLocation, onClose }) {
-  const [selectedArea, setSelectedArea] = useState(currentLocation || 'Almasguda (17.313, 78.545)');
+  const [selectedArea, setSelectedArea] = useState(currentLocation || '');
   const [customAddress, setCustomAddress] = useState('');
   const [locating, setLocating] = useState(false);
 
@@ -39,30 +40,14 @@ export default function PinLocationModal({ visible, currentLocation, onSelectLoc
     if (finalAddress) {
       setLocating(true);
       try {
-        const geocoded = await Location.geocodeAsync(finalAddress);
-        if (geocoded && geocoded.length > 0) {
-          const { latitude, longitude } = geocoded[0];
-          const locStr = `🎯 ${finalAddress} (${latitude.toFixed(4)}, ${longitude.toFixed(4)})`;
+        const coords = await smartGeocodeAddress(finalAddress);
+        if (coords) {
+          const locStr = `🎯 ${finalAddress} (${coords.latitude.toFixed(4)}, ${coords.longitude.toFixed(4)})`;
           onSelectLocation(locStr);
           setLocating(false);
           return;
         }
-      } catch (e) {
-        try {
-          const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(finalAddress)}&format=json&limit=1`, {
-            headers: { 'User-Agent': 'PlanToPark/1.0' }
-          });
-          const data = await res.json();
-          if (data && data.length > 0) {
-            const lat = parseFloat(data[0].lat);
-            const lon = parseFloat(data[0].lon);
-            const locStr = `🎯 ${finalAddress} (${lat.toFixed(4)}, ${lon.toFixed(4)})`;
-            onSelectLocation(locStr);
-            setLocating(false);
-            return;
-          }
-        } catch (nomErr) {}
-      }
+      } catch (e) {}
       setLocating(false);
       onSelectLocation(finalAddress);
     } else if (selectedArea) {
@@ -84,43 +69,31 @@ export default function PinLocationModal({ visible, currentLocation, onSelectLoc
         return;
       }
 
-      // 2. Query real hardware GPS coordinates
-      const pos = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced,
-      });
+      // 2. Query real hardware GPS coordinates with highest accuracy
+      let pos = null;
+      try {
+        pos = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Highest,
+        });
+      } catch (gpsErr) {
+        pos = await Location.getLastKnownPositionAsync({
+          maxAge: 30000,
+        });
+      }
+
+      if (!pos || !pos.coords) {
+        throw new Error('Unable to retrieve coordinates');
+      }
 
       const lat = pos.coords.latitude;
       const lng = pos.coords.longitude;
 
-      // 3. Reverse geocode to retrieve the real locality/neighborhood name
-      let areaName = '';
-      try {
-        const rev = await Location.reverseGeocodeAsync({ latitude: lat, longitude: lng });
-        if (rev && rev.length > 0) {
-          const r = rev[0];
-          const nameParts = [r.name, r.district, r.subregion, r.city].filter(Boolean);
-          const uniqueParts = [...new Set(nameParts)];
-          areaName = uniqueParts.slice(0, 2).join(', ') || r.city || r.district || 'My Location';
-        }
-      } catch (revErr) {
-        try {
-          const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`, {
-            headers: { 'User-Agent': 'PlanToPark/1.0' }
-          });
-          const data = await res.json();
-          if (data && data.address) {
-            areaName = data.address.suburb || data.address.neighbourhood || data.address.residential || data.address.village || data.address.town || data.address.city || 'My Location';
-          }
-        } catch (nomErr) {}
-      }
+      // 3. Reverse geocode to retrieve the real locality/neighborhood/colony name
+      const detailedAddress = await getDetailedAddressFromCoords(lat, lng);
+      const locationStr = `🎯 ${detailedAddress} (${lat.toFixed(4)}, ${lng.toFixed(4)})`;
 
-      if (!areaName) {
-        areaName = 'Current Location';
-      }
-
-      const locationStr = `🎯 ${areaName} (${lat.toFixed(4)}, ${lng.toFixed(4)})`;
       setSelectedArea(locationStr);
-      setCustomAddress('');
+      setCustomAddress(detailedAddress);
       onSelectLocation(locationStr);
     } catch (err) {
       console.warn('GPS detection error:', err);
@@ -131,9 +104,10 @@ export default function PinLocationModal({ visible, currentLocation, onSelectLoc
           async (position) => {
             const lat = position.coords.latitude;
             const lng = position.coords.longitude;
-            const locationStr = `🎯 Current Location (${lat.toFixed(4)}, ${lng.toFixed(4)})`;
+            const detailedAddress = await getDetailedAddressFromCoords(lat, lng);
+            const locationStr = `🎯 ${detailedAddress} (${lat.toFixed(4)}, ${lng.toFixed(4)})`;
             setSelectedArea(locationStr);
-            setCustomAddress('');
+            setCustomAddress(detailedAddress);
             onSelectLocation(locationStr);
             setLocating(false);
           },
@@ -161,7 +135,7 @@ export default function PinLocationModal({ visible, currentLocation, onSelectLoc
   const handleSelectPopular = (loc) => {
     const locationStr = `🎯 ${loc.name} (${loc.lat.toFixed(4)}, ${loc.lng.toFixed(4)})`;
     setSelectedArea(locationStr);
-    setCustomAddress('');
+    setCustomAddress(loc.name);
     onSelectLocation(locationStr);
   };
 
@@ -183,18 +157,18 @@ export default function PinLocationModal({ visible, currentLocation, onSelectLoc
             <View style={{ flex: 1 }}>
               <Text style={styles.gpsTitle}>Use Current GPS Location</Text>
               <Text style={styles.gpsSub}>
-                {locating ? 'Detecting your real-time GPS location...' : 'Auto-detect & pin current location'}
+                {locating ? 'Detecting your real-time colony & GPS location...' : 'Auto-detect colony, landmark & GPS coordinates'}
               </Text>
             </View>
           </TouchableOpacity>
 
           {/* Custom Input */}
-          <Text style={styles.sectionLabel}>Or Search Specific Area / Landmark</Text>
+          <Text style={styles.sectionLabel}>Or Search / Edit Specific Plot, Colony or Landmark</Text>
           <View style={styles.searchBox}>
             <Text style={styles.searchIcon}>📍</Text>
             <TextInput
               style={styles.input}
-              placeholder="Enter city, area, or landmark..."
+              placeholder="e.g. Plot 89, Chaitanya Hills, Hyderabad..."
               placeholderTextColor={COLORS.textMuted}
               value={customAddress}
               onChangeText={(txt) => {
@@ -228,8 +202,8 @@ export default function PinLocationModal({ visible, currentLocation, onSelectLoc
             <Text style={styles.mapPinEmoji}>📌</Text>
             <View style={{ flex: 1 }}>
               <Text style={styles.previewTitle}>Pinned Destination:</Text>
-              <Text style={styles.previewLocation}>
-                {customAddress || selectedArea}
+              <Text style={styles.previewLocation} numberOfLines={2}>
+                {customAddress || selectedArea || 'No location selected yet'}
               </Text>
             </View>
             <Text style={styles.activeBadge}>PINNED</Text>
@@ -262,160 +236,163 @@ export default function PinLocationModal({ visible, currentLocation, onSelectLoc
 
 const styles = StyleSheet.create({
   overlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(15, 23, 42, 0.88)',
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
     justifyContent: 'flex-end',
-    zIndex: 9999,
   },
   modalCard: {
-    backgroundColor: COLORS.cardBg,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    maxHeight: '90%',
-    padding: 20,
-    borderWidth: 1,
-    borderColor: COLORS.borderDark,
+    backgroundColor: COLORS.white,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    maxHeight: '88%',
+    paddingBottom: Platform.OS === 'ios' ? 36 : 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 20,
   },
   header: {
-    marginBottom: 16,
+    paddingHorizontal: 22,
+    paddingTop: 22,
+    paddingBottom: 14,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.borderDark,
-    paddingBottom: 12,
+    borderBottomColor: COLORS.borderLight,
   },
   modalTitle: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: '800',
-    color: COLORS.white,
-    marginBottom: 4,
+    color: COLORS.textDark,
   },
   modalSub: {
     fontSize: 13,
     color: COLORS.textMuted,
+    marginTop: 4,
     lineHeight: 18,
   },
   body: {
-    maxHeight: 400,
+    paddingHorizontal: 22,
+    paddingTop: 16,
   },
   gpsBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    backgroundColor: '#EEF2FF',
     borderWidth: 1.5,
-    borderColor: COLORS.primary,
-    borderRadius: 14,
-    padding: 14,
-    marginBottom: 16,
+    borderColor: '#6366F1',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 20,
+    gap: 14,
   },
   gpsIcon: {
-    fontSize: 22,
-    marginRight: 12,
+    fontSize: 24,
   },
   gpsTitle: {
-    color: COLORS.white,
-    fontWeight: '700',
     fontSize: 15,
+    fontWeight: '700',
+    color: '#4338CA',
   },
   gpsSub: {
-    color: COLORS.primary,
     fontSize: 12,
+    color: '#6366F1',
     marginTop: 2,
   },
   sectionLabel: {
-    color: COLORS.white,
     fontSize: 13,
     fontWeight: '700',
-    marginTop: 8,
-    marginBottom: 8,
+    color: COLORS.textDark,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 10,
+    marginTop: 4,
   },
   searchBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.darkBg,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: Platform.OS === 'ios' ? 12 : 6,
+    backgroundColor: COLORS.backgroundLight,
     borderWidth: 1,
-    borderColor: COLORS.borderDark,
-    marginBottom: 16,
+    borderColor: COLORS.border,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: Platform.OS === 'ios' ? 12 : 8,
+    marginBottom: 20,
   },
   searchIcon: {
     fontSize: 16,
-    marginRight: 8,
+    marginRight: 10,
   },
   input: {
     flex: 1,
-    color: COLORS.white,
     fontSize: 14,
+    color: COLORS.textDark,
   },
   chipContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
-    marginBottom: 16,
+    marginBottom: 20,
   },
   chip: {
-    backgroundColor: COLORS.darkBg,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
+    backgroundColor: COLORS.backgroundLight,
     borderWidth: 1,
-    borderColor: COLORS.borderDark,
+    borderColor: COLORS.border,
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
   },
   chipActive: {
-    backgroundColor: COLORS.primaryLight,
+    backgroundColor: COLORS.primaryLight || '#EDE9FE',
     borderColor: COLORS.primary,
   },
   chipTxt: {
-    fontSize: 12,
+    fontSize: 13,
     color: COLORS.textMuted,
-    fontWeight: '600',
+    fontWeight: '500',
   },
   chipTxtActive: {
-    color: COLORS.primaryDark,
-    fontWeight: '800',
+    color: COLORS.primary,
+    fontWeight: '700',
   },
   mapPinPreview: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.darkBg,
-    borderRadius: 14,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: COLORS.primary,
-    marginVertical: 10,
+    backgroundColor: '#F0FDF4',
+    borderWidth: 1.5,
+    borderColor: '#22C55E',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 24,
+    gap: 12,
   },
   mapPinEmoji: {
     fontSize: 24,
-    marginRight: 12,
   },
   previewTitle: {
-    color: COLORS.textMuted,
     fontSize: 11,
-    fontWeight: '600',
+    fontWeight: '700',
+    color: '#15803D',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   previewLocation: {
-    color: COLORS.white,
     fontSize: 14,
     fontWeight: '700',
+    color: '#166534',
     marginTop: 2,
   },
   activeBadge: {
-    backgroundColor: COLORS.primary,
-    color: COLORS.white,
     fontSize: 10,
     fontWeight: '800',
+    color: '#FFFFFF',
+    backgroundColor: '#16A34A',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 6,
+    overflow: 'hidden',
   },
   footer: {
-    marginTop: 12,
-    paddingTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.borderDark,
+    paddingHorizontal: 22,
+    paddingTop: 12,
   },
 });
