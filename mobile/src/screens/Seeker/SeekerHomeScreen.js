@@ -306,16 +306,16 @@ export default function SeekerHomeScreen({ navigation }) {
           onPress={() => navigation.navigate('SpotDetails', { space: item })}
           activeOpacity={0.88}
         >
-          <View style={styles.cardHeader}>
-            <View style={styles.badgeGroup}>
-              <View style={{ backgroundColor: '#f59e0b', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 }}>
-                <Text style={{ color: '#000000', fontSize: 10, fontWeight: '900' }}>🏢 1+ ACRE BANK REPO STOCKYARD</Text>
+          <View style={[styles.cardHeader, { flexWrap: 'wrap', gap: 6, alignItems: 'center' }]}>
+            <View style={[styles.badgeGroup, { flexWrap: 'wrap', flex: 1, gap: 6 }]}>
+              <View style={{ backgroundColor: '#f59e0b', paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6 }}>
+                <Text style={{ color: '#000000', fontSize: 10, fontWeight: '900' }}>🏢 1+ ACRE REPO STOCKYARD</Text>
               </View>
-              <View style={{ backgroundColor: 'rgba(56, 189, 248, 0.15)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, borderWidth: 1, borderColor: '#0284c7' }}>
+              <View style={{ backgroundColor: 'rgba(56, 189, 248, 0.15)', paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6, borderWidth: 1, borderColor: '#0284c7' }}>
                 <Text style={{ color: '#38bdf8', fontSize: 10, fontWeight: '800' }}>📐 {item.landAcres || 1.0} ACRES</Text>
               </View>
             </View>
-            <Text style={[styles.priceTxt, { color: '#fbbf24' }]}>
+            <Text style={[styles.priceTxt, { color: '#fbbf24', fontSize: 17 }]}>
               ₹{item.monthlyStorageRate || 1500}
               <Text style={{ fontSize: 11, color: '#94a3b8', fontWeight: '500' }}>/car/mo</Text>
             </Text>
@@ -958,16 +958,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 2,
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 4,
   },
   heatMapTitle: {
     color: '#ffffff',
     fontSize: 12,
     fontWeight: '800',
+    flexShrink: 1,
   },
   heatMapLegend: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexWrap: 'wrap',
     gap: 8,
   },
   legendPill: {
@@ -1062,11 +1066,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 6,
     marginBottom: 8,
   },
   badgeGroup: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexWrap: 'wrap',
+    flexShrink: 1,
     gap: 6,
   },
   verifiedBadge: {

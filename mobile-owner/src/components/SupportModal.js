@@ -171,31 +171,6 @@ export default function SupportModal({ visible, onClose, isStorageYard = false }
                 </View>
               </View>
             </View>
-
-            {/* Common Support Categories */}
-            <Text style={styles.sectionHeader}>Quick Help Topics</Text>
-            <View style={styles.topicsGrid}>
-              <View style={styles.topicCard}>
-                <Text style={styles.topicIcon}>🚜</Text>
-                <Text style={styles.topicTitle}>Yard Staging</Text>
-                <Text style={styles.topicDesc}>Bank recovery bay check-in & verification</Text>
-              </View>
-              <View style={styles.topicCard}>
-                <Text style={styles.topicIcon}>💰</Text>
-                <Text style={styles.topicTitle}>Payouts</Text>
-                <Text style={styles.topicDesc}>Host wallet bank transfer assistance</Text>
-              </View>
-              <View style={styles.topicCard}>
-                <Text style={styles.topicIcon}>🛑</Text>
-                <Text style={styles.topicTitle}>Overstays</Text>
-                <Text style={styles.topicDesc}>Report overstayed or unverified vehicles</Text>
-              </View>
-              <View style={styles.topicCard}>
-                <Text style={styles.topicIcon}>📝</Text>
-                <Text style={styles.topicTitle}>Listing Help</Text>
-                <Text style={styles.topicDesc}>Update pricing, bay capacity, or amenities</Text>
-              </View>
-            </View>
           </ScrollView>
         </View>
       </View>

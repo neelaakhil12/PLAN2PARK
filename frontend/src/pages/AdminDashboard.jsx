@@ -110,6 +110,20 @@ const AdminDashboard = () => {
   const [termSearchQuery, setTermSearchQuery] = useState('');
   const [showAddTermModal, setShowAddTermModal] = useState(false);
 
+  // ── Chatbot FAQs Management States ──
+  const [faqs, setFaqs] = useState([]);
+  const [faqsAudience, setFaqsAudience] = useState('parking_seeker'); // 'parking_seeker' | 'bank_finance'
+  const [editingFaq, setEditingFaq] = useState(null);
+  const [faqCategoryInput, setFaqCategoryInput] = useState('');
+  const [faqQuestionInput, setFaqQuestionInput] = useState('');
+  const [faqAnswerInput, setFaqAnswerInput] = useState('');
+  const [faqOrderInput, setFaqOrderInput] = useState(1);
+  const [faqAudienceInput, setFaqAudienceInput] = useState('parking_seeker');
+  const [faqSearchQuery, setFaqSearchQuery] = useState('');
+  const [faqCategoryFilter, setFaqCategoryFilter] = useState('all');
+  const [showAddFaqModal, setShowAddFaqModal] = useState(false);
+  const [faqLoading, setFaqLoading] = useState(false);
+
   const [supportSettings, setSupportSettings] = useState({
     supportEmail: 'plantopark@gmail.com',
     supportPhone: '+91 8919360467',
@@ -260,11 +274,130 @@ const AdminDashboard = () => {
     }
   };
 
+  const fetchFaqs = async () => {
+    try {
+      const res = await fetch(`${API_URL}/faqs/admin/all`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        setFaqs(await res.json());
+      }
+    } catch (e) {
+      console.error('Fetch FAQs error:', e);
+    }
+  };
+
+  const handleSaveFaq = async (e) => {
+    e.preventDefault();
+    if (!faqQuestionInput.trim() || !faqAnswerInput.trim() || !faqCategoryInput.trim()) {
+      alert('Please fill out the Category, Question, and Answer.');
+      return;
+    }
+    setFaqLoading(true);
+    try {
+      if (editingFaq) {
+        const res = await fetch(`${API_URL}/faqs/admin/${editingFaq._id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            audience: faqAudienceInput,
+            category: faqCategoryInput.trim(),
+            question: faqQuestionInput.trim(),
+            answer: faqAnswerInput.trim(),
+            order: faqOrderInput,
+          })
+        });
+        if (res.ok) {
+          const updated = await res.json();
+          setFaqs(prev => prev.map(f => f._id === updated._id ? updated : f));
+          setEditingFaq(null);
+          setFaqQuestionInput('');
+          setFaqAnswerInput('');
+          setFaqCategoryInput('');
+          setShowAddFaqModal(false);
+        } else {
+          const err = await res.json();
+          alert(err.message || 'Failed to update FAQ');
+        }
+      } else {
+        const res = await fetch(`${API_URL}/faqs/admin`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            audience: faqAudienceInput,
+            category: faqCategoryInput.trim(),
+            question: faqQuestionInput.trim(),
+            answer: faqAnswerInput.trim(),
+            order: faqOrderInput,
+          })
+        });
+        if (res.ok) {
+          const created = await res.json();
+          setFaqs(prev => [...prev, created]);
+          setFaqQuestionInput('');
+          setFaqAnswerInput('');
+          setFaqCategoryInput('');
+          setShowAddFaqModal(false);
+        } else {
+          const err = await res.json();
+          alert(err.message || 'Failed to create FAQ');
+        }
+      }
+    } catch (err) {
+      alert('Error saving FAQ: ' + err.message);
+    } finally {
+      setFaqLoading(false);
+    }
+  };
+
+  const handleDeleteFaq = async (id) => {
+    if (!window.confirm('Are you sure you want to permanently delete this FAQ from the chatbot?')) return;
+    try {
+      const res = await fetch(`${API_URL}/faqs/admin/${id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        setFaqs(prev => prev.filter(f => f._id !== id));
+      } else {
+        const err = await res.json();
+        alert(err.message || 'Failed to delete FAQ');
+      }
+    } catch (err) {
+      alert('Delete FAQ error: ' + err.message);
+    }
+  };
+
+  const handleToggleFaqActive = async (faq) => {
+    try {
+      const res = await fetch(`${API_URL}/faqs/admin/${faq._id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ isActive: !faq.isActive })
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        setFaqs(prev => prev.map(f => f._id === updated._id ? updated : f));
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   const fetchData = async () => {
     setLoading(true);
     try {
       const headers = { Authorization: `Bearer ${token}` };
-      const [rAnal, rUsers, rSpaces, rBookings, rComplaints, rReviews, rTerms] = await Promise.all([
+      const [rAnal, rUsers, rSpaces, rBookings, rComplaints, rReviews, rTerms, rFaqs] = await Promise.all([
         fetch(`${API_URL}/analytics/admin`, { headers }),
         fetch(`${API_URL}/auth/admin/users`, { headers }),
         fetch(`${API_URL}/spaces/admin/all`, { headers }),
@@ -272,6 +405,7 @@ const AdminDashboard = () => {
         fetch(`${API_URL}/complaints`, { headers }),
         fetch(`${API_URL}/reviews`, { headers }),
         fetch(`${API_URL}/terms/admin/all`, { headers }),
+        fetch(`${API_URL}/faqs/admin/all`, { headers }),
       ]);
       let userList = [];
       let spaceList = [];
@@ -304,6 +438,7 @@ const AdminDashboard = () => {
       if (rComplaints.ok) setComplaints(await rComplaints.json());
       if (rReviews.ok) setReviews(await rReviews.json());
       if (rTerms && rTerms.ok) setTerms(await rTerms.json());
+      if (rFaqs && rFaqs.ok) setFaqs(await rFaqs.json());
       fetchSupportSettings();
 
       // Fetch wallet payouts & commission
@@ -403,6 +538,9 @@ const AdminDashboard = () => {
     }
     if (currentView === 'promotions' && token) {
       fetchPromotions();
+    }
+    if (currentView === 'faqs' && token) {
+      fetchFaqs();
     }
   }, [currentView, revenueStartDate, revenueEndDate, token]);
 
@@ -789,6 +927,7 @@ const AdminDashboard = () => {
     payouts: '💸 Owner Withdrawals & Payout Requests',
     promotions: 'Promotional Offers & Push Broadcasts',
     terms: '📜 Terms & Conditions Management',
+    faqs: '💬 Chatbot FAQs (Parking & Bank Repo Yards)',
     complaints: 'Complaints',
     reviews: 'Support Reviews',
     notifications: 'Notifications',
@@ -806,6 +945,7 @@ const AdminDashboard = () => {
     { id: 'payouts', path: '/admin/payouts', label: '💸 Owner Withdrawals', icon: <DollarSign className="h-4.5 w-4.5 text-amber-400" /> },
     { id: 'promotions', path: '/admin/promotions', label: '📢 Promotional Offers', icon: <Megaphone className="h-4.5 w-4.5 text-amber-400" /> },
     { id: 'terms', path: '/admin/terms', label: '📜 Terms & Conditions', icon: <FileText className="h-4.5 w-4.5 text-indigo-400" /> },
+    { id: 'faqs', path: '/admin/faqs', label: '💬 Chatbot FAQs', icon: <HelpCircle className="h-4.5 w-4.5 text-cyan-400" /> },
     { id: 'complaints', path: '/admin/complaints', label: 'Complaints', icon: <AlertTriangle className="h-4.5 w-4.5 text-rose-400" /> },
     { id: 'reviews', path: '/admin/reviews', label: 'Support Reviews', icon: <MessageSquare className="h-4.5 w-4.5 text-purple-400" /> },
     { id: 'notifications', path: '/admin/notifications', label: 'Notifications', icon: <Bell className="h-4.5 w-4.5" /> },
@@ -2096,6 +2236,331 @@ const AdminDashboard = () => {
                                 className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl text-xs font-bold shadow-md shadow-indigo-600/20 transition-all flex items-center gap-2"
                               >
                                 {termLoading ? 'Saving...' : editingTerm ? 'Update Clause' : 'Create Clause'}
+                              </button>
+                            </div>
+                          </form>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+
+              {/* ── VIEW: CHATBOT FAQS MANAGEMENT ─────────────────────────── */}
+              {currentView === 'faqs' && (() => {
+                const audienceFaqs = faqs.filter(f => (f.audience || 'parking_seeker') === faqsAudience);
+                const uniqueCategories = ['all', ...new Set(audienceFaqs.map(f => f.category).filter(Boolean))];
+
+                const filteredFaqs = audienceFaqs
+                  .filter(f => {
+                    if (faqCategoryFilter !== 'all' && f.category !== faqCategoryFilter) return false;
+                    if (faqSearchQuery) {
+                      const q = faqSearchQuery.toLowerCase();
+                      return (
+                        (f.question && f.question.toLowerCase().includes(q)) ||
+                        (f.answer && f.answer.toLowerCase().includes(q)) ||
+                        (f.category && f.category.toLowerCase().includes(q))
+                      );
+                    }
+                    return true;
+                  })
+                  .sort((a, b) => (a.order || 0) - (b.order || 0));
+
+                return (
+                  <div className="space-y-6 animate-fadeIn">
+                    {/* Header Banner */}
+                    <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+                      <div>
+                        <h2 className="text-xl font-black text-slate-900 flex items-center gap-2">
+                          <HelpCircle className="h-6 w-6 text-cyan-500" />
+                          Chatbot FAQs Live Editor & Content Manager
+                        </h2>
+                        <p className="text-xs text-slate-500 mt-1">
+                          Manage, edit, add, or customize questions & answers for General Parking Seekers and Bank/NBFC Repo Stockyards. Updates reflect instantly in the mobile AI assistant.
+                        </p>
+                      </div>
+
+                      <button
+                        onClick={() => {
+                          setEditingFaq(null);
+                          setFaqAudienceInput(faqsAudience);
+                          setFaqCategoryInput(uniqueCategories.find(c => c !== 'all') || 'General');
+                          setFaqQuestionInput('');
+                          setFaqAnswerInput('');
+                          const maxOrd = Math.max(0, ...audienceFaqs.map(f => f.order || 0));
+                          setFaqOrderInput(maxOrd + 1);
+                          setShowAddFaqModal(true);
+                        }}
+                        className="bg-cyan-600 hover:bg-cyan-700 text-white font-bold px-4 py-2.5 rounded-xl text-xs flex items-center gap-2 shadow-md shadow-cyan-600/20 transition-all shrink-0 cursor-pointer"
+                      >
+                        <Plus className="h-4 w-4" /> Add New FAQ
+                      </button>
+                    </div>
+
+                    {/* Audience Filter Tabs & Search & Category Filter */}
+                    <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4">
+                      <div className="flex flex-wrap items-center gap-2 bg-slate-200/60 p-1.5 rounded-2xl">
+                        <button
+                          onClick={() => {
+                            setFaqsAudience('parking_seeker');
+                            setFaqCategoryFilter('all');
+                          }}
+                          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+                            faqsAudience === 'parking_seeker'
+                              ? 'bg-white text-blue-700 shadow-sm font-black'
+                              : 'text-slate-600 hover:text-slate-900'
+                          }`}
+                        >
+                          <span>🚗 Parking Seeker FAQs</span>
+                          <span className="px-2 py-0.5 rounded-full text-[10px] bg-blue-50 text-blue-600 font-bold">
+                            {faqs.filter(f => (f.audience || 'parking_seeker') === 'parking_seeker').length}
+                          </span>
+                        </button>
+
+                        <button
+                          onClick={() => {
+                            setFaqsAudience('bank_finance');
+                            setFaqCategoryFilter('all');
+                          }}
+                          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+                            faqsAudience === 'bank_finance'
+                              ? 'bg-white text-cyan-700 shadow-sm font-black'
+                              : 'text-slate-600 hover:text-slate-900'
+                          }`}
+                        >
+                          <span>🏦 Bank & Finance Storage Yards FAQs</span>
+                          <span className="px-2 py-0.5 rounded-full text-[10px] bg-cyan-50 text-cyan-600 font-bold">
+                            {faqs.filter(f => f.audience === 'bank_finance').length}
+                          </span>
+                        </button>
+                      </div>
+
+                      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                        {/* Category Filter */}
+                        <div className="relative">
+                          <select
+                            value={faqCategoryFilter}
+                            onChange={(e) => setFaqCategoryFilter(e.target.value)}
+                            className="w-full sm:w-52 px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-700 font-semibold focus:outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 cursor-pointer"
+                          >
+                            <option value="all">All Categories ({audienceFaqs.length})</option>
+                            {uniqueCategories.filter(c => c !== 'all').map(cat => (
+                              <option key={cat} value={cat}>
+                                {cat} ({audienceFaqs.filter(f => f.category === cat).length})
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        {/* Search Input */}
+                        <div className="relative w-full sm:w-64">
+                          <Search className="absolute left-3.5 top-2.5 h-4 w-4 text-slate-400" />
+                          <input
+                            type="text"
+                            placeholder="Search questions & answers..."
+                            value={faqSearchQuery}
+                            onChange={(e) => setFaqSearchQuery(e.target.value)}
+                            className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 transition-all"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* FAQs List Table */}
+                    <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm">
+                      <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+                        <div>
+                          <h3 className="font-extrabold text-slate-800 text-sm flex items-center gap-2">
+                            <span>{faqsAudience === 'bank_finance' ? '🏦 Bank & Finance Seized Vehicle FAQs' : '🚗 Parking Seeker Chatbot FAQs'}</span>
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 font-bold">
+                              {filteredFaqs.length} of {audienceFaqs.length} questions
+                            </span>
+                          </h3>
+                          <p className="text-[11px] text-slate-400 mt-0.5">
+                            Click the pencil icon on any row to edit questions and answers directly.
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm text-left">
+                          <thead className="bg-slate-50 text-slate-400 text-xs uppercase">
+                            <tr>
+                              <th className="px-5 py-3 w-16">#</th>
+                              <th className="px-5 py-3 w-44">Category</th>
+                              <th className="px-5 py-3">Question & Answer</th>
+                              <th className="px-5 py-3 w-28 text-center">Status</th>
+                              <th className="px-5 py-3 w-28 text-right">Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100 font-medium">
+                            {filteredFaqs.length === 0 ? (
+                              <tr>
+                                <td colSpan="5" className="text-center py-12 text-slate-400">
+                                  No FAQs found matching your query.
+                                </td>
+                              </tr>
+                            ) : (
+                              filteredFaqs.map((faq, idx) => (
+                                <tr key={faq._id || faq.id || idx} className="hover:bg-slate-50/70 transition-colors">
+                                  <td className="px-5 py-4 align-top">
+                                    <span className="h-7 w-7 rounded-lg bg-cyan-50 border border-cyan-200 text-cyan-700 font-black text-xs flex items-center justify-center font-mono">
+                                      {faq.order || idx + 1}
+                                    </span>
+                                  </td>
+                                  <td className="px-5 py-4 align-top">
+                                    <span className="inline-block px-2.5 py-1 rounded-lg text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                                      {faq.category || 'General'}
+                                    </span>
+                                  </td>
+                                  <td className="px-5 py-4 align-top">
+                                    <div className="space-y-1.5 max-w-2xl">
+                                      <p className="font-bold text-slate-900 text-xs leading-snug">
+                                        {faq.question}
+                                      </p>
+                                      <p className="text-slate-600 text-xs leading-relaxed">
+                                        {faq.answer}
+                                      </p>
+                                    </div>
+                                  </td>
+                                  <td className="px-5 py-4 align-top text-center">
+                                    <button
+                                      onClick={() => handleToggleFaqActive(faq)}
+                                      className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase transition-all cursor-pointer ${
+                                        faq.isActive !== false
+                                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100'
+                                          : 'bg-slate-100 text-slate-500 border border-slate-200 hover:bg-slate-200'
+                                      }`}
+                                    >
+                                      {faq.isActive !== false ? '✓ Active' : 'Inactive'}
+                                    </button>
+                                  </td>
+                                  <td className="px-5 py-4 align-top text-right">
+                                    <div className="flex items-center justify-end gap-1.5">
+                                      <button
+                                        onClick={() => {
+                                          setEditingFaq(faq);
+                                          setFaqAudienceInput(faq.audience || faqsAudience);
+                                          setFaqCategoryInput(faq.category || '');
+                                          setFaqQuestionInput(faq.question || '');
+                                          setFaqAnswerInput(faq.answer || '');
+                                          setFaqOrderInput(faq.order || idx + 1);
+                                          setShowAddFaqModal(true);
+                                        }}
+                                        className="h-8 w-8 rounded-lg bg-slate-50 border border-slate-200 text-slate-600 hover:text-cyan-600 hover:border-cyan-300 flex items-center justify-center transition-colors cursor-pointer"
+                                        title="Edit FAQ"
+                                      >
+                                        <Edit2 className="h-3.5 w-3.5" />
+                                      </button>
+                                      <button
+                                        onClick={() => handleDeleteFaq(faq._id)}
+                                        className="h-8 w-8 rounded-lg bg-slate-50 border border-slate-200 text-slate-600 hover:text-rose-600 hover:border-rose-300 flex items-center justify-center transition-colors cursor-pointer"
+                                        title="Delete FAQ"
+                                      >
+                                        <Trash2 className="h-3.5 w-3.5" />
+                                      </button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              ))
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                    {/* Add / Edit FAQ Modal */}
+                    {showAddFaqModal && (
+                      <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+                        <div className="bg-white rounded-3xl border border-slate-200 max-w-lg w-full p-6 shadow-2xl animate-scaleUp">
+                          <div className="flex items-center justify-between pb-4 border-b border-slate-100 mb-4">
+                            <h3 className="font-black text-slate-900 text-base flex items-center gap-2">
+                              <HelpCircle className="h-5 w-5 text-cyan-500" />
+                              {editingFaq ? 'Edit Chatbot FAQ' : 'Add New Chatbot FAQ'}
+                            </h3>
+                            <button
+                              onClick={() => setShowAddFaqModal(false)}
+                              className="h-8 w-8 rounded-xl bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200 transition-colors cursor-pointer"
+                            >
+                              <X className="h-4 w-4" />
+                            </button>
+                          </div>
+
+                          <form onSubmit={handleSaveFaq} className="space-y-4">
+                            <div>
+                              <label className="block text-xs font-bold text-slate-600 mb-1">Target Chatbot Audience</label>
+                              <select
+                                value={faqAudienceInput}
+                                onChange={(e) => setFaqAudienceInput(e.target.value)}
+                                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:border-cyan-400"
+                              >
+                                <option value="parking_seeker">🚗 Parking Seeker Chatbot</option>
+                                <option value="bank_finance">🏦 Bank & Finance Seized Vehicle Storage Yards</option>
+                              </select>
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                              <div>
+                                <label className="block text-xs font-bold text-slate-600 mb-1">Topic / Category *</label>
+                                <input
+                                  type="text"
+                                  required
+                                  placeholder="e.g. About & Eligibility"
+                                  value={faqCategoryInput}
+                                  onChange={(e) => setFaqCategoryInput(e.target.value)}
+                                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-cyan-400"
+                                />
+                              </div>
+
+                              <div>
+                                <label className="block text-xs font-bold text-slate-600 mb-1">Display Order</label>
+                                <input
+                                  type="number"
+                                  value={faqOrderInput}
+                                  onChange={(e) => setFaqOrderInput(Number(e.target.value))}
+                                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:border-cyan-400"
+                                />
+                              </div>
+                            </div>
+
+                            <div>
+                              <label className="block text-xs font-bold text-slate-600 mb-1">Question Text *</label>
+                              <input
+                                type="text"
+                                required
+                                placeholder="e.g. What is Plant2Park?"
+                                value={faqQuestionInput}
+                                onChange={(e) => setFaqQuestionInput(e.target.value)}
+                                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-cyan-400"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-xs font-bold text-slate-600 mb-1">Answer Text *</label>
+                              <textarea
+                                rows={4}
+                                required
+                                placeholder="Enter the detailed resolution or answer provided to users..."
+                                value={faqAnswerInput}
+                                onChange={(e) => setFaqAnswerInput(e.target.value)}
+                                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-cyan-400 leading-relaxed"
+                              />
+                            </div>
+
+                            <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
+                              <button
+                                type="button"
+                                onClick={() => setShowAddFaqModal(false)}
+                                className="px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors cursor-pointer"
+                              >
+                                Cancel
+                              </button>
+                              <button
+                                type="submit"
+                                disabled={faqLoading}
+                                className="bg-cyan-600 hover:bg-cyan-700 text-white px-5 py-2.5 rounded-xl text-xs font-bold shadow-md shadow-cyan-600/20 transition-all flex items-center gap-2 cursor-pointer"
+                              >
+                                {faqLoading ? 'Saving...' : editingFaq ? 'Update FAQ' : 'Create FAQ'}
                               </button>
                             </div>
                           </form>

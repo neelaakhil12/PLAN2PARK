@@ -1060,12 +1060,22 @@ router.delete('/:id', protect, async (req, res) => {
       return res.status(404).json({ message: 'Booking order not found' });
     }
 
-    const space = await ParkingSpace.findById(booking.spaceId);
-
-    // Check authorization: Owner of space, Seeker of booking, or Admin
-    const isOwner = space && space.ownerId && space.ownerId.toString() === req.user._id.toString();
-    const isSeeker = booking.seekerId && booking.seekerId.toString() === req.user._id.toString();
+    const currentUserId = req.user._id ? req.user._id.toString() : req.user.id?.toString();
     const isAdmin = req.user.role === 'admin';
+    const isSeeker = booking.seekerId && booking.seekerId.toString() === currentUserId;
+
+    // Check if user is the space owner
+    let isOwner = false;
+    if (booking.spaceId) {
+      const space = await ParkingSpace.findById(booking.spaceId);
+      if (space && space.ownerId && space.ownerId.toString() === currentUserId) {
+        isOwner = true;
+      }
+    }
+    // Also allow if user is an authenticated owner/storage owner
+    if (!isOwner && (req.user.role === 'owner' || req.user.accountCategory?.includes('owner'))) {
+      isOwner = true;
+    }
 
     if (!isOwner && !isSeeker && !isAdmin) {
       return res.status(401).json({ message: 'Not authorized to delete this booking order' });
@@ -1174,23 +1184,6 @@ const cancelBookingHandler = async (req, res) => {
 };
 router.post('/:id/cancel', protect, cancelBookingHandler);
 router.put('/:id/cancel', protect, cancelBookingHandler);
-
-// @desc    Delete a booking order
-// @route   DELETE /api/bookings/:id
-// @access  Private (Owner, Seeker, Admin)
-router.delete('/:id', protect, async (req, res) => {
-  try {
-    const booking = await Booking.findById(req.params.id);
-    if (!booking) {
-      return res.status(404).json({ message: 'Booking not found' });
-    }
-    await Booking.findByIdAndDelete(req.params.id);
-    res.json({ message: 'Booking order deleted successfully', bookingId: req.params.id });
-  } catch (error) {
-    console.error('Delete booking error:', error);
-    res.status(500).json({ message: error.message });
-  }
-});
 
 module.exports = router;
 

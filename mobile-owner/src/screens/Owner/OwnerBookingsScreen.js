@@ -10,6 +10,7 @@ import {
   Platform,
   StatusBar,
   Linking,
+  Alert,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AuthContext } from '../../context/AuthContext';
@@ -76,33 +77,45 @@ export default function OwnerBookingsScreen({ navigation }) {
   const handleDeleteBooking = async (bookingId, vehicleNumber) => {
     const doDelete = async () => {
       try {
+        // Optimistically remove from state immediately
+        setBookings((prev) => prev.filter((b) => b._id !== bookingId));
+
         const baseUrl = await getBaseApiUrl();
         const res = await fetch(`${baseUrl}/bookings/${bookingId}`, {
           method: 'DELETE',
-          headers: { Authorization: `Bearer ${token}` },
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+          },
         });
 
         if (res.ok) {
           fetchOwnerBookings();
         } else {
-          const err = await res.json();
-          if (typeof window !== 'undefined' && window.alert) {
-            window.alert(err.message || 'Could not delete booking order');
+          const err = await res.json().catch(() => ({}));
+          const errMsg = err.message || 'Could not delete booking order';
+          if (Platform.OS === 'web' && typeof window !== 'undefined') {
+            window.alert(errMsg);
           } else {
-            Alert.alert('Error', err.message || 'Could not delete booking order');
+            Alert.alert('Error', errMsg);
           }
+          fetchOwnerBookings();
         }
       } catch (e) {
-        console.error(e);
+        console.error('Delete booking error:', e);
+        fetchOwnerBookings();
       }
     };
 
-    if (typeof window !== 'undefined' && window.confirm) {
-      if (window.confirm(`Delete booking order for vehicle "${vehicleNumber || 'this booking'}"?`)) {
+    const confirmTitle = 'Delete Booking Order';
+    const confirmMsg = `Are you sure you want to delete order for ${vehicleNumber || 'this booking'}?`;
+
+    if (Platform.OS === 'web' && typeof window !== 'undefined' && window.confirm) {
+      if (window.confirm(confirmMsg)) {
         doDelete();
       }
-    } else if (typeof Alert !== 'undefined' && Alert.alert) {
-      Alert.alert('Delete Booking Order', `Are you sure you want to delete order for ${vehicleNumber || 'this booking'}?`, [
+    } else {
+      Alert.alert(confirmTitle, confirmMsg, [
         { text: 'Cancel', style: 'cancel' },
         { text: 'Delete', style: 'destructive', onPress: doDelete },
       ]);

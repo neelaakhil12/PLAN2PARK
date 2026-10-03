@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useContext } from 'react';
 import {
   View,
   Text,
@@ -13,7 +13,9 @@ import {
   KeyboardAvoidingView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { AuthContext } from '../../context/AuthContext';
 import { seekerFaqs } from '../../data/seekerFaqs';
+import { bankFinanceFaqs } from '../../data/bankFinanceFaqs';
 import { endpoints } from '../../config/api';
 
 // Format helper for timestamps (e.g., "9:50 PM")
@@ -44,8 +46,8 @@ const generateTicketId = () => {
   return result;
 };
 
-// Structured Topic Categories mapped to seekerFaqs (Pure Automated Self-Service)
-const TOPIC_CATEGORIES = [
+// Structured Topic Categories for General Parking Seekers
+const SEEKER_TOPIC_CATEGORIES = [
   {
     id: 'cat_booking',
     title: 'Booking & Finding Parking',
@@ -90,23 +92,85 @@ const TOPIC_CATEGORIES = [
   },
 ];
 
+// Structured Topic Categories for Bank & Finance Seized Vehicle Storage Yards
+const BANK_FINANCE_TOPIC_CATEGORIES = [
+  {
+    id: 'bf_about',
+    title: 'About & Eligibility',
+    description: 'Platform overview, eligible organizations & vehicle types',
+    questionIds: [1, 2, 3, 4, 35],
+  },
+  {
+    id: 'bf_account',
+    title: 'Account & Registration',
+    description: 'Bank registration, multiple users & login credentials',
+    questionIds: [8, 9, 10, 11, 39],
+  },
+  {
+    id: 'bf_yard',
+    title: 'Yard Discovery & Booking',
+    description: 'Search storage yards, check capacity & online booking',
+    questionIds: [5, 6, 7, 16, 17, 18, 38],
+  },
+  {
+    id: 'bf_vehicle',
+    title: 'Vehicle Entry & Seizure',
+    description: 'Add seized vehicles, upload RC/chassis documents & photos',
+    questionIds: [12, 13, 14, 15, 36, 37],
+  },
+  {
+    id: 'bf_tracking',
+    title: 'Tracking & Status',
+    description: 'Track stored vehicles, approval status & cancellation',
+    questionIds: [19, 20, 21, 22, 23, 34],
+  },
+  {
+    id: 'bf_release',
+    title: 'Vehicle Release & Dispatch',
+    description: 'Release authorization, gate pass & handover documents',
+    questionIds: [24, 25, 26, 27, 28],
+  },
+  {
+    id: 'bf_inventory',
+    title: 'Inventory & Search',
+    description: 'Search by registration number, yard filter & storage duration',
+    questionIds: [29, 30, 33],
+  },
+  {
+    id: 'bf_billing',
+    title: 'Billing & Support',
+    description: 'Yard storage charges, invoices & customer support',
+    questionIds: [31, 32, 40],
+  },
+];
+
 const BOT_NAME = 'Agent Plan2Park';
 
 export default function HelpAssistantScreen({ navigation }) {
+  const { user } = useContext(AuthContext);
+  const isBankSeeker = user?.accountCategory === 'bank_finance_seeker' || user?.accountCategory?.includes('bank');
+
+  const topicCategories = isBankSeeker ? BANK_FINANCE_TOPIC_CATEGORIES : SEEKER_TOPIC_CATEGORIES;
+  const initialFaqs = isBankSeeker ? bankFinanceFaqs : seekerFaqs;
+
   const [ticketId] = useState(generateTicketId);
-  const [faqs, setFaqs] = useState(seekerFaqs);
+  const [faqs, setFaqs] = useState(initialFaqs);
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [isChatEnded, setIsChatEnded] = useState(false);
   const scrollViewRef = useRef(null);
 
-  // Initial greeting and prompt
+  // Initial greeting based on role
+  const greetingText = isBankSeeker
+    ? "Hello! Welcome to Plant2Park Bank & Finance Support. I'm Agent Plan2Park, here to assist with your vehicle storage yard requests."
+    : "Hello! Welcome to PlanToPark Support. I'm Agent Plan2Park, here to assist you.";
+
   const [messages, setMessages] = useState(() => [
     {
       id: 'greeting-1',
       sender: 'bot',
       botName: BOT_NAME,
-      text: "Hello! Welcome to PlanToPark Support. I'm Agent Plan2Park, here to assist you.",
+      text: greetingText,
       timestamp: formatTime(),
     },
     {
@@ -115,7 +179,7 @@ export default function HelpAssistantScreen({ navigation }) {
       botName: BOT_NAME,
       text: "Can you specify what you need help with from the options below?",
       timestamp: formatTime(),
-      options: TOPIC_CATEGORIES.map((cat) => ({
+      options: topicCategories.map((cat) => ({
         id: cat.id,
         label: cat.title,
         payload: { type: 'SELECT_TOPIC', topic: cat },
@@ -124,11 +188,13 @@ export default function HelpAssistantScreen({ navigation }) {
     },
   ]);
 
-  // Fetch live FAQs if available, otherwise use seekerFaqs
+  // Fetch live FAQs from backend (filtered by audience) so admin edits reflect immediately
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetch(endpoints.getFaqs);
+        const audienceParam = isBankSeeker ? 'bank_finance' : 'parking_seeker';
+        const url = `${endpoints.getFaqs}?audience=${audienceParam}`;
+        const res = await fetch(url);
         if (res.ok) {
           const data = await res.json();
           if (Array.isArray(data) && data.length > 0) {
@@ -136,10 +202,10 @@ export default function HelpAssistantScreen({ navigation }) {
           }
         }
       } catch (err) {
-        // Fallback to local seekerFaqs
+        // Fallback to local default FAQs
       }
     })();
-  }, []);
+  }, [isBankSeeker]);
 
   const messageLayouts = useRef({});
   const pendingScrollId = useRef(null);
@@ -197,7 +263,7 @@ export default function HelpAssistantScreen({ navigation }) {
         id: `greeting-1-${Date.now()}`,
         sender: 'bot',
         botName: BOT_NAME,
-        text: "Hello! Welcome to PlanToPark Support. I'm Agent Plan2Park, here to assist you.",
+        text: greetingText,
         timestamp: formatTime(),
       },
       {
@@ -206,7 +272,7 @@ export default function HelpAssistantScreen({ navigation }) {
         botName: BOT_NAME,
         text: "Can you specify what you need help with from the options below?",
         timestamp: formatTime(),
-        options: TOPIC_CATEGORIES.map((cat) => ({
+        options: topicCategories.map((cat) => ({
           id: cat.id,
           label: cat.title,
           payload: { type: 'SELECT_TOPIC', topic: cat },
@@ -228,7 +294,7 @@ export default function HelpAssistantScreen({ navigation }) {
         {
           id: `ended-${Date.now()}`,
           sender: 'system',
-          text: 'Chat session has ended. Thank you for using PlanToPark Support!',
+          text: 'Chat session has ended. Thank you for using Plant2Park Support!',
           timestamp: formatTime(),
         },
       ]);
@@ -290,13 +356,15 @@ export default function HelpAssistantScreen({ navigation }) {
       if (payload.type === 'SELECT_TOPIC') {
         const topic = payload.topic;
 
-        // Get questions belonging to this topic
-        const topicQuestions = faqs.filter((f) =>
-          topic.questionIds.includes(f.id)
-        );
+        // Get questions belonging to this topic (by ID, faqId, or category name matching)
+        const topicQuestions = faqs.filter((f) => {
+          const idMatch = topic.questionIds?.includes(f.id) || topic.questionIds?.includes(f.faqId);
+          const catMatch = f.category && topic.title && f.category.toLowerCase() === topic.title.toLowerCase();
+          return idMatch || catMatch;
+        });
 
         const questionOptions = topicQuestions.map((q) => ({
-          id: `q_${q.id}`,
+          id: `q_${q.id || q._id}`,
           label: q.question,
           payload: { type: 'SELECT_QUESTION', questionItem: q, topic },
         }));
@@ -357,7 +425,9 @@ export default function HelpAssistantScreen({ navigation }) {
           id: `bot-${Date.now()}`,
           sender: 'bot',
           botName: BOT_NAME,
-          text: 'Awesome! Glad I could help. Have a safe journey and smooth parking experience! 🚗✨',
+          text: isBankSeeker
+            ? 'Awesome! Glad I could help. Wishing you efficient yard management and secure vehicle storage! 🚜🏢'
+            : 'Awesome! Glad I could help. Have a safe journey and smooth parking experience! 🚗✨',
           timestamp: formatTime(),
           options: [
             {
@@ -382,7 +452,7 @@ export default function HelpAssistantScreen({ navigation }) {
           botName: BOT_NAME,
           text: 'Sure! Please choose a category below to continue:',
           timestamp: formatTime(),
-          options: TOPIC_CATEGORIES.map((cat) => ({
+          options: topicCategories.map((cat) => ({
             id: cat.id,
             label: cat.title,
             payload: { type: 'SELECT_TOPIC', topic: cat },
@@ -398,7 +468,7 @@ export default function HelpAssistantScreen({ navigation }) {
           {
             id: `ended-${Date.now()}`,
             sender: 'system',
-            text: 'Chat session has ended. Thank you for using PlanToPark Support!',
+            text: 'Chat session has ended. Thank you for using Plant2Park Support!',
             timestamp: formatTime(),
           },
         ]);

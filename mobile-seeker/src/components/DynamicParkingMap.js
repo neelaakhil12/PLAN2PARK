@@ -126,6 +126,8 @@ export default function DynamicParkingMap({
       display: flex;
       justify-content: space-between;
       align-items: center;
+      flex-wrap: wrap;
+      gap: 4px;
       margin-bottom: 2px;
     }
     .legend-title {
@@ -136,8 +138,9 @@ export default function DynamicParkingMap({
     }
     .legend-pills {
       display: flex;
-      gap: 8px;
+      gap: 6px;
       align-items: center;
+      flex-wrap: wrap;
     }
     .legend-pill {
       display: flex;

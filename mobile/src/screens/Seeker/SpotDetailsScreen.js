@@ -59,6 +59,10 @@ const generateRazorpayHtml = (booking, orderData, user, space, finalPrice) => {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>PlanToPark - Secure Checkout</title>
+  <link rel="dns-prefetch" href="//checkout.razorpay.com">
+  <link rel="preconnect" href="https://checkout.razorpay.com" crossorigin>
+  <link rel="dns-prefetch" href="//api.razorpay.com">
+  <link rel="preconnect" href="https://api.razorpay.com" crossorigin>
   <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -135,24 +139,33 @@ const generateRazorpayHtml = (booking, orderData, user, space, finalPrice) => {
             signature: response.razorpay_signature || ''
           }));
         }
+    function tryOpenRazorpay() {
+      if (typeof Razorpay !== 'undefined') {
+        try {
+          var rzp = new Razorpay(options);
+          rzp.on('payment.failed', function(resp) {
+            if (window.ReactNativeWebView) {
+              window.ReactNativeWebView.postMessage(JSON.stringify({
+                event: 'PAYMENT_FAILED',
+                error: resp.error?.description || 'Payment failed'
+              }));
+            }
+          });
+          rzp.open();
+        } catch (e) {
+          setTimeout(tryOpenRazorpay, 50);
+        }
+      } else {
+        setTimeout(tryOpenRazorpay, 30);
       }
-    };
+    }
 
-    var rzp = new Razorpay(options);
-    rzp.on('payment.failed', function(resp) {
-      if (window.ReactNativeWebView) {
-        window.ReactNativeWebView.postMessage(JSON.stringify({
-          event: 'PAYMENT_FAILED',
-          error: resp.error?.description || 'Payment failed'
-        }));
-      }
-    });
-
-    window.onload = function() {
-      setTimeout(function() {
-        rzp.open();
-      }, 300);
-    };
+    if (document.readyState === 'complete' || document.readyState === 'interactive') {
+      tryOpenRazorpay();
+    } else {
+      document.addEventListener('DOMContentLoaded', tryOpenRazorpay);
+      window.addEventListener('load', tryOpenRazorpay);
+    }
   </script>
 </body>
 </html>`;
@@ -203,6 +216,13 @@ export default function SpotDetailsScreen({ route, navigation }) {
   const [cardExpiry, setCardExpiry] = useState('12/28');
   const [cardCvv, setCardCvv] = useState('789');
   const [processingPayment, setProcessingPayment] = useState(false);
+
+  // Pre-load Razorpay script so checkout opens instantly on tap
+  useEffect(() => {
+    if (Platform.OS === 'web') {
+      loadRazorpayScript();
+    }
+  }, []);
 
   const handleCreateBooking = async () => {
     if (!vehicleNumber) {

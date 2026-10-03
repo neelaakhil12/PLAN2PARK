@@ -10,6 +10,7 @@ import {
   RefreshControl,
   Platform,
   StatusBar,
+  Alert,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AuthContext } from '../../context/AuthContext';
@@ -111,6 +112,7 @@ export default function OwnerHomeScreen({ navigation }) {
   const handleDeleteSpot = (spotId, spotTitle) => {
     const doDelete = async () => {
       try {
+        setSpots((prev) => prev.filter((s) => s._id !== spotId));
         const baseUrl = await getBaseApiUrl();
         const res = await fetch(`${baseUrl}/spaces/${spotId}`, {
           method: 'DELETE',
@@ -118,13 +120,16 @@ export default function OwnerHomeScreen({ navigation }) {
         });
         if (res.ok) {
           fetchOwnerSpots();
+        } else {
+          fetchOwnerSpots();
         }
       } catch (err) {
         console.error('Error deleting spot:', err);
+        fetchOwnerSpots();
       }
     };
 
-    if (typeof window !== 'undefined' && window.confirm) {
+    if (Platform.OS === 'web' && typeof window !== 'undefined' && window.confirm) {
       if (window.confirm(`Are you sure you want to delete "${spotTitle || 'this spot'}"?`)) {
         doDelete();
       }

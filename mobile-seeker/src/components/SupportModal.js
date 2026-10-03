@@ -178,31 +178,6 @@ export default function SupportModal({ visible, onClose, isBankFinance = false }
                 </View>
               </View>
             </View>
-
-            {/* Common Support Topics */}
-            <Text style={styles.sectionHeader}>Quick Help Categories</Text>
-            <View style={styles.topicsGrid}>
-              <View style={styles.topicCard}>
-                <Text style={styles.topicIcon}>📍</Text>
-                <Text style={styles.topicTitle}>Navigation</Text>
-                <Text style={styles.topicDesc}>Directions to reserved parking slots</Text>
-              </View>
-              <View style={styles.topicCard}>
-                <Text style={styles.topicIcon}>⏰</Text>
-                <Text style={styles.topicTitle}>Overstay</Text>
-                <Text style={styles.topicDesc}>Extend time or calculate overtime tariffs</Text>
-              </View>
-              <View style={styles.topicCard}>
-                <Text style={styles.topicIcon}>💳</Text>
-                <Text style={styles.topicTitle}>Refunds</Text>
-                <Text style={styles.topicDesc}>Instant UPI and wallet refund status</Text>
-              </View>
-              <View style={styles.topicCard}>
-                <Text style={styles.topicIcon}>🚧</Text>
-                <Text style={styles.topicTitle}>Access Barrier</Text>
-                <Text style={styles.topicDesc}>Boom barrier or host contact assistance</Text>
-              </View>
-            </View>
           </ScrollView>
         </View>
       </View>

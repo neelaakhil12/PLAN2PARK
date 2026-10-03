@@ -798,7 +798,7 @@ export default function AddSpotScreen({ route, navigation }) {
           isActive,
           cancellationPolicy,
           maxWalletDiscount: Number(maxWalletDiscount || 0),
-          suitableVehicles,
+          suitableVehicles: isVehicleStorageYard ? ['hatchback', 'sedan', 'suv', 'commercial', '4-wheeler'] : suitableVehicles,
           spaceCategory: isVehicleStorageYard ? 'commercial_vehicle_storage' : 'standard',
           landAcres: isVehicleStorageYard ? Number(landAcres) : 0,
           monthlyStorageRate: isVehicleStorageYard ? Number(monthlyStorageRate) : 0,
@@ -1196,95 +1196,99 @@ export default function AddSpotScreen({ route, navigation }) {
             </View>
           </View>
 
-          {/* Supported Vehicle Sizes & Types */}
-          <View style={{ marginBottom: 18 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-              <Text style={styles.label}>🚗 Vehicles Fit in this Spot (Select all that fit)</Text>
-              <Text style={{ fontSize: 11, color: COLORS.ownerAccent, fontWeight: '700' }}>
-                {suitableVehicles.length} of 3 Selected
+          {/* Supported Vehicle Sizes & Types (Standard Parking Space Owners Only - not needed for 1+ Acre Vehicle Storage Yards) */}
+          {!isVehicleStorageYard && (
+            <View style={{ marginBottom: 18 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6, flexWrap: 'wrap', gap: 6 }}>
+                <Text style={[styles.label, { marginBottom: 0, flexShrink: 1 }]}>🚗 Vehicles Fit in this Spot</Text>
+                <View style={{ backgroundColor: 'rgba(56, 189, 248, 0.15)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, borderWidth: 1, borderColor: '#0284c7' }}>
+                  <Text style={{ fontSize: 11, color: COLORS.ownerAccent, fontWeight: '800' }}>
+                    {suitableVehicles.length} of 3 Selected
+                  </Text>
+                </View>
+              </View>
+              <Text style={{ fontSize: 12, color: COLORS.textMuted, marginBottom: 10 }}>
+                Check which car sizes can comfortably enter and park in your space:
               </Text>
-            </View>
-            <Text style={{ fontSize: 12, color: COLORS.textMuted, marginBottom: 10 }}>
-              Check which car sizes can comfortably enter and park in your space:
-            </Text>
 
-            <View style={{ gap: 10 }}>
-              {[
-                {
-                  id: 'hatchback',
-                  title: 'Hatchback',
-                  icon: '🚗',
-                  subtitle: 'Small cars, usually 4–5 seats',
-                  examples: 'Swift, i20, Baleno',
-                },
-                {
-                  id: 'sedan',
-                  title: 'Sedan',
-                  icon: '🚘',
-                  subtitle: 'Separate boot/trunk, usually 4–5 seats',
-                  examples: 'Dzire, Honda City, Verna',
-                },
-                {
-                  id: 'suv',
-                  title: 'SUV',
-                  icon: '🚙',
-                  subtitle: 'Taller, larger body, usually 5–7 seats',
-                  examples: 'Creta, Seltos, XUV700',
-                },
-              ].map((vehicle) => {
-                const isChecked = suitableVehicles.includes(vehicle.id);
-                return (
-                  <TouchableOpacity
-                    key={vehicle.id}
-                    style={{
-                      backgroundColor: isChecked ? 'rgba(56, 189, 248, 0.12)' : COLORS.darkBg,
-                      borderWidth: 1.5,
-                      borderColor: isChecked ? COLORS.ownerAccent : '#334155',
-                      borderRadius: 14,
-                      padding: 12,
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                    }}
-                    onPress={() => toggleVehicleType(vehicle.id)}
-                    activeOpacity={0.8}
-                  >
-                    <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, gap: 12, marginRight: 10 }}>
-                      <Text style={{ fontSize: 24 }}>{vehicle.icon}</Text>
-                      <View style={{ flex: 1 }}>
-                        <Text style={{ color: isChecked ? COLORS.white : '#94a3b8', fontSize: 14, fontWeight: '800' }}>
-                          {vehicle.title}
-                        </Text>
-                        <Text style={{ color: COLORS.textMuted, fontSize: 11, marginTop: 1 }}>
-                          {vehicle.subtitle}
-                        </Text>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
-                          <Text style={{ fontSize: 10, color: COLORS.ownerAccent, fontWeight: '700' }}>Examples:</Text>
-                          <Text style={{ fontSize: 10, color: '#94a3b8' }}>{vehicle.examples}</Text>
+              <View style={{ gap: 10 }}>
+                {[
+                  {
+                    id: 'hatchback',
+                    title: 'Hatchback',
+                    icon: '🚗',
+                    subtitle: 'Small cars, usually 4–5 seats',
+                    examples: 'Swift, i20, Baleno',
+                  },
+                  {
+                    id: 'sedan',
+                    title: 'Sedan',
+                    icon: '🚘',
+                    subtitle: 'Separate boot/trunk, usually 4–5 seats',
+                    examples: 'Dzire, Honda City, Verna',
+                  },
+                  {
+                    id: 'suv',
+                    title: 'SUV',
+                    icon: '🚙',
+                    subtitle: 'Taller, larger body, usually 5–7 seats',
+                    examples: 'Creta, Seltos, XUV700',
+                  },
+                ].map((vehicle) => {
+                  const isChecked = suitableVehicles.includes(vehicle.id);
+                  return (
+                    <TouchableOpacity
+                      key={vehicle.id}
+                      style={{
+                        backgroundColor: isChecked ? 'rgba(56, 189, 248, 0.12)' : COLORS.darkBg,
+                        borderWidth: 1.5,
+                        borderColor: isChecked ? COLORS.ownerAccent : '#334155',
+                        borderRadius: 14,
+                        padding: 12,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                      }}
+                      onPress={() => toggleVehicleType(vehicle.id)}
+                      activeOpacity={0.8}
+                    >
+                      <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, gap: 12, marginRight: 10 }}>
+                        <Text style={{ fontSize: 24 }}>{vehicle.icon}</Text>
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ color: isChecked ? COLORS.white : '#94a3b8', fontSize: 14, fontWeight: '800' }}>
+                            {vehicle.title}
+                          </Text>
+                          <Text style={{ color: COLORS.textMuted, fontSize: 11, marginTop: 1 }}>
+                            {vehicle.subtitle}
+                          </Text>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
+                            <Text style={{ fontSize: 10, color: COLORS.ownerAccent, fontWeight: '700' }}>Examples:</Text>
+                            <Text style={{ fontSize: 10, color: '#94a3b8' }}>{vehicle.examples}</Text>
+                          </View>
                         </View>
                       </View>
-                    </View>
 
-                    {/* Checkbox box with checkmark */}
-                    <View style={{
-                      width: 24,
-                      height: 24,
-                      borderRadius: 6,
-                      borderWidth: 2,
-                      borderColor: isChecked ? COLORS.ownerAccent : '#475569',
-                      backgroundColor: isChecked ? COLORS.ownerAccent : 'transparent',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}>
-                      {isChecked && (
-                        <Text style={{ color: COLORS.white, fontSize: 13, fontWeight: '900' }}>✓</Text>
-                      )}
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
+                      {/* Checkbox box with checkmark */}
+                      <View style={{
+                        width: 24,
+                        height: 24,
+                        borderRadius: 6,
+                        borderWidth: 2,
+                        borderColor: isChecked ? COLORS.ownerAccent : '#475569',
+                        backgroundColor: isChecked ? COLORS.ownerAccent : 'transparent',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}>
+                        {isChecked && (
+                          <Text style={{ color: COLORS.white, fontSize: 13, fontWeight: '900' }}>✓</Text>
+                        )}
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
             </View>
-          </View>
+          )}
 
           {/* Max Wallet Discount Option (Owner Control) */}
           <View style={{ marginBottom: 14 }}>
@@ -1370,8 +1374,8 @@ export default function AddSpotScreen({ route, navigation }) {
             borderWidth: 1.5,
             borderColor: isVehicleStorageYard ? 'rgba(245, 158, 11, 0.4)' : 'rgba(124, 58, 237, 0.4)',
           }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-              <Text style={{ fontSize: 15, fontWeight: '800', color: COLORS.white }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 6, marginBottom: 6 }}>
+              <Text style={{ fontSize: 15, fontWeight: '800', color: COLORS.white, flexShrink: 1 }}>
                 {isVehicleStorageYard ? '📸 1+ Acre Land & Yard Photos' : '📸 Parking Spot Photos'}
               </Text>
               {spotImages.length > 0 ? (
