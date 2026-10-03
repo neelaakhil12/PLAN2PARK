@@ -22,6 +22,7 @@
     "expo-file-system": "~18.0.7",
     "expo-font": "~13.0.1",
     "expo-image-picker": "~16.0.4",
+    "expo-location": "~18.0.10",
     "expo-splash-screen": "~0.29.18",
     "expo-status-bar": "~2.0.0",
     "react": "18.3.1",

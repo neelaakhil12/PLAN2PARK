@@ -22,12 +22,22 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0f172a"
       },
-      "package": "com.plantopark.app"
+      "package": "com.plantopark.app",
+      "permissions": [
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "PlanToPark needs access to your location to find and display parking spots near you."
+        }
+      ],
       [
         "expo-build-properties",
         {

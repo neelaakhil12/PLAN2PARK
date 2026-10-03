@@ -16,6 +16,7 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Location from 'expo-location';
 import { AuthContext } from '../../context/AuthContext';
 import { getBaseApiUrl, endpoints, COMMON_HEADERS, getImageUrl } from '../../config/api';
 import { COLORS } from '../../theme/colors';
@@ -76,20 +77,69 @@ export default function SeekerHomeScreen({ navigation }) {
   const [viewMode, setViewMode] = useState('map'); // 'map' or 'list'
   const [selectedMapSpot, setSelectedMapSpot] = useState(null);
 
-  // Location pinning state (prompts upon login/open)
-  const [pinnedLocation, setPinnedLocation] = useState('Almasguda (17.313, 78.545)');
-  const [showPinModal, setShowPinModal] = useState(true);
+  // Location pinning state
+  const [pinnedLocation, setPinnedLocation] = useState('Almasguda (17.3128, 78.5450)');
+  const [showPinModal, setShowPinModal] = useState(false);
 
   // Profile completion state (ONLY for newly registered users)
   const [showProfileModal, setShowProfileModal] = useState(false);
 
-  // Parse coordinates from pinnedLocation (e.g. "Almasguda (17.313, 78.545)")
-  const userCoords = useMemo(() => {
-    const match = pinnedLocation.match(/\(([0-9.]+),\s*([0-9.]+)\)/);
+  // Restore saved location or auto-detect device GPS on startup
+  useEffect(() => {
+    (async () => {
+      try {
+        const savedLoc = await AsyncStorage.getItem('seeker_pinned_location');
+        if (savedLoc) {
+          setPinnedLocation(savedLoc);
+          return;
+        }
+
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status === 'granted') {
+          const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+          const lat = pos.coords.latitude;
+          const lng = pos.coords.longitude;
+          let area = '';
+          try {
+            const rev = await Location.reverseGeocodeAsync({ latitude: lat, longitude: lng });
+            if (rev && rev.length > 0) {
+              const r = rev[0];
+              const parts = [r.name, r.district, r.subregion, r.city].filter(Boolean);
+              area = [...new Set(parts)].slice(0, 2).join(', ') || r.city || 'My Location';
+            }
+          } catch (e) {}
+          if (!area) area = 'Current Location';
+          const newLoc = `🎯 ${area} (${lat.toFixed(4)}, ${lng.toFixed(4)})`;
+          setPinnedLocation(newLoc);
+          await AsyncStorage.setItem('seeker_pinned_location', newLoc);
+        } else {
+          // If permission not yet granted, show pin modal for user choice
+          setShowPinModal(true);
+        }
+      } catch (err) {
+        console.warn('Auto GPS startup check error:', err);
+      }
+    })();
+  }, []);
+
+  // Parse coordinates reliably from pinnedLocation
+  const seekerCoords = useMemo(() => {
+    if (!pinnedLocation) return { lat: 17.3128, lng: 78.5450 };
+    const match = pinnedLocation.match(/\((-?\d+\.?\d*),\s*(-?\d+\.?\d*)\)/);
     if (match) {
       return { lat: parseFloat(match[1]), lng: parseFloat(match[2]) };
     }
-    return { lat: 17.313, lng: 78.545 };
+    const locLower = pinnedLocation.toLowerCase();
+    if (locLower.includes('hitech')) return { lat: 17.4435, lng: 78.3772 };
+    if (locLower.includes('banjara')) return { lat: 17.4156, lng: 78.4347 };
+    if (locLower.includes('madhapur')) return { lat: 17.4483, lng: 78.3915 };
+    if (locLower.includes('jubilee')) return { lat: 17.4319, lng: 78.4071 };
+    if (locLower.includes('gachibowli')) return { lat: 17.4401, lng: 78.3489 };
+    if (locLower.includes('kondapur')) return { lat: 17.4646, lng: 78.3582 };
+    if (locLower.includes('secunderabad')) return { lat: 17.4334, lng: 78.5042 };
+    if (locLower.includes('lb nagar') || locLower.includes('l.b. nagar')) return { lat: 17.3457, lng: 78.5522 };
+    if (locLower.includes('ibrahimpatnam')) return { lat: 17.1950, lng: 78.6480 };
+    return { lat: 17.3128, lng: 78.5450 };
   }, [pinnedLocation]);
 
   const fetchUnreadNotifications = async () => {
@@ -174,9 +224,12 @@ export default function SeekerHomeScreen({ navigation }) {
     }
   };
 
-  const handleSelectPinnedLocation = (location) => {
+  const handleSelectPinnedLocation = async (location) => {
     setPinnedLocation(location);
     setShowPinModal(false);
+    try {
+      await AsyncStorage.setItem('seeker_pinned_location', location);
+    } catch (e) {}
   };
 
   const handleSaveProfile = async (profileData) => {
@@ -186,23 +239,6 @@ export default function SeekerHomeScreen({ navigation }) {
     }
     setShowProfileModal(false);
   };
-
-  // Extract seeker coordinates from pinnedLocation string
-  const getPinnedCoords = () => {
-    const match = (pinnedLocation || '').match(/\((-?\d+\.\d+),\s*(-?\d+\.\d+)\)/);
-    if (match) {
-      return { lat: parseFloat(match[1]), lng: parseFloat(match[2]) };
-    }
-    const locLower = (pinnedLocation || '').toLowerCase();
-    if (locLower.includes('hitech')) return { lat: 17.4435, lng: 78.3772 };
-    if (locLower.includes('banjara')) return { lat: 17.4156, lng: 78.4347 };
-    if (locLower.includes('madhapur')) return { lat: 17.4483, lng: 78.3915 };
-    if (locLower.includes('jubilee')) return { lat: 17.4319, lng: 78.4071 };
-    if (locLower.includes('gachibowli')) return { lat: 17.4401, lng: 78.3489 };
-    return { lat: 17.3128, lng: 78.5450 }; // Almasguda default
-  };
-
-  const seekerCoords = getPinnedCoords();
 
   // Determine if the logged-in seeker is a bank/finance user (used throughout)
   const isBankSeeker = user?.accountCategory === 'bank_finance_seeker';
@@ -723,8 +759,8 @@ export default function SeekerHomeScreen({ navigation }) {
             backgroundColor: '#0f172a',
           }}>
             <DynamicParkingMap
-              userLat={userCoords.lat}
-              userLng={userCoords.lng}
+              userLat={seekerCoords.lat}
+              userLng={seekerCoords.lng}
               userLocationName={pinnedLocation}
               spots={displaySpaces}
               selectedSpot={selectedMapSpot}

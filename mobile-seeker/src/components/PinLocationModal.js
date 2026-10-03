@@ -8,80 +8,161 @@ import {
   StyleSheet,
   ScrollView,
   Platform,
+  Alert,
 } from 'react-native';
+import * as Location from 'expo-location';
 import { COLORS } from '../theme/colors';
 import Button from './Button';
 
 const POPULAR_LOCATIONS = [
-  'Hitech City, Hyderabad',
-  'Banjara Hills, Hyderabad',
-  'Madhapur, Hyderabad',
-  'Gachibowli, Hyderabad',
-  'Jubilee Hills, Hyderabad',
-  'Kondapur, Hyderabad',
-  'Begumpet, Hyderabad',
-  'Secunderabad Railway Station',
+  { name: 'Almasguda, Hyderabad', lat: 17.3128, lng: 78.5450 },
+  { name: 'Hitech City, Hyderabad', lat: 17.4435, lng: 78.3772 },
+  { name: 'Madhapur, Hyderabad', lat: 17.4483, lng: 78.3915 },
+  { name: 'Gachibowli, Hyderabad', lat: 17.4401, lng: 78.3489 },
+  { name: 'Kondapur, Hyderabad', lat: 17.4646, lng: 78.3582 },
+  { name: 'Jubilee Hills, Hyderabad', lat: 17.4319, lng: 78.4071 },
+  { name: 'Banjara Hills, Hyderabad', lat: 17.4156, lng: 78.4347 },
+  { name: 'Secunderabad Station', lat: 17.4334, lng: 78.5042 },
+  { name: 'LB Nagar, Hyderabad', lat: 17.3457, lng: 78.5522 },
+  { name: 'Ibrahimpatnam', lat: 17.1950, lng: 78.6480 },
 ];
 
 export default function PinLocationModal({ visible, currentLocation, onSelectLocation, onClose }) {
-  const [selectedArea, setSelectedArea] = useState(currentLocation || 'Hitech City, Hyderabad');
+  const [selectedArea, setSelectedArea] = useState(currentLocation || 'Almasguda (17.313, 78.545)');
   const [customAddress, setCustomAddress] = useState('');
   const [locating, setLocating] = useState(false);
 
   if (!visible) return null;
 
-  const handleConfirm = () => {
-    const finalLocation = customAddress.trim() || selectedArea;
-    if (finalLocation) {
-      onSelectLocation(finalLocation);
+  const handleConfirm = async () => {
+    const finalAddress = customAddress.trim();
+    if (finalAddress) {
+      setLocating(true);
+      try {
+        const geocoded = await Location.geocodeAsync(finalAddress);
+        if (geocoded && geocoded.length > 0) {
+          const { latitude, longitude } = geocoded[0];
+          const locStr = `🎯 ${finalAddress} (${latitude.toFixed(4)}, ${longitude.toFixed(4)})`;
+          onSelectLocation(locStr);
+          setLocating(false);
+          return;
+        }
+      } catch (e) {
+        try {
+          const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(finalAddress)}&format=json&limit=1`, {
+            headers: { 'User-Agent': 'PlanToPark/1.0' }
+          });
+          const data = await res.json();
+          if (data && data.length > 0) {
+            const lat = parseFloat(data[0].lat);
+            const lon = parseFloat(data[0].lon);
+            const locStr = `🎯 ${finalAddress} (${lat.toFixed(4)}, ${lon.toFixed(4)})`;
+            onSelectLocation(locStr);
+            setLocating(false);
+            return;
+          }
+        } catch (nomErr) {}
+      }
+      setLocating(false);
+      onSelectLocation(finalAddress);
+    } else if (selectedArea) {
+      onSelectLocation(selectedArea);
     }
   };
 
-  const handleUseGps = () => {
+  const handleUseGps = async () => {
     setLocating(true);
-    if (typeof navigator !== 'undefined' && navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        async (position) => {
-          const lat = position.coords.latitude;
-          const lng = position.coords.longitude;
-          try {
-            const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`);
-            const data = await res.json();
-            const areaName = data.address
-              ? (data.address.suburb || data.address.neighbourhood || data.address.residential || data.address.city_district || data.address.city || 'Current Area')
-              : 'Current GPS Location';
-            const locationStr = `🎯 ${areaName} (${lat.toFixed(3)}, ${lng.toFixed(3)})`;
+    try {
+      // 1. Request foreground location permission
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert(
+          'Location Permission Required',
+          'Please allow location access in your device settings so PlanToPark can pin your exact parking position.'
+        );
+        setLocating(false);
+        return;
+      }
+
+      // 2. Query real hardware GPS coordinates
+      const pos = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+
+      const lat = pos.coords.latitude;
+      const lng = pos.coords.longitude;
+
+      // 3. Reverse geocode to retrieve the real locality/neighborhood name
+      let areaName = '';
+      try {
+        const rev = await Location.reverseGeocodeAsync({ latitude: lat, longitude: lng });
+        if (rev && rev.length > 0) {
+          const r = rev[0];
+          const nameParts = [r.name, r.district, r.subregion, r.city].filter(Boolean);
+          const uniqueParts = [...new Set(nameParts)];
+          areaName = uniqueParts.slice(0, 2).join(', ') || r.city || r.district || 'My Location';
+        }
+      } catch (revErr) {
+        try {
+          const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`, {
+            headers: { 'User-Agent': 'PlanToPark/1.0' }
+          });
+          const data = await res.json();
+          if (data && data.address) {
+            areaName = data.address.suburb || data.address.neighbourhood || data.address.residential || data.address.village || data.address.town || data.address.city || 'My Location';
+          }
+        } catch (nomErr) {}
+      }
+
+      if (!areaName) {
+        areaName = 'Current Location';
+      }
+
+      const locationStr = `🎯 ${areaName} (${lat.toFixed(4)}, ${lng.toFixed(4)})`;
+      setSelectedArea(locationStr);
+      setCustomAddress('');
+      onSelectLocation(locationStr);
+    } catch (err) {
+      console.warn('GPS detection error:', err);
+
+      // Web fallback
+      if (typeof navigator !== 'undefined' && navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          async (position) => {
+            const lat = position.coords.latitude;
+            const lng = position.coords.longitude;
+            const locationStr = `🎯 Current Location (${lat.toFixed(4)}, ${lng.toFixed(4)})`;
             setSelectedArea(locationStr);
             setCustomAddress('');
             onSelectLocation(locationStr);
-          } catch (e) {
-            const fallbackStr = `🎯 GPS Location (${lat.toFixed(3)}, ${lng.toFixed(3)})`;
-            setSelectedArea(fallbackStr);
-            setCustomAddress('');
-            onSelectLocation(fallbackStr);
-          } finally {
             setLocating(false);
-          }
-        },
-        (error) => {
-          console.warn('Geolocation error:', error);
-          const fallback = '🎯 Current Location (Banjara Hills, Hyderabad)';
-          setSelectedArea(fallback);
-          setCustomAddress('');
-          onSelectLocation(fallback);
-          setLocating(false);
-        },
-        { enableHighAccuracy: true, timeout: 6000 }
+          },
+          (navErr) => {
+            Alert.alert(
+              'Location Unavailable',
+              'Unable to detect your device GPS location. Please turn on your device GPS / Location services and try again.'
+            );
+            setLocating(false);
+          },
+          { enableHighAccuracy: true, timeout: 10000 }
+        );
+        return;
+      }
+
+      Alert.alert(
+        'Location Unavailable',
+        'Unable to detect GPS position. Please make sure location services are turned ON in your device settings.'
       );
-    } else {
-      setTimeout(() => {
-        const fallback = '🎯 Current Location (Banjara Hills, Hyderabad)';
-        setSelectedArea(fallback);
-        setCustomAddress('');
-        onSelectLocation(fallback);
-        setLocating(false);
-      }, 500);
+    } finally {
+      setLocating(false);
     }
+  };
+
+  const handleSelectPopular = (loc) => {
+    const locationStr = `🎯 ${loc.name} (${loc.lat.toFixed(4)}, ${loc.lng.toFixed(4)})`;
+    setSelectedArea(locationStr);
+    setCustomAddress('');
+    onSelectLocation(locationStr);
   };
 
   const modalBody = (
@@ -97,7 +178,7 @@ export default function PinLocationModal({ visible, currentLocation, onSelectLoc
 
         <ScrollView style={styles.body} showsVerticalScrollIndicator={false}>
           {/* GPS Locate Button */}
-          <TouchableOpacity style={styles.gpsBtn} onPress={handleUseGps} activeOpacity={0.8}>
+          <TouchableOpacity style={styles.gpsBtn} onPress={handleUseGps} activeOpacity={0.8} disabled={locating}>
             <Text style={styles.gpsIcon}>🎯</Text>
             <View style={{ flex: 1 }}>
               <Text style={styles.gpsTitle}>Use Current GPS Location</Text>
@@ -127,19 +208,15 @@ export default function PinLocationModal({ visible, currentLocation, onSelectLoc
           <Text style={styles.sectionLabel}>Popular Parking Hotspots</Text>
           <View style={styles.chipContainer}>
             {POPULAR_LOCATIONS.map((loc) => {
-              const isSelected = selectedArea === loc && !customAddress;
+              const isSelected = selectedArea.includes(loc.name) && !customAddress;
               return (
                 <TouchableOpacity
-                  key={loc}
+                  key={loc.name}
                   style={[styles.chip, isSelected && styles.chipActive]}
-                  onPress={() => {
-                    setSelectedArea(loc);
-                    setCustomAddress('');
-                    onSelectLocation(loc);
-                  }}
+                  onPress={() => handleSelectPopular(loc)}
                 >
                   <Text style={[styles.chipTxt, isSelected && styles.chipTxtActive]}>
-                    {loc}
+                    {loc.name}
                   </Text>
                 </TouchableOpacity>
               );
@@ -162,9 +239,10 @@ export default function PinLocationModal({ visible, currentLocation, onSelectLoc
         {/* Footer Action */}
         <View style={styles.footer}>
           <Button
-            title="Confirm Pinned Location 🚀"
+            title={locating ? "Detecting Location..." : "Confirm Pinned Location 🚀"}
             onPress={handleConfirm}
             variant="primary"
+            disabled={locating}
           />
         </View>
       </View>
