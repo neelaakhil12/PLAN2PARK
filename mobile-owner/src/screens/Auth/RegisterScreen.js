@@ -163,10 +163,6 @@ export default function RegisterScreen({ route, navigation }) {
     </SafeAreaView>
   );
 }
-      </ScrollView>
-    </SafeAreaView>
-  );
-}
 
 const styles = StyleSheet.create({
   container: {
