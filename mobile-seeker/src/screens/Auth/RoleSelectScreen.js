@@ -35,25 +35,6 @@ export default function RoleSelectScreen({ navigation }) {
           </View>
           <Text style={[styles.arrow, { color: COLORS.seekerAccent }]}>→</Text>
         </TouchableOpacity>
-
-        {/* Option 2: Banks & Auto Finance Companies */}
-        <TouchableOpacity
-          style={[styles.roleCard, { borderColor: COLORS.bankAccent, backgroundColor: 'rgba(14, 165, 233, 0.06)' }]}
-          onPress={() => navigation.navigate('Login', { role: 'seeker', category: 'bank_finance_seeker' })}
-          activeOpacity={0.85}
-        >
-          <View style={[styles.iconContainer, { backgroundColor: 'rgba(14, 165, 233, 0.2)' }]}>
-            <Text style={styles.cardEmoji}>🏦</Text>
-          </View>
-          <View style={styles.cardInfo}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <Text style={styles.roleTitle}>Banks & Auto Finance</Text>
-              <View style={styles.miniBadgeCyan}><Text style={styles.miniBadgeCyanTxt}>REPO YARDS</Text></View>
-            </View>
-            <Text style={styles.roleDesc}>Book high-security 1+ Acre stockyards with 24/7 guards & CCTV for seized/repossessed vehicles.</Text>
-          </View>
-          <Text style={[styles.arrow, { color: COLORS.bankAccent }]}>→</Text>
-        </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
   );

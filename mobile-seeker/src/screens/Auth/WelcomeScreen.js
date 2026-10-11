@@ -22,11 +22,11 @@ export default function WelcomeScreen({ navigation }) {
             resizeMode="contain"
           />
           <Text style={styles.brandTitle}>Plan2Park Seeker</Text>
-          <Text style={styles.tagline}>Park Smart. Reserve Parking & Seized Vehicle Storage Instantly.</Text>
+          <Text style={styles.tagline}>Park Smart. Find & Reserve Parking Spots Instantly.</Text>
         </View>
 
         <View style={styles.buttonContainer}>
-          {/* 1. Standard Parking Seeker Login */}
+          {/* Parking Seeker Login */}
           <Button
             title="Login as Parking Seeker"
             onPress={() => navigation.navigate('Login', { role: 'seeker', category: 'standard' })}
@@ -38,37 +38,6 @@ export default function WelcomeScreen({ navigation }) {
             onPress={() => navigation.navigate('Register', { role: 'seeker', category: 'standard' })}
           >
             <Text style={styles.registerTxt}>Don't have an account? Sign Up as Parking Seeker</Text>
-          </TouchableOpacity>
-
-          {/* Divider */}
-          <View style={styles.dividerRow}>
-            <View style={styles.dividerLine} />
-            <Text style={styles.dividerTxt}>OR FOR INSTITUTIONS</Text>
-            <View style={styles.dividerLine} />
-          </View>
-
-          {/* 2. NEW Dedicated Bankers & Auto Finance Login Button */}
-          <TouchableOpacity
-            style={styles.bankLoginBtn}
-            onPress={() => navigation.navigate('Login', { role: 'seeker', category: 'bank_finance_seeker' })}
-            activeOpacity={0.85}
-          >
-            <View style={styles.bankBtnContent}>
-              <Text style={styles.bankEmoji}>🏦</Text>
-              <View style={styles.bankTextCol}>
-                <Text style={styles.bankBtnTitle}>Bank & Auto Finance Login</Text>
-                <Text style={styles.bankBtnSubtitle}>
-                  For Banks, NBFCs & Loan Recovery Depts — Find & Book 1+ Acre Secured Storage for Seized Vehicles
-                </Text>
-              </View>
-            </View>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.bankRegisterBtn}
-            onPress={() => navigation.navigate('Register', { role: 'seeker', category: 'bank_finance_seeker' })}
-          >
-            <Text style={styles.bankRegisterTxt}>Register Bank / Auto Finance Account</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>

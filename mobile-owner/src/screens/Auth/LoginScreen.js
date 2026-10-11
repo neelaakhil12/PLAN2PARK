@@ -17,9 +17,6 @@ import Button from '../../components/Button';
 import Header from '../../components/Header';
 
 export default function LoginScreen({ route, navigation }) {
-  const category = route.params?.category === 'vehicle_storage_owner' ? 'vehicle_storage_owner' : 'standard';
-  const isStorage = category === 'vehicle_storage_owner';
-
   const { loginForRole } = useContext(AuthContext);
 
   const [email, setEmail] = useState('');
@@ -28,7 +25,7 @@ export default function LoginScreen({ route, navigation }) {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
-  const themeColor = isStorage ? COLORS.storageAccent : COLORS.ownerAccent;
+  const themeColor = COLORS.ownerAccent;
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -40,8 +37,7 @@ export default function LoginScreen({ route, navigation }) {
     setLoading(true);
     setErrorMsg('');
     try {
-      // Owner app logs in with role 'owner' and active category ('standard' or 'vehicle_storage_owner')
-      await loginForRole('owner', email.trim(), password, category);
+      await loginForRole('owner', email.trim(), password, 'standard');
     } catch (err) {
       const msg = err.message || 'Invalid credentials';
       setErrorMsg(msg);
@@ -54,7 +50,7 @@ export default function LoginScreen({ route, navigation }) {
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
       <Header
-        title={isStorage ? 'Vehicle Storage Land Owner Login' : 'Space Owner Login'}
+        title="Space Owner Login"
         subtitle="PlanToPark Owner"
         onBack={() => navigation.goBack()}
       />
@@ -62,30 +58,14 @@ export default function LoginScreen({ route, navigation }) {
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <View style={styles.badgeRow}>
           <View style={[styles.roleBadge, { backgroundColor: themeColor }]}>
-            <Text style={[styles.roleBadgeTxt, isStorage && { color: '#000000' }]}>
-              {isStorage ? '🏢 VEHICLE STORAGE LAND OWNER (1+ ACRE)' : '🅿️ SPACE OWNER LOGIN'}
-            </Text>
+            <Text style={styles.roleBadgeTxt}>🅿️ SPACE OWNER LOGIN</Text>
           </View>
         </View>
 
-        <Text style={styles.heading}>
-          {isStorage ? 'Vehicle Storage Partner 🏢' : 'Welcome Back 👋'}
-        </Text>
+        <Text style={styles.heading}>Welcome Back 👋</Text>
         <Text style={styles.subheading}>
-          {isStorage
-            ? 'Enter your credentials to manage your 1+ Acre vehicle storage yards for banks & auto finance'
-            : 'Enter your credentials to manage your listed parking spaces, driveways & garages'}
+          Enter your credentials to manage your listed parking spaces, driveways & garages
         </Text>
-
-        {/* ℹ️ Mandatory 1 Acre Land Requirement Note for Vehicle Storage */}
-        {isStorage && (
-          <View style={styles.noteBox}>
-            <Text style={styles.noteTitle}>⚠️ MANDATORY 1 ACRE LAND REQUIREMENT</Text>
-            <Text style={styles.noteText}>
-              A minimum of <Text style={{ fontWeight: '800', color: '#fbbf24' }}>1.0 Acre (43,560 sq ft)</Text> of secure, gated/fenced land is strictly required for listing Commercial Vehicle Storage / Bank Seized Vehicle Stockyards.
-            </Text>
-          </View>
-        )}
 
         {!!errorMsg && (
           <View style={styles.errorBox}>
@@ -139,13 +119,7 @@ export default function LoginScreen({ route, navigation }) {
         </View>
 
         <Button
-          title={
-            loading
-              ? 'Signing in...'
-              : isStorage
-              ? 'Sign In as Vehicle Storage Land Owner'
-              : 'Sign In as Space Owner'
-          }
+          title={loading ? 'Signing in...' : 'Sign In as Space Owner'}
           onPress={handleLogin}
           disabled={loading}
           style={[styles.submitBtn, { backgroundColor: themeColor }]}
@@ -157,12 +131,12 @@ export default function LoginScreen({ route, navigation }) {
             onPress={() =>
               navigation.navigate('Register', {
                 role: 'owner',
-                category,
+                category: 'standard',
               })
             }
           >
             <Text style={[styles.footerLink, { color: themeColor }]}>
-              {isStorage ? 'Register as Vehicle Storage Land Owner' : 'Register as Space Owner'}
+              Register as Space Owner
             </Text>
           </TouchableOpacity>
         </View>

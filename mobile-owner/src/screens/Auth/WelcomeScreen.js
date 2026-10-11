@@ -25,19 +25,8 @@ export default function WelcomeScreen({ navigation }) {
           <Text style={styles.tagline}>List Your Parking Space or Land & Earn Smart.</Text>
         </View>
 
-        {/* ℹ️ Mandatory 1 Acre Land Requirement Notice before Login/Account creation */}
-        <View style={styles.noteContainer}>
-          <View style={styles.noteHeader}>
-            <Text style={styles.noteIcon}>🏢</Text>
-            <Text style={styles.noteTitle}>VEHICLE STORAGE LAND REQUIREMENT</Text>
-          </View>
-          <Text style={styles.noteBody}>
-            For listing land as a Commercial Vehicle Storage Yard for Banks & Auto Finance companies (seized vehicle stockyard), a <Text style={styles.noteHighlight}>minimum of 1.0 Acre land</Text> is strictly required.
-          </Text>
-        </View>
-
         <View style={styles.buttonContainer}>
-          {/* 1. Login as Space Owner */}
+          {/* Login as Space Owner */}
           <Button
             title="Login as Space Owner"
             onPress={() => navigation.navigate('Login', { role: 'owner', category: 'standard' })}
@@ -49,27 +38,6 @@ export default function WelcomeScreen({ navigation }) {
             onPress={() => navigation.navigate('Register', { role: 'owner', category: 'standard' })}
           >
             <Text style={styles.registerLinkTxt}>Don't have an account? Register as Space Owner</Text>
-          </TouchableOpacity>
-
-          {/* Divider */}
-          <View style={styles.dividerRow}>
-            <View style={styles.dividerLine} />
-            <Text style={styles.dividerTxt}>OR FOR LANDOWNERS (1+ ACRE)</Text>
-            <View style={styles.dividerLine} />
-          </View>
-
-          {/* 2. Login as Vehicle Storage Land Owner in the same button color and style */}
-          <Button
-            title="Login as Vehicle Storage Land Owner"
-            onPress={() => navigation.navigate('Login', { role: 'owner', category: 'vehicle_storage_owner' })}
-            style={styles.loginBtn}
-          />
-
-          <TouchableOpacity
-            style={styles.registerLink}
-            onPress={() => navigation.navigate('Register', { role: 'owner', category: 'vehicle_storage_owner' })}
-          >
-            <Text style={styles.registerLinkTxt}>Don't have an account? Register as Vehicle Storage Land Owner</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>

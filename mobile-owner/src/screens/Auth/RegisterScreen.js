@@ -18,9 +18,6 @@ import Button from '../../components/Button';
 import Header from '../../components/Header';
 
 export default function RegisterScreen({ route, navigation }) {
-  const category = route.params?.category === 'vehicle_storage_owner' ? 'vehicle_storage_owner' : 'standard';
-  const isStorageOwner = category === 'vehicle_storage_owner';
-
   const { signupForRole } = useContext(AuthContext);
 
   const [name, setName] = useState('');
@@ -30,50 +27,13 @@ export default function RegisterScreen({ route, navigation }) {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  // Storage Landowner specific fields
-  const [landAcres, setLandAcres] = useState('1.0');
-  const FENCING_OPTIONS = ['Compound Wall', 'Barbed Wire Fencing', 'Chain Link Mesh'];
-  const [fencingTypes, setFencingTypes] = useState(['Compound Wall']);
-  const [hasSecurityGuards, setHasSecurityGuards] = useState(true);
-
-  const toggleFencingType = (fType) => {
-    if (fencingTypes.includes(fType)) {
-      if (fencingTypes.length === 1) {
-        Alert.alert('Selection Required', 'Please select at least one boundary security/fencing feature.');
-        return;
-      }
-      setFencingTypes(fencingTypes.filter((t) => t !== fType));
-    } else {
-      setFencingTypes([...fencingTypes, fType]);
-    }
-  };
-
-  const toggleSelectAllFencing = () => {
-    if (fencingTypes.length === FENCING_OPTIONS.length) {
-      setFencingTypes([FENCING_OPTIONS[0]]);
-    } else {
-      setFencingTypes([...FENCING_OPTIONS]);
-    }
-  };
-
-  const roleTitle = isStorageOwner ? 'Register Vehicle Storage Land Owner' : 'Register Space Owner';
-  const themeColor = isStorageOwner ? COLORS.storageAccent : COLORS.ownerAccent;
+  const roleTitle = 'Register Space Owner';
+  const themeColor = COLORS.ownerAccent;
 
   const handleRegister = async () => {
     if (!name.trim() || !email.trim() || !password.trim() || !contact.trim()) {
       Alert.alert('Missing Fields', 'Please fill in Name, Email, Mobile and Password');
       return;
-    }
-
-    if (isStorageOwner) {
-      const acres = parseFloat(landAcres);
-      if (isNaN(acres) || acres < 1.0) {
-        Alert.alert(
-          '1 Acre Minimum Required',
-          'A minimum of 1.0 Acre of secure land is strictly required to register as an authorized Vehicle Storage Yard for banks and auto finance companies.'
-        );
-        return;
-      }
     }
 
     if (password.length < 4) {
@@ -84,8 +44,7 @@ export default function RegisterScreen({ route, navigation }) {
     setLoading(true);
     try {
       const extraData = {
-        accountCategory: category,
-        ...(isStorageOwner ? { landAcres: parseFloat(landAcres), fencingType: fencingTypes.join(', '), hasSecurityGuards } : {}),
+        accountCategory: 'standard',
       };
 
       // Always register as role 'owner' in Owner App
@@ -108,30 +67,14 @@ export default function RegisterScreen({ route, navigation }) {
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <View style={styles.badgeRow}>
           <View style={[styles.roleBadge, { backgroundColor: themeColor }]}>
-            <Text style={[styles.roleBadgeTxt, isStorageOwner && { color: '#000000' }]}>
-              {isStorageOwner ? '🏢 VEHICLE STORAGE (1+ ACRE)' : '🅿️ SPACE OWNER REGISTRATION'}
-            </Text>
+            <Text style={styles.roleBadgeTxt}>🅿️ SPACE OWNER REGISTRATION</Text>
           </View>
         </View>
 
-        <Text style={styles.heading}>
-          {isStorageOwner ? 'List 1+ Acre Land 🏢' : 'Join as Space Owner 🅿️'}
-        </Text>
+        <Text style={styles.heading}>Join as Space Owner 🅿️</Text>
         <Text style={styles.subheading}>
-          {isStorageOwner
-            ? 'Monetize your vacant 1+ Acre land for bank seized vehicle stockyard'
-            : 'Turn your vacant driveway, garage, or commercial parking lot into income'}
+          Turn your vacant driveway, garage, or commercial parking lot into income
         </Text>
-
-        {/* ⚠️ Mandatory 1 Acre Policy Warning for Vehicle Storage */}
-        {isStorageOwner && (
-          <View style={styles.warningBox}>
-            <Text style={styles.warningTitle}>⚠️ MANDATORY 1 ACRE LAND REQUIREMENT</Text>
-            <Text style={styles.warningTxt}>
-              To register as an authorized Vehicle Storage Yard for Banks & Auto Finance repossession, you must have a minimum of <Text style={{ fontWeight: '800', color: '#fbbf24' }}>1.0 Acre (43,560 sq ft)</Text> of secure, gated/fenced land.
-            </Text>
-          </View>
-        )}
 
         <View style={styles.inputGroup}>
           <Text style={styles.label}>Name</Text>
@@ -169,73 +112,6 @@ export default function RegisterScreen({ route, navigation }) {
           />
         </View>
 
-        {isStorageOwner && (
-          <>
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Total Land Area (Acres - Minimum 1.0)</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="e.g. 1.5"
-                placeholderTextColor={COLORS.textMuted}
-                value={landAcres}
-                onChangeText={setLandAcres}
-                keyboardType="decimal-pad"
-              />
-            </View>
-
-            <View style={styles.inputGroup}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                <Text style={styles.label}>Boundary Security / Fencing Type</Text>
-                <TouchableOpacity onPress={toggleSelectAllFencing} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                  <Text style={{ color: COLORS.storageAccent, fontSize: 12, fontWeight: '800' }}>
-                    {fencingTypes.length === FENCING_OPTIONS.length ? '✓ Deselect All' : 'Select All'}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-
-              <View style={styles.fencingRow}>
-                {FENCING_OPTIONS.map((fType) => {
-                  const isChecked = fencingTypes.includes(fType);
-                  return (
-                    <TouchableOpacity
-                      key={fType}
-                      style={[
-                        styles.fencingOption,
-                        isChecked && { borderColor: COLORS.storageAccent, backgroundColor: 'rgba(245, 158, 11, 0.12)' },
-                      ]}
-                      onPress={() => toggleFencingType(fType)}
-                      activeOpacity={0.7}
-                    >
-                      <View style={[
-                        styles.checkboxBox,
-                        isChecked && { backgroundColor: COLORS.storageAccent, borderColor: COLORS.storageAccent }
-                      ]}>
-                        {isChecked && <Text style={styles.checkMark}>✓</Text>}
-                      </View>
-                      <Text style={[styles.fencingTxt, isChecked && { color: COLORS.storageAccent, fontWeight: '700' }]}>
-                        {fType}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </View>
-
-            <View style={styles.switchRow}>
-              <View style={{ flex: 1, paddingRight: 10 }}>
-                <Text style={styles.switchLabel}>24/7 Security Guards Available</Text>
-                <Text style={styles.switchDesc}>Guards physically stationed at premises</Text>
-              </View>
-              <Switch
-                value={hasSecurityGuards}
-                onValueChange={setHasSecurityGuards}
-                trackColor={{ false: '#334155', true: COLORS.storageAccent }}
-                thumbColor="#ffffff"
-              />
-            </View>
-          </>
-        )}
-
         <View style={styles.inputGroup}>
           <Text style={styles.label}>Password</Text>
           <View style={styles.passwordContainer}>
@@ -262,13 +138,7 @@ export default function RegisterScreen({ route, navigation }) {
         </View>
 
         <Button
-          title={
-            loading
-              ? 'Registering...'
-              : isStorageOwner
-              ? 'Register as Vehicle Storage Land Owner'
-              : 'Register as Space Owner'
-          }
+          title={loading ? 'Registering...' : 'Register as Space Owner'}
           onPress={handleRegister}
           disabled={loading}
           style={[styles.submitBtn, { backgroundColor: themeColor }]}
@@ -280,15 +150,19 @@ export default function RegisterScreen({ route, navigation }) {
             onPress={() =>
               navigation.navigate('Login', {
                 role: 'owner',
-                category,
+                category: 'standard',
               })
             }
           >
             <Text style={[styles.footerLink, { color: themeColor }]}>
-              {isStorageOwner ? 'Login as Vehicle Storage Land Owner' : 'Login as Space Owner'}
+              Login as Space Owner
             </Text>
           </TouchableOpacity>
         </View>
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
       </ScrollView>
     </SafeAreaView>
   );

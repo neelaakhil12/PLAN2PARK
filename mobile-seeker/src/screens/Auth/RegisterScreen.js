@@ -17,8 +17,6 @@ import Button from '../../components/Button';
 import Header from '../../components/Header';
 
 export default function RegisterScreen({ route, navigation }) {
-  const isBankSeeker = route.params?.category === 'bank_finance_seeker';
-
   const { signupForRole } = useContext(AuthContext);
 
   const [name, setName] = useState('');
@@ -26,20 +24,14 @@ export default function RegisterScreen({ route, navigation }) {
   const [contact, setContact] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [organizationName, setOrganizationName] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const roleTitle = isBankSeeker ? 'Register Bank & Finance' : 'Create Seeker Account';
-  const themeColor = isBankSeeker ? COLORS.bankAccent : COLORS.seekerAccent;
+  const roleTitle = 'Create Seeker Account';
+  const themeColor = COLORS.seekerAccent;
 
   const handleRegister = async () => {
     if (!name.trim() || !email.trim() || !password.trim() || !contact.trim()) {
       Alert.alert('Missing Fields', 'Please fill in Name, Email, Mobile and Password');
-      return;
-    }
-
-    if (isBankSeeker && !organizationName.trim()) {
-      Alert.alert('Required', 'Please enter your Bank / NBFC / Recovery Agency Name');
       return;
     }
 
@@ -51,8 +43,7 @@ export default function RegisterScreen({ route, navigation }) {
     setLoading(true);
     try {
       const extraData = {
-        accountCategory: isBankSeeker ? 'bank_finance_seeker' : 'standard',
-        ...(isBankSeeker ? { organizationName: organizationName.trim() } : {}),
+        accountCategory: 'standard',
       };
 
       await signupForRole('seeker', name.trim(), email.trim(), password.trim(), contact.trim(), extraData);
@@ -74,39 +65,20 @@ export default function RegisterScreen({ route, navigation }) {
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <View style={styles.badgeRow}>
           <View style={[styles.roleBadge, { backgroundColor: themeColor }]}>
-            <Text style={styles.roleBadgeTxt}>
-              {isBankSeeker ? '🏦 BANK & AUTO FINANCE REGISTRATION' : '🚗 PARKING SEEKER REGISTRATION'}
-            </Text>
+            <Text style={styles.roleBadgeTxt}>🚗 PARKING SEEKER REGISTRATION</Text>
           </View>
         </View>
 
-        <Text style={styles.heading}>
-          {isBankSeeker ? 'Bank & Finance Sign Up 🏦' : 'Join as Seeker 🚗'}
-        </Text>
+        <Text style={styles.heading}>Join as Seeker 🚗</Text>
         <Text style={styles.subheading}>
-          {isBankSeeker
-            ? 'Access secured 1+ Acre yards for repossessed and seized vehicles'
-            : 'Find, reserve, and park seamlessly across prime locations'}
+          Find, reserve, and park seamlessly across prime locations
         </Text>
-
-        {isBankSeeker && (
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Bank / NBFC / Organization Name</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="e.g. HDFC Auto Loans / Shriram Finance"
-              placeholderTextColor={COLORS.textMuted}
-              value={organizationName}
-              onChangeText={setOrganizationName}
-            />
-          </View>
-        )}
 
         <View style={styles.inputGroup}>
-          <Text style={styles.label}>{isBankSeeker ? 'Authorized Officer Name' : 'Full Name'}</Text>
+          <Text style={styles.label}>Full Name</Text>
           <TextInput
             style={styles.input}
-            placeholder={isBankSeeker ? 'e.g. Rajesh Kumar (Recovery Manager)' : 'e.g. Akhil Kumar'}
+            placeholder="e.g. Akhil Kumar"
             placeholderTextColor={COLORS.textMuted}
             value={name}
             onChangeText={setName}
@@ -114,10 +86,10 @@ export default function RegisterScreen({ route, navigation }) {
         </View>
 
         <View style={styles.inputGroup}>
-          <Text style={styles.label}>{isBankSeeker ? 'Official Work Email' : 'Email Address'}</Text>
+          <Text style={styles.label}>Email Address</Text>
           <TextInput
             style={styles.input}
-            placeholder="e.g. name@bank.com"
+            placeholder="e.g. name@example.com"
             placeholderTextColor={COLORS.textMuted}
             value={email}
             onChangeText={setEmail}
@@ -164,7 +136,7 @@ export default function RegisterScreen({ route, navigation }) {
         </View>
 
         <Button
-          title={loading ? 'Creating Account...' : isBankSeeker ? 'Register Bank / Finance Dept' : 'Create Seeker Account'}
+          title={loading ? 'Creating Account...' : 'Create Seeker Account'}
           onPress={handleRegister}
           disabled={loading}
           style={[styles.submitBtn, { backgroundColor: themeColor }]}
@@ -176,12 +148,12 @@ export default function RegisterScreen({ route, navigation }) {
             onPress={() =>
               navigation.navigate('Login', {
                 role: 'seeker',
-                category: isBankSeeker ? 'bank_finance_seeker' : 'standard',
+                category: 'standard',
               })
             }
           >
             <Text style={[styles.footerLink, { color: themeColor }]}>
-              {isBankSeeker ? 'Bank & Auto Finance Login' : 'Log In as Seeker'}
+              Log In as Seeker
             </Text>
           </TouchableOpacity>
         </View>

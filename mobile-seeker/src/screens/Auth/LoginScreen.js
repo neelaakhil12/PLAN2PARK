@@ -17,8 +17,6 @@ import Button from '../../components/Button';
 import Header from '../../components/Header';
 
 export default function LoginScreen({ route, navigation }) {
-  const isBankSeeker = route.params?.category === 'bank_finance_seeker';
-
   const { loginForRole } = useContext(AuthContext);
 
   const [email, setEmail] = useState('');
@@ -27,8 +25,8 @@ export default function LoginScreen({ route, navigation }) {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
-  const roleTitle = isBankSeeker ? 'Banks & Finance Login' : 'Parking Seeker Login';
-  const themeColor = isBankSeeker ? COLORS.bankAccent : COLORS.seekerAccent;
+  const roleTitle = 'Parking Seeker Login';
+  const themeColor = COLORS.seekerAccent;
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -40,7 +38,7 @@ export default function LoginScreen({ route, navigation }) {
     setLoading(true);
     setErrorMsg('');
     try {
-      await loginForRole('seeker', email.trim(), password, isBankSeeker ? 'bank_finance_seeker' : 'standard');
+      await loginForRole('seeker', email.trim(), password, 'standard');
     } catch (err) {
       const msg = err.message || 'Invalid credentials';
       setErrorMsg(msg);
@@ -57,19 +55,13 @@ export default function LoginScreen({ route, navigation }) {
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <View style={styles.badgeRow}>
           <View style={[styles.roleBadge, { backgroundColor: themeColor }]}>
-            <Text style={styles.roleBadgeTxt}>
-              {isBankSeeker ? '🏦 BANKS & AUTO FINANCE LOGIN' : '🚗 PARKING SEEKER LOGIN'}
-            </Text>
+            <Text style={styles.roleBadgeTxt}>🚗 PARKING SEEKER LOGIN</Text>
           </View>
         </View>
 
-        <Text style={styles.heading}>
-          {isBankSeeker ? 'Bank & Auto Finance 🏦' : 'Welcome Back 👋'}
-        </Text>
+        <Text style={styles.heading}>Welcome Back 👋</Text>
         <Text style={styles.subheading}>
-          {isBankSeeker
-            ? 'Search & reserve secured 1+ Acre stockyards for repossessed vehicles'
-            : 'Enter your credentials to search and reserve parking spots'}
+          Enter your credentials to search and reserve parking spots
         </Text>
 
         {!!errorMsg && (
@@ -83,7 +75,7 @@ export default function LoginScreen({ route, navigation }) {
           <Text style={styles.label}>Email Address</Text>
           <TextInput
             style={styles.input}
-            placeholder={isBankSeeker ? 'e.g. recovery@bank.com' : 'e.g. name@example.com'}
+            placeholder="e.g. name@example.com"
             placeholderTextColor={COLORS.textMuted}
             value={email}
             onChangeText={setEmail}
@@ -124,7 +116,7 @@ export default function LoginScreen({ route, navigation }) {
         </View>
 
         <Button
-          title={loading ? 'Signing in...' : isBankSeeker ? 'Sign In as Bank / Auto Finance' : 'Sign In as Parking Seeker'}
+          title={loading ? 'Signing in...' : 'Sign In as Parking Seeker'}
           onPress={handleLogin}
           disabled={loading}
           style={[styles.submitBtn, { backgroundColor: themeColor }]}
@@ -136,12 +128,12 @@ export default function LoginScreen({ route, navigation }) {
             onPress={() =>
               navigation.navigate('Register', {
                 role: 'seeker',
-                category: isBankSeeker ? 'bank_finance_seeker' : 'standard',
+                category: 'standard',
               })
             }
           >
             <Text style={[styles.footerLink, { color: themeColor }]}>
-              {isBankSeeker ? 'Register Bank / Repo Dept' : 'Sign Up as Parking Seeker'}
+              Sign Up as Parking Seeker
             </Text>
           </TouchableOpacity>
         </View>
