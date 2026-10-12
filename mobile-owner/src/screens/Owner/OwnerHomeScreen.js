@@ -28,12 +28,29 @@ export default function OwnerHomeScreen({ navigation }) {
   const [spots, setSpots] = useState([]);
   const [recentBookings, setRecentBookings] = useState([]);
   const [totalEarnings, setTotalEarnings] = useState(0);
+  const [unreadNotifs, setUnreadNotifs] = useState(0);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+
+  const fetchUnreadNotifications = async () => {
+    if (!token) return;
+    try {
+      const res = await fetch(endpoints.getNotifications, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setUnreadNotifs(data.unreadCount || 0);
+      }
+    } catch (e) {
+      // ignore
+    }
+  };
 
   useEffect(() => {
     if (isFocused && token) {
       fetchOwnerSpots();
+      fetchUnreadNotifications();
     }
   }, [isFocused, token]);
 
@@ -152,15 +169,32 @@ export default function OwnerHomeScreen({ navigation }) {
     <SafeAreaView style={styles.container} edges={['left', 'right']}>
       {/* Header with notch padding */}
       <View style={[styles.header, { paddingTop: topPadding + 10 }]}>
-        <View>
+        <View style={{ flex: 1, marginRight: 8 }}>
           <Text style={[styles.headerTitle, isStorageOwner && { color: '#fbbf24' }]}>
             {isStorageOwner ? 'Storage Land Owner 🏢' : 'Owner Dashboard 🅿️'}
           </Text>
           <Text style={styles.headerSub}>Welcome, {user?.name || (isStorageOwner ? 'Land Owner' : 'Owner')}</Text>
         </View>
-        <TouchableOpacity onPress={logout} style={styles.logoutBtn}>
-          <Text style={styles.logoutTxt}>Sign Out</Text>
-        </TouchableOpacity>
+
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          {/* In-App Notifications Bell Icon */}
+          <TouchableOpacity
+            onPress={() => navigation.navigate('Notifications')}
+            style={styles.notifBellBtn}
+            activeOpacity={0.75}
+          >
+            <Text style={{ fontSize: 18 }}>🔔</Text>
+            {unreadNotifs > 0 && (
+              <View style={styles.notifBadge}>
+                <Text style={styles.notifBadgeTxt}>{unreadNotifs > 9 ? '9+' : unreadNotifs}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity onPress={logout} style={styles.logoutBtn} activeOpacity={0.8}>
+            <Text style={styles.logoutTxt}>Sign Out</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView
@@ -171,6 +205,7 @@ export default function OwnerHomeScreen({ navigation }) {
             onRefresh={() => {
               setRefreshing(true);
               fetchOwnerSpots();
+              fetchUnreadNotifications();
             }}
             tintColor={isStorageOwner ? COLORS.storageAccent : COLORS.ownerAccent}
           />
@@ -380,6 +415,37 @@ const styles = StyleSheet.create({
     color: COLORS.danger,
     fontSize: 12,
     fontWeight: '700',
+  },
+  notifBellBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: COLORS.cardBg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.borderDark,
+    position: 'relative',
+    flexShrink: 0,
+  },
+  notifBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    backgroundColor: '#ef4444',
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 3,
+    borderWidth: 1.5,
+    borderColor: COLORS.darkBg,
+  },
+  notifBadgeTxt: {
+    color: '#ffffff',
+    fontSize: 9,
+    fontWeight: '900',
   },
   content: {
     padding: 16,

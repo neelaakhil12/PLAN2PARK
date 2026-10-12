@@ -143,17 +143,9 @@ export const AuthProvider = ({ children }) => {
     const baseUrl = await getBaseApiUrl();
     const currentToken = token || (await AsyncStorage.getItem('user_token'));
 
-    const plateToSave = (profileData.vehicleNumber || profileData.vehiclePlateNumber || profileData.plateNumber || '').trim().toUpperCase();
-    const updatedVehicles = plateToSave
-      ? [{ plateNumber: plateToSave, vehicleType: profileData.vehicleType || 'Car' }]
-      : (user?.vehicles && user.vehicles.length > 0 ? user.vehicles : []);
-
     const localUpdatedUser = {
       ...user,
       ...profileData,
-      vehicleNumber: plateToSave || user?.vehicleNumber || (updatedVehicles[0]?.plateNumber) || '',
-      vehiclePlateNumber: plateToSave || user?.vehiclePlateNumber || (updatedVehicles[0]?.plateNumber) || '',
-      vehicles: updatedVehicles,
       profileImage: profileData.profileImage || user?.profileImage,
     };
 

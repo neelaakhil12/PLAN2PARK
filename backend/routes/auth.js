@@ -650,6 +650,7 @@ router.get('/wallet', protect, async (req, res) => {
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
+});
 // ─── PUSH TOKEN REGISTRATION ─────────────────────────────────────────
 // @desc    Register or update device push token for external push notifications
 // @route   POST /api/auth/push-token

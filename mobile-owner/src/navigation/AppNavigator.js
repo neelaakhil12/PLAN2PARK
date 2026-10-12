@@ -20,6 +20,7 @@ import OwnerBookingsScreen from '../screens/Owner/OwnerBookingsScreen';
 import AddSpotScreen from '../screens/Owner/AddSpotScreen';
 import WalletScreen from '../screens/Owner/WalletScreen';
 import ProfileScreen from '../screens/Owner/ProfileScreen';
+import NotificationsScreen from '../screens/Owner/NotificationsScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -86,6 +87,7 @@ function OwnerStack() {
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="OwnerMain" component={OwnerTabs} />
       <Stack.Screen name="AddSpot" component={AddSpotScreen} />
+      <Stack.Screen name="Notifications" component={NotificationsScreen} />
     </Stack.Navigator>
   );
 }

@@ -9,8 +9,6 @@ import {
   Image,
   ActivityIndicator,
   Alert,
-  TextInput,
-  Modal,
 } from 'react-native';
 import { Platform } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
@@ -27,9 +25,6 @@ export default function ProfileScreen() {
   const { user, updateProfile, logout } = useContext(AuthContext);
   const [showTermsModal, setShowTermsModal] = useState(false);
   const [showSupportModal, setShowSupportModal] = useState(false);
-  const [showVehicleModal, setShowVehicleModal] = useState(false);
-  const [vehicleInput, setVehicleInput] = useState('');
-  const [savingVehicle, setSavingVehicle] = useState(false);
 
   const isStorageOwner =
     user?.accountCategory === 'vehicle_storage_owner' ||
@@ -37,33 +32,6 @@ export default function ProfileScreen() {
   const [selectedTermsType, setSelectedTermsType] = useState(isStorageOwner ? 'storage_owner' : 'owner');
   const [uploadingImage, setUploadingImage] = useState(false);
   const [imageLoadError, setImageLoadError] = useState(false);
-
-  const currentVehiclePlate = user?.vehiclePlateNumber ||
-    user?.vehicleNumber ||
-    (user?.vehicles && user.vehicles[0]?.plateNumber) ||
-    '';
-
-  const handleSaveVehicle = async () => {
-    const formatted = vehicleInput.trim().toUpperCase();
-    if (!formatted) {
-      Alert.alert('Required', 'Please enter your vehicle plate number');
-      return;
-    }
-    setSavingVehicle(true);
-    try {
-      await updateProfile({
-        vehiclePlateNumber: formatted,
-        vehicleNumber: formatted,
-        vehicles: [{ plateNumber: formatted, vehicleType: 'Car' }],
-      });
-      Alert.alert('Updated', `Vehicle plate number updated to ${formatted}!`);
-      setShowVehicleModal(false);
-    } catch (err) {
-      Alert.alert('Error', err.message || 'Failed to update vehicle number');
-    } finally {
-      setSavingVehicle(false);
-    }
-  };
 
   const handleGalleryUpload = async () => {
     try {
@@ -196,34 +164,6 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        {/* Saved Vehicle Plate */}
-        <Text style={styles.sectionTitle}>Saved Vehicle Plate</Text>
-        <View style={styles.vehicleCard}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
-              <Text style={{ fontSize: 26 }}>🚗</Text>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.vehPlateText}>
-                  {currentVehiclePlate || 'No Plate Added'}
-                </Text>
-                <Text style={styles.vehSubText}>
-                  Auto-fills when booking or reserving spots
-                </Text>
-              </View>
-            </View>
-            <TouchableOpacity
-              style={styles.editVehBtn}
-              onPress={() => {
-                setVehicleInput(currentVehiclePlate);
-                setShowVehicleModal(true);
-              }}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.editVehBtnText}>✏️ Edit</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
         {/* Support & Legal */}
         <Text style={styles.sectionTitle}>Support & Legal</Text>
         <TouchableOpacity
@@ -267,44 +207,6 @@ export default function ProfileScreen() {
           style={{ marginTop: 24, marginBottom: 30 }}
         />
       </ScrollView>
-
-      {/* Edit Vehicle Plate Modal */}
-      <Modal visible={showVehicleModal} transparent animationType="fade" onRequestClose={() => setShowVehicleModal(false)}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>🚗 Edit Vehicle Plate Number</Text>
-            <Text style={styles.modalSub}>
-              This vehicle number will automatically fill when booking a parking spot.
-            </Text>
-            <TextInput
-              style={styles.plateInput}
-              placeholder="e.g. TS07AB1234"
-              placeholderTextColor="#94a3b8"
-              value={vehicleInput}
-              onChangeText={setVehicleInput}
-              autoCapitalize="characters"
-            />
-            <View style={{ flexDirection: 'row', gap: 10, marginTop: 16 }}>
-              <TouchableOpacity
-                style={[styles.modalBtn, { backgroundColor: '#334155' }]}
-                onPress={() => setShowVehicleModal(false)}
-                disabled={savingVehicle}
-              >
-                <Text style={styles.modalBtnText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalBtn, { backgroundColor: COLORS.ownerAccent || '#3b82f6', flex: 1 }]}
-                onPress={handleSaveVehicle}
-                disabled={savingVehicle}
-              >
-                <Text style={[styles.modalBtnText, { fontWeight: '800' }]}>
-                  {savingVehicle ? 'Saving...' : 'Save Vehicle'}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
 
       {/* Dynamic Terms & Conditions Modal */}
       <TermsModal
@@ -468,90 +370,6 @@ const styles = StyleSheet.create({
   },
   linkTxt: {
     color: COLORS.white,
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  vehicleCard: {
-    backgroundColor: COLORS.cardBg,
-    borderRadius: 14,
-    padding: 16,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: COLORS.borderDark,
-  },
-  vehPlateText: {
-    color: COLORS.white,
-    fontSize: 16,
-    fontWeight: '800',
-    letterSpacing: 1,
-  },
-  vehSubText: {
-    color: COLORS.textMuted,
-    fontSize: 11,
-    marginTop: 2,
-  },
-  editVehBtn: {
-    backgroundColor: 'rgba(59, 130, 246, 0.15)',
-    borderWidth: 1,
-    borderColor: COLORS.ownerAccent || '#3b82f6',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-  },
-  editVehBtnText: {
-    color: COLORS.ownerAccent || '#3b82f6',
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.75)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  modalCard: {
-    backgroundColor: '#1e293b',
-    borderRadius: 16,
-    padding: 20,
-    width: '100%',
-    maxWidth: 380,
-    borderWidth: 1,
-    borderColor: '#334155',
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: '#ffffff',
-    marginBottom: 4,
-  },
-  modalSub: {
-    fontSize: 12,
-    color: '#94a3b8',
-    marginBottom: 16,
-    lineHeight: 18,
-  },
-  plateInput: {
-    backgroundColor: '#0f172a',
-    borderWidth: 1.5,
-    borderColor: '#3b82f6',
-    borderRadius: 10,
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '700',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    letterSpacing: 1.5,
-  },
-  modalBtn: {
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  modalBtnText: {
-    color: '#ffffff',
     fontSize: 14,
     fontWeight: '600',
   },

@@ -76,5 +76,12 @@ export const endpoints = {
 
   // Terms & Conditions
   getTerms: (type) => `${API_URL}/terms/${type}`,
+
+  // Notifications & Alerts
+  getNotifications: `${API_URL}/notifications`,
+  readAllNotifications: `${API_URL}/notifications/read-all`,
+  readNotification: (id) => `${API_URL}/notifications/read/${id}`,
+  deleteNotification: (id) => `${API_URL}/notifications/${id}`,
+  clearAllNotifications: `${API_URL}/notifications/user/clear-all`,
 };
 

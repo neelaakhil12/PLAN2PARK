@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useContext, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useContext, useMemo, useRef, useCallback } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
   Text,
@@ -251,12 +252,22 @@ export default function SpotDetailsScreen({ route, navigation }) {
   const [useWallet, setUseWallet] = useState(true);
 
   // Automatically update vehicle plate number when user profile updates (e.g. edited in Profile tab)
-  useEffect(() => {
+  const syncPlateFromProfile = useCallback(() => {
     const currentPlate = getUserPlateNumber();
     if (currentPlate) {
       setVehicleNumber(currentPlate);
     }
   }, [user?.vehiclePlateNumber, user?.vehicleNumber, user?.vehicles]);
+
+  useEffect(() => {
+    syncPlateFromProfile();
+  }, [syncPlateFromProfile]);
+
+  useFocusEffect(
+    useCallback(() => {
+      syncPlateFromProfile();
+    }, [syncPlateFromProfile])
+  );
 
   useEffect(() => {
     const fetchWallet = async () => {
@@ -877,7 +888,12 @@ export default function SpotDetailsScreen({ route, navigation }) {
           <Text style={styles.sectionTitle}>Reservation Details</Text>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Vehicle Plate Number</Text>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+              <Text style={styles.label}>Vehicle Plate Number</Text>
+              {vehicleNumber ? (
+                <Text style={{ color: '#10b981', fontSize: 11, fontWeight: '700' }}>✓ Auto-filled from profile</Text>
+              ) : null}
+            </View>
             <TextInput
               style={styles.input}
               placeholder="e.g. TS 08 EA 5678"
