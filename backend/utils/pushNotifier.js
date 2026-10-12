@@ -1,4 +1,6 @@
-const fetch = (...args) => import('node-fetch').then(({ default: fetch }) => fetch(...args));
+const fetchFn = typeof fetch === 'function' 
+  ? fetch 
+  : (...args) => import('node-fetch').then(({ default: f }) => f(...args));
 
 /**
  * Sends an external device push notification via Expo Push Notification API.
@@ -10,10 +12,12 @@ const fetch = (...args) => import('node-fetch').then(({ default: fetch }) => fet
  * @param {object} data - Navigation metadata (e.g. { screen: 'Notifications' })
  */
 async function sendPushNotification(pushTokens, title, body, data = {}) {
-  const tokens = (Array.isArray(pushTokens) ? pushTokens : [pushTokens])
-    .filter((t) => typeof t === 'string' && t.startsWith('ExponentPushToken['));
+  const rawTokens = Array.isArray(pushTokens) ? pushTokens : [pushTokens];
+  const tokens = rawTokens
+    .filter((t) => typeof t === 'string' && (t.startsWith('ExponentPushToken[') || t.startsWith('ExpoPushToken[') || t.includes('[')));
 
   if (tokens.length === 0) {
+    console.log('[pushNotifier] No valid Expo push tokens found in:', rawTokens);
     return { success: false, reason: 'No valid Expo push tokens provided' };
   }
 
@@ -29,7 +33,7 @@ async function sendPushNotification(pushTokens, title, body, data = {}) {
   }));
 
   try {
-    const res = await fetch('https://exp.host/--/api/v2/push/send', {
+    const res = await fetchFn('https://exp.host/--/api/v2/push/send', {
       method: 'POST',
       headers: {
         'Accept': 'application/json',
@@ -40,10 +44,10 @@ async function sendPushNotification(pushTokens, title, body, data = {}) {
     });
 
     const result = await res.json();
-    console.log('Expo Push Notification response:', JSON.stringify(result));
+    console.log('[pushNotifier] Expo Push response:', JSON.stringify(result));
     return { success: true, result };
   } catch (error) {
-    console.error('Error sending Expo push notification:', error);
+    console.error('[pushNotifier] Error sending Expo push notification:', error);
     return { success: false, error: error.message };
   }
 }

@@ -1,5 +1,6 @@
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
+import Constants from 'expo-constants';
 import { getBaseApiUrl, COMMON_HEADERS } from '../config/api';
 
 // Configure foreground notification behavior (alert, sound, badge)
@@ -48,8 +49,15 @@ export async function registerForPushNotificationsAsync(authToken) {
       return null;
     }
 
-    // Fetch Expo Push Token
-    const tokenData = await Notifications.getExpoPushTokenAsync().catch((err) => {
+    // Fetch Expo Push Token with EAS Project ID
+    const projectId =
+      Constants?.expoConfig?.extra?.eas?.projectId ??
+      Constants?.easConfig?.projectId ??
+      'ccbd4650-78fe-4739-bfc4-be371f21b54c';
+
+    const tokenData = await Notifications.getExpoPushTokenAsync({
+      projectId,
+    }).catch((err) => {
       console.log('Failed to fetch Expo push token (may be Expo Go / Simulator):', err.message);
       return null;
     });
