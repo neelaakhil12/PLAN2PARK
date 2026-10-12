@@ -19,6 +19,8 @@ const notificationSchema = new mongoose.Schema({
       'payment_success',
       'booking_expiry',
       'cancellation',
+      'wallet_credit',
+      'new_booking',
       'general',
     ],
     default: 'general',

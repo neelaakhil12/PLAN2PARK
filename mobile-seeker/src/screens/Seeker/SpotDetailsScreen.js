@@ -20,6 +20,7 @@ import { endpoints, getBaseApiUrl, getImageUrl, PUBLIC_ONLINE_URL } from '../../
 import { COLORS } from '../../theme/colors';
 import Button from '../../components/Button';
 import Header from '../../components/Header';
+import { triggerExternalNotification } from '../../services/notificationService';
 
 const showAlert = (title, message, buttons) => {
   if (typeof window !== 'undefined' && window.alert) {
@@ -356,6 +357,11 @@ export default function SpotDetailsScreen({ route, navigation }) {
           totalAmount: 0,
           walletUsed: walletDiscount,
         });
+        triggerExternalNotification({
+          title: '🎟️ Booking Confirmed!',
+          body: `Your booking for slot ${newBooking.slotId || 'Slot-1'} at ${space.title || 'Parking Spot'} is confirmed.`,
+          data: { screen: 'Notifications' },
+        });
         setLoading(false);
         return;
       }
@@ -442,6 +448,11 @@ export default function SpotDetailsScreen({ route, navigation }) {
                 walletUsed: walletDiscount,
                 paymentId: response.razorpay_payment_id,
               });
+              triggerExternalNotification({
+                title: '🎟️ Booking Confirmed!',
+                body: `Your booking for slot ${newBooking.slotId || 'Slot-1'} at ${space.title || 'Parking Spot'} is confirmed.`,
+                data: { screen: 'Notifications' },
+              });
             },
           };
 
@@ -507,6 +518,11 @@ export default function SpotDetailsScreen({ route, navigation }) {
         totalAmount: finalPayablePrice,
         walletUsed: walletDiscount,
         paymentId: paymentId,
+      });
+      triggerExternalNotification({
+        title: '🎟️ Booking Confirmed!',
+        body: `Your booking for slot ${slot} at ${space.title || 'Parking Spot'} is confirmed.`,
+        data: { screen: 'Notifications' },
       });
     } catch (e) {
       console.warn('Payment verify error:', e);
@@ -791,11 +807,13 @@ export default function SpotDetailsScreen({ route, navigation }) {
               { id: 'hatchback', name: 'Hatchback', icon: '🚗', desc: 'Small cars (Swift, i20, Baleno)' },
               { id: 'sedan', name: 'Sedan', icon: '🚘', desc: 'Midsize cars (Dzire, City, Verna)' },
               { id: 'suv', name: 'SUV', icon: '🚙', desc: 'Large cars (Creta, Seltos, XUV700)' },
+              { id: '2-wheeler', name: '2-Wheeler', icon: '🏍️', desc: 'Bikes & Scooters (Activa, Pulsar, Splendor)' },
             ].map((v) => {
               const fits = !space.suitableVehicles ||
                 space.suitableVehicles.length === 0 ||
-                space.suitableVehicles.includes('4-wheeler') ||
-                space.suitableVehicles.includes(v.id);
+                (v.id === '2-wheeler'
+                  ? space.suitableVehicles.includes('2-wheeler')
+                  : (space.suitableVehicles.includes('4-wheeler') || space.suitableVehicles.includes(v.id)));
               return (
                 <View
                   key={v.id}
@@ -880,12 +898,9 @@ export default function SpotDetailsScreen({ route, navigation }) {
               { id: '2-wheeler', label: '🏍️ 2-Wheeler' },
             ].map((vt) => {
               const isSelected = vehicleType === vt.id;
-              const isCar = ['hatchback', 'sedan', 'suv'].includes(vt.id);
-              const fits = !isCar ||
-                !space.suitableVehicles ||
-                space.suitableVehicles.length === 0 ||
-                space.suitableVehicles.includes('4-wheeler') ||
-                space.suitableVehicles.includes(vt.id);
+              const fits = vt.id === '2-wheeler'
+                ? (!space.suitableVehicles || space.suitableVehicles.length === 0 || space.suitableVehicles.includes('2-wheeler'))
+                : (!space.suitableVehicles || space.suitableVehicles.length === 0 || space.suitableVehicles.includes('4-wheeler') || space.suitableVehicles.includes(vt.id));
               return (
                 <TouchableOpacity
                   key={vt.id}
@@ -900,7 +915,7 @@ export default function SpotDetailsScreen({ route, navigation }) {
                     {vt.label}
                   </Text>
                   <Text style={{ fontSize: 9, color: fits ? '#10b981' : '#ef4444', marginTop: 2, fontWeight: '700' }}>
-                    {fits ? '✓ Fits Spot' : '⚠️ Space tight'}
+                    {fits ? '✓ Fits Spot' : (vt.id === '2-wheeler' ? '✕ Not Allowed' : '⚠️ Space tight')}
                   </Text>
                 </TouchableOpacity>
               );

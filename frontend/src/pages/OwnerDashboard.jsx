@@ -63,7 +63,7 @@ const OwnerDashboard = () => {
     imageFile: null,
     lat: 17.313,
     lng: 78.545,
-    suitableVehicles: ['hatchback', 'sedan', 'suv'],
+    suitableVehicles: ['hatchback', 'sedan', 'suv', '2-wheeler'],
     spaceCategory: user?.accountCategory === 'vehicle_storage_owner' ? 'commercial_vehicle_storage' : 'standard',
     landAcres: user?.landAcres ? String(user.landAcres) : '1.0',
     monthlyStorageRate: '1500',
@@ -397,7 +397,7 @@ const OwnerDashboard = () => {
           title: '', address: '', city: 'Hyderabad', location: 'Hyderabad', googleMapsLink: '',
           totalSlots: '5', pricePerHour: '50', pricePerDay: '400', pricePerWeek: '2000', pricePerMonth: '6000',
           maxWalletDiscount: '10', cancellationPolicy: 'full', hasEvCharger: false, hasCctv: false, isCovered: false,
-          imageUrl: '', imageFile: null, lat: 17.313, lng: 78.545, suitableVehicles: ['hatchback', 'sedan', 'suv']
+          imageUrl: '', imageFile: null, lat: 17.313, lng: 78.545, suitableVehicles: ['hatchback', 'sedan', 'suv', '2-wheeler']
         });
         await fetchOwnerData();
         setCurrentView('dashboard');
@@ -1267,12 +1267,19 @@ const OwnerDashboard = () => {
                     </div>
                   </div>
                   <span className="text-xs font-black text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
-                    {(spotForm.suitableVehicles || []).length} of 3 Selected
+                    {(spotForm.suitableVehicles || []).length} of 4 Selected
                   </span>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
                   {[
+                    {
+                      id: '2-wheeler',
+                      title: '2-Wheeler',
+                      icon: '🏍️',
+                      subtitle: 'Bikes & Scooters',
+                      examples: 'Activa, Pulsar, Splendor',
+                    },
                     {
                       id: 'hatchback',
                       title: 'Hatchback',

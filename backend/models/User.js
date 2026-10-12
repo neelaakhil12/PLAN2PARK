@@ -98,6 +98,10 @@ const userSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    pushToken: {
+      type: String,
+      default: '',
+    },
     walletTransactions: [
       {
         type: { type: String, enum: ['credit', 'debit'], default: 'credit' },

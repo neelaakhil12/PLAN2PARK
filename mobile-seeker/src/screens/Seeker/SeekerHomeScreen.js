@@ -53,7 +53,8 @@ const RADIUS_OPTIONS = [
 ];
 
 const VEHICLE_FILTER_OPTIONS = [
-  { label: 'All Cars', value: 'all', icon: '🚘' },
+  { label: 'All Vehicles', value: 'all', icon: '🚗' },
+  { label: '2-Wheeler', value: '2-wheeler', icon: '🏍️' },
   { label: 'Hatchback', value: 'hatchback', icon: '🚗' },
   { label: 'Sedan', value: 'sedan', icon: '🚘' },
   { label: 'SUV', value: 'suv', icon: '🚙' },
@@ -291,20 +292,24 @@ export default function SeekerHomeScreen({ navigation }) {
     let matchesVehicle = true;
     if (selectedVehicleType !== 'all') {
       const targetVehicle = selectedVehicleType.toLowerCase();
-      const hasSpecificCarTypes = normalizedVehicles.some((v) =>
-        ['hatchback', 'sedan', 'suv'].includes(v)
-      );
-
-      if (hasSpecificCarTypes) {
-        // Owner explicitly chose vehicle types — strictly enforce!
-        matchesVehicle = normalizedVehicles.includes(targetVehicle);
+      if (targetVehicle === '2-wheeler') {
+        matchesVehicle = normalizedVehicles.includes('2-wheeler');
       } else {
-        // Legacy spot with generic ['4-wheeler'] or unspecified:
-        // '4-wheeler' fits standard cars (hatchback, sedan), but not large SUVs
-        if (targetVehicle === 'suv') {
-          matchesVehicle = false;
+        const hasSpecificCarTypes = normalizedVehicles.some((v) =>
+          ['hatchback', 'sedan', 'suv'].includes(v)
+        );
+
+        if (hasSpecificCarTypes) {
+          // Owner explicitly chose vehicle types — strictly enforce!
+          matchesVehicle = normalizedVehicles.includes(targetVehicle);
         } else {
-          matchesVehicle = normalizedVehicles.includes('4-wheeler') || normalizedVehicles.length === 0;
+          // Legacy spot with generic ['4-wheeler'] or unspecified:
+          // '4-wheeler' fits standard cars (hatchback, sedan), but not large SUVs
+          if (targetVehicle === 'suv') {
+            matchesVehicle = false;
+          } else {
+            matchesVehicle = normalizedVehicles.includes('4-wheeler') || normalizedVehicles.length === 0;
+          }
         }
       }
     }
@@ -456,10 +461,11 @@ export default function SeekerHomeScreen({ navigation }) {
               try { sv = JSON.parse(sv); } catch (e) { sv = sv.split(',').map((s) => s.trim()); }
             }
             const normalized = (Array.isArray(sv) ? sv : []).map((v) => (v || '').toLowerCase().trim());
-            const hasExplicitCars = normalized.some((v) => ['hatchback', 'sedan', 'suv'].includes(v));
+            const allowedTypes = ['hatchback', 'sedan', 'suv', '2-wheeler'];
+            const hasExplicitTypes = normalized.some((v) => allowedTypes.includes(v));
 
-            const listToShow = hasExplicitCars
-              ? normalized.filter((v) => ['hatchback', 'sedan', 'suv'].includes(v))
+            const listToShow = hasExplicitTypes
+              ? normalized.filter((v) => allowedTypes.includes(v))
               : ['hatchback', 'sedan'];
 
             return listToShow.map((v) => {
@@ -467,7 +473,7 @@ export default function SeekerHomeScreen({ navigation }) {
               return (
                 <View key={v} style={[styles.carFitBadge, isMatch && styles.carFitBadgeMatch]}>
                   <Text style={[styles.carFitBadgeTxt, isMatch && styles.carFitBadgeTxtMatch]}>
-                    {v === 'hatchback' ? '🚗 Hatchback' : v === 'sedan' ? '🚘 Sedan' : '🚙 SUV'}
+                    {v === '2-wheeler' ? '🏍️ 2-Wheeler' : v === 'hatchback' ? '🚗 Hatchback' : v === 'sedan' ? '🚘 Sedan' : '🚙 SUV'}
                   </Text>
                 </View>
               );

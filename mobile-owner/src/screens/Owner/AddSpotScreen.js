@@ -51,7 +51,7 @@ export default function AddSpotScreen({ route, navigation }) {
   const [suitableVehicles, setSuitableVehicles] = useState(
     editingSpot?.suitableVehicles && editingSpot.suitableVehicles.length > 0
       ? editingSpot.suitableVehicles
-      : ['hatchback', 'sedan', 'suv']
+      : ['hatchback', 'sedan', 'suv', '2-wheeler']
   );
 
   // Commercial Vehicle Storage Yard (Banks & Auto Finance) fields
@@ -1203,16 +1203,23 @@ export default function AddSpotScreen({ route, navigation }) {
                 <Text style={[styles.label, { marginBottom: 0, flexShrink: 1 }]}>🚗 Vehicles Fit in this Spot</Text>
                 <View style={{ backgroundColor: 'rgba(56, 189, 248, 0.15)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, borderWidth: 1, borderColor: '#0284c7' }}>
                   <Text style={{ fontSize: 11, color: COLORS.ownerAccent, fontWeight: '800' }}>
-                    {suitableVehicles.length} of 3 Selected
+                    {suitableVehicles.length} of 4 Selected
                   </Text>
                 </View>
               </View>
               <Text style={{ fontSize: 12, color: COLORS.textMuted, marginBottom: 10 }}>
-                Check which car sizes can comfortably enter and park in your space:
+                Check which vehicle sizes can comfortably enter and park in your space:
               </Text>
 
               <View style={{ gap: 10 }}>
                 {[
+                  {
+                    id: '2-wheeler',
+                    title: '2-Wheeler (Bikes & Scooters)',
+                    icon: '🏍️',
+                    subtitle: 'Motorcycles, scooters, and mopeds',
+                    examples: 'Activa, Pulsar, Splendor, Jupiter, Royal Enfield',
+                  },
                   {
                     id: 'hatchback',
                     title: 'Hatchback',

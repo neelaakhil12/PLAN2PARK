@@ -11,13 +11,14 @@ import {
   Platform,
   StatusBar,
   ScrollView,
+  Image,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
 import { AuthContext } from '../../context/AuthContext';
-import { getBaseApiUrl, endpoints, COMMON_HEADERS } from '../../config/api';
+import { getBaseApiUrl, endpoints, COMMON_HEADERS, getImageUrl } from '../../config/api';
 import { COLORS } from '../../theme/colors';
 import PinLocationModal from '../../components/PinLocationModal';
 import ProfileEditorModal from '../../components/ProfileEditorModal';
@@ -48,10 +49,12 @@ const RADIUS_OPTIONS = [
   { label: '10 km', value: 10, icon: '🎯' },
   { label: '15 km', value: 15, icon: '🎯' },
   { label: '20 km', value: 20, icon: '🎯' },
+  { label: '25 km', value: 25, icon: '🎯' },
 ];
 
 const VEHICLE_FILTER_OPTIONS = [
-  { label: 'All Cars', value: 'all', icon: '🚘' },
+  { label: 'All Vehicles', value: 'all', icon: '🚗' },
+  { label: '2-Wheeler', value: '2-wheeler', icon: '🏍️' },
   { label: 'Hatchback', value: 'hatchback', icon: '🚗' },
   { label: 'Sedan', value: 'sedan', icon: '🚘' },
   { label: 'SUV', value: 'suv', icon: '🚙' },
@@ -236,6 +239,9 @@ export default function SeekerHomeScreen({ navigation }) {
     setShowProfileModal(false);
   };
 
+  // Determine if the logged-in seeker is a bank/finance user (used throughout)
+  const isBankSeeker = user?.accountCategory === 'bank_finance_seeker';
+
   // Process spaces with Geocoding distance calculation & proximity sorting
   const processedSpaces = spaces.map((space) => {
     const sLat = space.coordinates?.lat || space.lat || (space.location?.coordinates && space.location.coordinates[1]);
@@ -256,34 +262,71 @@ export default function SeekerHomeScreen({ navigation }) {
     // Hide offline spaces from seeker list
     if (item.isActive === false) return false;
 
-    // Distance Radius Filter
-    if (selectedRadius !== null && item.calculatedDist !== null && item.calculatedDist > selectedRadius) {
-      return false;
-    }
-
-    // Commercial Storage vs Standard Parking Filter
-    if (spaceCategoryFilter === 'commercial_vehicle_storage') {
+    // Commercial Storage vs Standard Parking Filter - Strictly separated!
+    if (isBankSeeker) {
       if (item.spaceCategory !== 'commercial_vehicle_storage') return false;
-    } else if (spaceCategoryFilter === 'standard') {
+    } else {
       if (item.spaceCategory === 'commercial_vehicle_storage') return false;
     }
 
-    const queryLower = searchQuery.toLowerCase();
-    const matchesSearch =
-      !searchQuery ||
-      item.title?.toLowerCase().includes(queryLower) ||
-      item.address?.toLowerCase().includes(queryLower) ||
-      item.location?.toLowerCase().includes(queryLower) ||
-      item.city?.toLowerCase().includes(queryLower);
+    // Distance Radius Filter (1 km, 5 km, 10 km, etc.)
+    if (selectedRadius !== null) {
+      if (item.calculatedDist === null || item.calculatedDist === undefined || item.calculatedDist > selectedRadius) {
+        return false;
+      }
+    }
 
-    const matchesEv = filterEv ? item.hasEvCharger : true;
+    // Vehicle Size / Car Fit Filter (hatchback, sedan, suv)
+    let rawVehicles = item.suitableVehicles || [];
+    if (typeof rawVehicles === 'string') {
+      try {
+        rawVehicles = JSON.parse(rawVehicles);
+      } catch (e) {
+        rawVehicles = rawVehicles.split(',').map((s) => s.trim());
+      }
+    }
+    const normalizedVehicles = (Array.isArray(rawVehicles) ? rawVehicles : []).map((v) =>
+      (v || '').toLowerCase().trim()
+    );
 
-    // Vehicle Size / Car Fit Filter
     let matchesVehicle = true;
     if (selectedVehicleType !== 'all') {
-      const sv = item.suitableVehicles || [];
-      matchesVehicle = sv.includes(selectedVehicleType) || sv.includes('4-wheeler') || sv.length === 0;
+      const targetVehicle = selectedVehicleType.toLowerCase();
+      if (targetVehicle === '2-wheeler') {
+        matchesVehicle = normalizedVehicles.includes('2-wheeler');
+      } else {
+        const hasSpecificCarTypes = normalizedVehicles.some((v) =>
+          ['hatchback', 'sedan', 'suv'].includes(v)
+        );
+
+        if (hasSpecificCarTypes) {
+          // Owner explicitly chose vehicle types — strictly enforce!
+          matchesVehicle = normalizedVehicles.includes(targetVehicle);
+        } else {
+          // Legacy spot with generic ['4-wheeler'] or unspecified:
+          // '4-wheeler' fits standard cars (hatchback, sedan), but not large SUVs
+          if (targetVehicle === 'suv') {
+            matchesVehicle = false;
+          } else {
+            matchesVehicle = normalizedVehicles.includes('4-wheeler') || normalizedVehicles.length === 0;
+          }
+        }
+      }
     }
+
+    // Search query matching (checks title, address, location, city, and vehicle types)
+    const queryLower = searchQuery.toLowerCase().trim();
+    let matchesSearch = true;
+    if (queryLower) {
+      matchesSearch =
+        (item.title && item.title.toLowerCase().includes(queryLower)) ||
+        (item.address && item.address.toLowerCase().includes(queryLower)) ||
+        (item.location && item.location.toLowerCase().includes(queryLower)) ||
+        (item.city && item.city.toLowerCase().includes(queryLower)) ||
+        normalizedVehicles.some((v) => v.includes(queryLower));
+    }
+
+    const matchesEv = filterEv ? !!item.hasEvCharger : true;
 
     return matchesSearch && matchesEv && matchesVehicle;
   });
@@ -321,6 +364,12 @@ export default function SeekerHomeScreen({ navigation }) {
 
           <Text style={[styles.spotTitle, { fontSize: 17 }]}>{item.title || 'Bank Vehicle Stockyard'}</Text>
           <Text style={styles.spotAddress}>📍 {item.address || item.location || ''}</Text>
+
+          <Image
+            source={{ uri: getImageUrl(item.image || item.imageUrl) }}
+            style={{ width: '100%', height: 135, borderRadius: 10, marginTop: 8 }}
+            resizeMode="cover"
+          />
 
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginVertical: 8 }}>
             <View style={{ backgroundColor: '#1e293b', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 }}>
@@ -385,6 +434,12 @@ export default function SeekerHomeScreen({ navigation }) {
         <Text style={styles.spotTitle}>{item.title || item.location || 'Owner Parking Space'}</Text>
         <Text style={styles.spotAddress}>📍 {item.address || item.location || ''}</Text>
 
+        <Image
+          source={{ uri: getImageUrl(item.image || item.imageUrl) }}
+          style={{ width: '100%', height: 135, borderRadius: 10, marginTop: 8 }}
+          resizeMode="cover"
+        />
+
         {/* Distance + Live Demand Badges Row */}
         <View style={styles.distanceRow}>
           <View style={styles.distChip}>
@@ -400,30 +455,30 @@ export default function SeekerHomeScreen({ navigation }) {
 
         {/* Vehicle Size Compatibility Badges */}
         <View style={styles.vehicleBadgesRow}>
-          {(item.suitableVehicles && item.suitableVehicles.length > 0 && !item.suitableVehicles.includes('4-wheeler')) ? (
-            item.suitableVehicles.filter((v) => ['hatchback', 'sedan', 'suv'].includes(v)).map((v) => {
+          {(() => {
+            let sv = item.suitableVehicles || [];
+            if (typeof sv === 'string') {
+              try { sv = JSON.parse(sv); } catch (e) { sv = sv.split(',').map((s) => s.trim()); }
+            }
+            const normalized = (Array.isArray(sv) ? sv : []).map((v) => (v || '').toLowerCase().trim());
+            const allowedTypes = ['hatchback', 'sedan', 'suv', '2-wheeler'];
+            const hasExplicitTypes = normalized.some((v) => allowedTypes.includes(v));
+
+            const listToShow = hasExplicitTypes
+              ? normalized.filter((v) => allowedTypes.includes(v))
+              : ['hatchback', 'sedan'];
+
+            return listToShow.map((v) => {
               const isMatch = selectedVehicleType === v;
               return (
                 <View key={v} style={[styles.carFitBadge, isMatch && styles.carFitBadgeMatch]}>
                   <Text style={[styles.carFitBadgeTxt, isMatch && styles.carFitBadgeTxtMatch]}>
-                    {v === 'hatchback' ? '🚗 Hatchback' : v === 'sedan' ? '🚘 Sedan' : '🚙 SUV'}
+                    {v === '2-wheeler' ? '🏍️ 2-Wheeler' : v === 'hatchback' ? '🚗 Hatchback' : v === 'sedan' ? '🚘 Sedan' : '🚙 SUV'}
                   </Text>
                 </View>
               );
-            })
-          ) : (
-            <>
-              <View style={[styles.carFitBadge, selectedVehicleType === 'hatchback' && styles.carFitBadgeMatch]}>
-                <Text style={[styles.carFitBadgeTxt, selectedVehicleType === 'hatchback' && styles.carFitBadgeTxtMatch]}>🚗 Hatchback</Text>
-              </View>
-              <View style={[styles.carFitBadge, selectedVehicleType === 'sedan' && styles.carFitBadgeMatch]}>
-                <Text style={[styles.carFitBadgeTxt, selectedVehicleType === 'sedan' && styles.carFitBadgeTxtMatch]}>🚘 Sedan</Text>
-              </View>
-              <View style={[styles.carFitBadge, selectedVehicleType === 'suv' && styles.carFitBadgeMatch]}>
-                <Text style={[styles.carFitBadgeTxt, selectedVehicleType === 'suv' && styles.carFitBadgeTxtMatch]}>🚙 SUV</Text>
-              </View>
-            </>
-          )}
+            });
+          })()}
         </View>
 
         <Text style={styles.cardTagline}>Helps users decide before traveling.</Text>
@@ -449,34 +504,8 @@ export default function SeekerHomeScreen({ navigation }) {
     );
   };
 
-  return (
-    <SafeAreaView style={styles.container} edges={['left', 'right']}>
-      {/* App Header */}
-      <View style={[styles.header, { paddingTop: topPadding + 10 }]}>
-        <View style={{ flex: 1, marginRight: 8, justifyContent: 'center' }}>
-          <Text style={styles.welcomeText} numberOfLines={1}>Hello, {user?.name || 'Seeker'} 👋</Text>
-          <Text style={styles.headerSub} numberOfLines={1} ellipsizeMode="tail">Find secure owner parking nearby</Text>
-        </View>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-          <TouchableOpacity
-            onPress={() => navigation.navigate('Notifications')}
-            style={styles.notifBellBtn}
-            activeOpacity={0.75}
-          >
-            <Text style={{ fontSize: 18 }}>🔔</Text>
-            {unreadNotifs > 0 && (
-              <View style={styles.notifBadge}>
-                <Text style={styles.notifBadgeTxt}>{unreadNotifs > 9 ? '9+' : unreadNotifs}</Text>
-              </View>
-            )}
-          </TouchableOpacity>
-
-          <TouchableOpacity onPress={logout} style={styles.logoutBtn} activeOpacity={0.8}>
-            <Text style={styles.logoutTxt}>Logout</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-
+  const renderHeaderControls = () => (
+    <View>
       {/* Pinned Location Banner */}
       <TouchableOpacity
         style={styles.pinnedBanner}
@@ -485,10 +514,12 @@ export default function SeekerHomeScreen({ navigation }) {
       >
         <Text style={styles.pinnedIcon}>📍</Text>
         <View style={{ flex: 1 }}>
-          <Text style={styles.pinnedTitle}>SEARCH NEAR PINNED LOCATION</Text>
+          <Text style={styles.pinnedTitle}>
+            {isBankSeeker ? 'SEARCH NEAR SECURED LAND AREA' : 'SEARCH NEAR PINNED LOCATION'}
+          </Text>
           <Text style={styles.pinnedLocTxt} numberOfLines={1}>{pinnedLocation}</Text>
         </View>
-        <View style={styles.changePinBadge}>
+        <View style={[styles.changePinBadge, isBankSeeker && { backgroundColor: COLORS.bankAccent }]}>
           <Text style={styles.changePinTxt}>Change Pin 🎯</Text>
         </View>
       </TouchableOpacity>
@@ -499,45 +530,23 @@ export default function SeekerHomeScreen({ navigation }) {
           <Text style={styles.searchIcon}>🔍</Text>
           <TextInput
             style={styles.searchInput}
-            placeholder="Search specific area, landmark, or spot name..."
+            placeholder={
+              isBankSeeker
+                ? 'Search repo yard, land area, or stockyard name...'
+                : 'Search specific area, landmark, or spot name...'
+            }
             placeholderTextColor={COLORS.textMuted}
             value={searchQuery}
             onChangeText={setSearchQuery}
           />
+          {searchQuery ? (
+            <TouchableOpacity onPress={() => setSearchQuery('')} style={{ padding: 4 }}>
+              <Text style={{ color: COLORS.textMuted, fontSize: 13, fontWeight: '700' }}>✕</Text>
+            </TouchableOpacity>
+          ) : null}
         </View>
 
-        {/* Portal Category Selector: Standard Parking vs Commercial Repo Yards */}
-        <View style={{ flexDirection: 'row', backgroundColor: '#131b2e', borderRadius: 12, padding: 3, marginTop: 10, borderWidth: 1, borderColor: '#1e293b' }}>
-          {[
-            { id: 'all', label: '🌐 All Spaces' },
-            { id: 'standard', label: '🅿️ Parking' },
-            { id: 'commercial_vehicle_storage', label: '🏢 Repo Yards (1+ Ac)' },
-          ].map((cat) => {
-            const isSel = spaceCategoryFilter === cat.id;
-            return (
-              <TouchableOpacity
-                key={cat.id}
-                style={{
-                  flex: cat.id === 'commercial_vehicle_storage' ? 1.4 : 1,
-                  paddingVertical: 7,
-                  borderRadius: 9,
-                  backgroundColor: isSel ? (cat.id === 'commercial_vehicle_storage' ? '#f59e0b' : COLORS.primary) : 'transparent',
-                  alignItems: 'center',
-                }}
-                onPress={() => setSpaceCategoryFilter(cat.id)}
-              >
-                <Text style={{
-                  color: isSel ? (cat.id === 'commercial_vehicle_storage' ? '#000000' : '#ffffff') : '#94a3b8',
-                  fontSize: 11,
-                  fontWeight: '800',
-                }}>
-                  {cat.label}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-
+        {/* Radius Filter Options */}
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -548,7 +557,10 @@ export default function SeekerHomeScreen({ navigation }) {
             return (
               <TouchableOpacity
                 key={opt.label}
-                style={[styles.filterPill, isSelected && styles.filterPillActive]}
+                style={[
+                  styles.filterPill,
+                  isSelected && (isBankSeeker ? { backgroundColor: COLORS.bankAccent, borderColor: COLORS.bankAccent } : styles.filterPillActive)
+                ]}
                 onPress={() => setSelectedRadius(opt.value)}
                 activeOpacity={0.75}
               >
@@ -559,70 +571,90 @@ export default function SeekerHomeScreen({ navigation }) {
             );
           })}
 
-          <TouchableOpacity
-            style={[styles.filterPill, filterEv && styles.filterPillActive]}
-            onPress={() => setFilterEv(!filterEv)}
-            activeOpacity={0.75}
-          >
-            <Text style={[styles.filterPillTxt, filterEv && styles.filterPillTxtActive]}>
-              ⚡ EV Only
-            </Text>
-          </TouchableOpacity>
+          {!isBankSeeker && (
+            <TouchableOpacity
+              style={[styles.filterPill, filterEv && styles.filterPillActive]}
+              onPress={() => setFilterEv(!filterEv)}
+              activeOpacity={0.75}
+            >
+              <Text style={[styles.filterPillTxt, filterEv && styles.filterPillTxtActive]}>
+                ⚡ EV Only
+              </Text>
+            </TouchableOpacity>
+          )}
         </ScrollView>
 
-        {/* Car Size Fit Filter Bar */}
-        <View style={styles.vehicleFilterBar}>
-          <Text style={styles.vehicleFilterHeader}>🚗 Vehicle Fit:</Text>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.vehicleFilterScroll}
-          >
-            {VEHICLE_FILTER_OPTIONS.map((opt) => {
-              const isSelected = selectedVehicleType === opt.value;
-              return (
-                <TouchableOpacity
-                  key={opt.value}
-                  style={[
-                    styles.vehicleFilterPill,
-                    isSelected && styles.vehicleFilterPillActive,
-                  ]}
-                  onPress={() => setSelectedVehicleType(opt.value)}
-                  activeOpacity={0.75}
-                >
-                  <Text style={[
-                    styles.vehicleFilterTxt,
-                    isSelected && styles.vehicleFilterTxtActive,
-                  ]}>
-                    {opt.icon} {opt.label}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
-        </View>
+        {/* Car Size Fit Filter Bar - STRICTLY for Parking Seeker only */}
+        {!isBankSeeker && (
+          <View style={styles.vehicleFilterBar}>
+            <Text style={styles.vehicleFilterHeader}>🚗 Vehicle Fit:</Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.vehicleFilterScroll}
+            >
+              {VEHICLE_FILTER_OPTIONS.map((opt) => {
+                const isSelected = selectedVehicleType === opt.value;
+                return (
+                  <TouchableOpacity
+                    key={opt.value}
+                    style={[
+                      styles.vehicleFilterPill,
+                      isSelected && styles.vehicleFilterPillActive,
+                    ]}
+                    onPress={() => setSelectedVehicleType(opt.value)}
+                    activeOpacity={0.75}
+                  >
+                    <Text style={[
+                      styles.vehicleFilterTxt,
+                      isSelected && styles.vehicleFilterTxtActive,
+                    ]}>
+                      {opt.icon} {opt.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        )}
       </View>
 
-      {/* Parking Demand Heat Map Info Banner */}
+      {/* Parking Demand Heat Map Info Banner (or Bank Repo Standards) */}
       <View style={styles.heatMapBanner}>
-        <View style={styles.heatMapHeader}>
-          <Text style={styles.heatMapTitle}>🔥 Parking Demand Heat Map</Text>
-          <View style={styles.heatMapLegend}>
-            <View style={styles.legendPill}>
-              <View style={[styles.legendDot, { backgroundColor: '#10b981' }]} />
-              <Text style={styles.legendTxt}>Easy</Text>
+        {isBankSeeker ? (
+          <View>
+            <View style={styles.heatMapHeader}>
+              <Text style={[styles.heatMapTitle, { color: '#38bdf8' }]}>🏢 1+ Acre Verified Stockyards</Text>
+              <View style={[styles.legendPill, { backgroundColor: '#0284c7' }]}>
+                <Text style={{ color: '#fff', fontSize: 10, fontWeight: '800' }}>MIN 1 ACRE</Text>
+              </View>
             </View>
-            <View style={styles.legendPill}>
-              <View style={[styles.legendDot, { backgroundColor: '#f59e0b' }]} />
-              <Text style={styles.legendTxt}>Moderate</Text>
-            </View>
-            <View style={styles.legendPill}>
-              <View style={[styles.legendDot, { backgroundColor: '#ef4444' }]} />
-              <Text style={styles.legendTxt}>Full</Text>
-            </View>
+            <Text style={styles.heatMapTagline}>
+              High-security yards for Banks & NBFCs with 24/7 security, compound wall & CCTV.
+            </Text>
           </View>
-        </View>
-        <Text style={styles.heatMapTagline}>Helps users decide before traveling.</Text>
+        ) : (
+          <View>
+            <View style={styles.heatMapHeader}>
+              <Text style={styles.heatMapTitle}>🔥 Parking Demand Heat Map</Text>
+              <View style={styles.heatMapLegend}>
+                <View style={styles.legendPill}>
+                  <View style={[styles.legendDot, { backgroundColor: '#10b981' }]} />
+                  <Text style={styles.legendTxt}>Easy</Text>
+                </View>
+                <View style={styles.legendPill}>
+                  <View style={[styles.legendDot, { backgroundColor: '#f59e0b' }]} />
+                  <Text style={styles.legendTxt}>Moderate</Text>
+                </View>
+                <View style={styles.legendPill}>
+                  <View style={[styles.legendDot, { backgroundColor: '#ef4444' }]} />
+                  <Text style={styles.legendTxt}>Full</Text>
+                </View>
+              </View>
+            </View>
+            <Text style={styles.heatMapTagline}>Helps users decide before traveling.</Text>
+          </View>
+        )}
       </View>
 
       {/* View Mode Toggle Switch (Map vs List) */}
@@ -643,41 +675,120 @@ export default function SeekerHomeScreen({ navigation }) {
           activeOpacity={0.8}
         >
           <Text style={[styles.viewModeTxt, viewMode === 'list' && styles.viewModeTxtActive]}>
-            📋 List View
+            📋 List View ({displaySpaces.length})
           </Text>
         </TouchableOpacity>
       </View>
+    </View>
+  );
 
-      {/* Main Content: Map or List */}
+  return (
+    <SafeAreaView style={styles.container} edges={['left', 'right']}>
+      {/* App Header */}
+      <View style={[styles.header, { paddingTop: topPadding + 10 }]}>
+        <View style={{ flex: 1, marginRight: 8, justifyContent: 'center' }}>
+          <Text style={styles.welcomeText} numberOfLines={1}>
+            Hello, {user?.name || (isBankSeeker ? 'Bank Partner' : 'Seeker')} 👋
+          </Text>
+          <Text style={[styles.headerSub, isBankSeeker && { color: '#38bdf8' }]} numberOfLines={1} ellipsizeMode="tail">
+            {isBankSeeker ? 'Find 1+ Acre secure stockyards for repossession' : 'Find secure owner parking nearby'}
+          </Text>
+        </View>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+          <TouchableOpacity
+            onPress={() => navigation.navigate('HelpAssistant')}
+            style={styles.notifBellBtn}
+            activeOpacity={0.75}
+            title="Ask Smart Assistant"
+          >
+            <Text style={{ fontSize: 16 }}>🤖</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={() => navigation.navigate('Notifications')}
+            style={styles.notifBellBtn}
+            activeOpacity={0.75}
+          >
+            <Text style={{ fontSize: 16 }}>🔔</Text>
+            {unreadNotifs > 0 && (
+              <View style={styles.notifBadge}>
+                <Text style={styles.notifBadgeTxt}>{unreadNotifs > 9 ? '9+' : unreadNotifs}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity onPress={logout} style={styles.logoutBtn} activeOpacity={0.8}>
+            <Text style={styles.logoutTxt}>Logout</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* Main Content: Map or List with Smooth Full-Page Scrolling */}
       {loading ? (
         <View style={styles.centerLoading}>
-          <ActivityIndicator size="large" color={COLORS.primary} />
-          <Text style={styles.loadingTxt}>Fetching owner parking spaces from database...</Text>
+          <ActivityIndicator size="large" color={isBankSeeker ? COLORS.bankAccent : COLORS.primary} />
+          <Text style={styles.loadingTxt}>Fetching available spaces from database...</Text>
         </View>
       ) : viewMode === 'map' ? (
         <View style={{ flex: 1 }}>
-          <DynamicParkingMap
-            userLat={seekerCoords.lat}
-            userLng={seekerCoords.lng}
-            userLocationName={pinnedLocation}
-            spots={displaySpaces}
-            selectedSpot={selectedMapSpot}
-            onSelectSpot={(spot, navigateDirectly) => {
-              if (navigateDirectly) {
-                navigation.navigate('SpotDetails', { space: spot });
-              } else {
-                setSelectedMapSpot(spot);
-              }
-            }}
-            onCloseCard={() => setSelectedMapSpot(null)}
-          />
+          {/* Scrollable filter/search controls above the map */}
+          <ScrollView
+            style={{ flexGrow: 0, flexShrink: 0 }}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={() => {
+                  setRefreshing(true);
+                  fetchSpaces();
+                }}
+                tintColor={isBankSeeker ? COLORS.bankAccent : COLORS.primary}
+              />
+            }
+          >
+            {renderHeaderControls()}
+          </ScrollView>
+
+          {/* Map fills the remaining screen height - no scrolling needed */}
+          <View style={{
+            flex: 1,
+            marginHorizontal: 16,
+            marginTop: 4,
+            marginBottom: 8 + insets.bottom,
+            borderRadius: 18,
+            overflow: 'hidden',
+            borderWidth: 1.5,
+            borderColor: isBankSeeker ? 'rgba(56, 189, 248, 0.4)' : 'rgba(37, 99, 235, 0.4)',
+            backgroundColor: '#0f172a',
+          }}>
+            <DynamicParkingMap
+              userLat={seekerCoords.lat}
+              userLng={seekerCoords.lng}
+              userLocationName={pinnedLocation}
+              spots={displaySpaces}
+              selectedSpot={selectedMapSpot}
+              onSelectSpot={(spot, navigateDirectly) => {
+                if (navigateDirectly) {
+                  navigation.navigate('SpotDetails', { space: spot });
+                } else {
+                  setSelectedMapSpot(spot);
+                }
+              }}
+              onCloseCard={() => setSelectedMapSpot(null)}
+            />
+          </View>
         </View>
       ) : (
         <FlatList
+          style={{ flex: 1 }}
           data={displaySpaces}
           keyExtractor={(item) => item._id || Math.random().toString()}
           renderItem={renderSpotCard}
-          contentContainerStyle={[styles.listContainer, { paddingBottom: 40 + insets.bottom }]}
+          ListHeaderComponent={renderHeaderControls}
+          contentContainerStyle={[styles.listContainer, { paddingBottom: 60 + insets.bottom }]}
+          showsVerticalScrollIndicator={true}
+          keyboardShouldPersistTaps="handled"
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -685,14 +796,46 @@ export default function SeekerHomeScreen({ navigation }) {
                 setRefreshing(true);
                 fetchSpaces();
               }}
-              tintColor={COLORS.primary}
+              tintColor={isBankSeeker ? COLORS.bankAccent : COLORS.primary}
             />
           }
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
-              <Text style={styles.emptyEmoji}>🅿️</Text>
-              <Text style={styles.emptyTitle}>No Owner Parking Spots Found</Text>
-              <Text style={styles.emptySub}>No owner has added parking spaces in this area yet.</Text>
+              <Text style={styles.emptyEmoji}>{isBankSeeker ? '🏢' : '🅿️'}</Text>
+              <Text style={styles.emptyTitle}>
+                {searchQuery || selectedRadius !== null || selectedVehicleType !== 'all'
+                  ? 'No Spots Match Current Filters'
+                  : (isBankSeeker ? 'No 1+ Acre Repo Yards Found' : 'No Owner Parking Spots Found')}
+              </Text>
+              <Text style={styles.emptySub}>
+                {searchQuery || selectedRadius !== null || selectedVehicleType !== 'all'
+                  ? `No parking spots found for ${selectedVehicleType !== 'all' ? selectedVehicleType.toUpperCase() : 'selected vehicle'}${selectedRadius ? ` within ${selectedRadius} km` : ''}${searchQuery ? ` matching "${searchQuery}"` : ''}.`
+                  : (isBankSeeker
+                    ? 'No 1+ Acre vehicle storage yards added in this area yet.'
+                    : 'No owner has added parking spaces in this area yet.')}
+              </Text>
+              {(searchQuery || selectedRadius !== null || selectedVehicleType !== 'all' || filterEv) && (
+                <TouchableOpacity
+                  style={{
+                    marginTop: 14,
+                    paddingHorizontal: 16,
+                    paddingVertical: 10,
+                    borderRadius: 10,
+                    backgroundColor: COLORS.primary,
+                  }}
+                  onPress={() => {
+                    setSearchQuery('');
+                    setSelectedRadius(null);
+                    setSelectedVehicleType('all');
+                    setFilterEv(false);
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Text style={{ color: '#fff', fontWeight: '800', fontSize: 13 }}>
+                    🔄 Clear All Filters
+                  </Text>
+                </TouchableOpacity>
+              )}
             </View>
           }
         />

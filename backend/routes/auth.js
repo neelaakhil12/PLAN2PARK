@@ -650,6 +650,25 @@ router.get('/wallet', protect, async (req, res) => {
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
+// ─── PUSH TOKEN REGISTRATION ─────────────────────────────────────────
+// @desc    Register or update device push token for external push notifications
+// @route   POST /api/auth/push-token
+// @access  Private
+router.post('/push-token', protect, async (req, res) => {
+  try {
+    const { pushToken } = req.body;
+    if (!pushToken) {
+      return res.status(400).json({ message: 'pushToken is required' });
+    }
+    const user = await User.findById(req.user._id);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    user.pushToken = pushToken;
+    await user.save();
+    res.json({ success: true, message: 'Push token registered successfully' });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
 });
 
 module.exports = router;

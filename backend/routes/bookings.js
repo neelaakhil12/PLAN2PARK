@@ -9,6 +9,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const { getCommissionRate } = require('./wallet');
+const { sendPushNotification } = require('../utils/pushNotifier');
 
 const uploadsDir = path.join(__dirname, '../uploads');
 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
@@ -69,6 +70,15 @@ const processBookingPaymentAndCreditOwner = async (booking) => {
               adminCommission,
             },
           });
+
+          if (owner.pushToken) {
+            sendPushNotification(
+              owner.pushToken,
+              '💰 Wallet Credited & Booking Confirmed!',
+              `₹${ownerEarnings} credited to your wallet for booking at ${space.title || 'your parking spot'}.`,
+              { screen: 'Orders', bookingId: booking._id }
+            );
+          }
         } catch (notifErr) {
           console.warn('Owner credit notification error:', notifErr.message);
         }
@@ -234,6 +244,44 @@ router.post('/', protect, seekerOnly, upload.single('driverImageFile'), async (r
           expiresAt: endTime,
         },
       });
+
+      // External Push Notification to Seeker's Mobile Notification Tray
+      if (req.user.pushToken) {
+        sendPushNotification(
+          req.user.pushToken,
+          isFullyPaidByWallet ? '🎉 Parking Confirmed & Paid!' : '🎟️ Booking Reserved - Slot Allocated!',
+          `Your booking for slot ${targetSlotId} at ${space.title || 'Parking Space'} is confirmed.`,
+          { screen: 'Notifications', bookingId: booking._id }
+        );
+      }
+
+      // External Push Notification & DB Notification to Space Owner
+      const ownerUser = await User.findById(space.ownerId);
+      if (ownerUser) {
+        await Notification.create({
+          userId: ownerUser._id,
+          targetRole: 'owner',
+          type: 'new_booking',
+          title: '🅿️ New Booking Received!',
+          message: `A seeker has booked slot ${targetSlotId} at your spot '${space.title || 'Parking Space'}'.`,
+          data: {
+            bookingId: booking._id,
+            spaceId: space._id,
+            spaceTitle: space.title,
+            slot: targetSlotId,
+            vehicleNumber: vehicleNumber || '',
+          },
+        });
+
+        if (ownerUser.pushToken) {
+          sendPushNotification(
+            ownerUser.pushToken,
+            '🅿️ New Booking Received!',
+            `A seeker has booked slot ${targetSlotId} at your spot '${space.title || 'Parking Space'}'.`,
+            { screen: 'Orders', bookingId: booking._id }
+          );
+        }
+      }
     } catch (notifErr) {
       console.log('Notification trigger error:', notifErr.message);
     }
@@ -839,6 +887,16 @@ router.post('/:id/verify-payment', protect, seekerOnly, async (req, res) => {
           slot: booking.slotId,
         },
       });
+
+      const seekerUser = await User.findById(booking.seekerId);
+      if (seekerUser && seekerUser.pushToken) {
+        sendPushNotification(
+          seekerUser.pushToken,
+          '💳 Payment Successful!',
+          `Your payment of ₹${booking.totalAmount} for Slot ${booking.slotId} is complete. Your parking pass is active!`,
+          { screen: 'Notifications', bookingId: booking._id }
+        );
+      }
     } catch (notifErr) {
       console.log('Notification trigger error:', notifErr.message);
     }
