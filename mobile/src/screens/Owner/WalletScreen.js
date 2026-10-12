@@ -14,9 +14,10 @@ import {
   StatusBar,
   Alert,
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AuthContext } from '../../context/AuthContext';
-import { getBaseApiUrl } from '../../config/api';
+import { getBaseApiUrl, getImageUrl } from '../../config/api';
 import { COLORS } from '../../theme/colors';
 import { useIsFocused } from '@react-navigation/native';
 
@@ -33,7 +34,8 @@ export default function WalletScreen({ navigation }) {
     pendingWithdrawal: 0,
     totalWithdrawn: 0,
     totalGrossEarned: 0,
-    platformCommissionRate: 10,
+    platformCommissionRate: 15,
+    minWithdrawalAmount: 2000,
     bankAccountDetails: {},
     transactions: [],
     payoutRequests: [],
@@ -51,8 +53,9 @@ export default function WalletScreen({ navigation }) {
   const [accountNumber, setAccountNumber] = useState('');
   const [ifscCode, setIfscCode] = useState('');
   const [bankName, setBankName] = useState('');
+  const [qrImageUri, setQrImageUri] = useState(null);
 
-  // Receipt Preview Modal
+  // Receipt / QR Preview Modal
   const [selectedReceipt, setSelectedReceipt] = useState(null);
 
   useEffect(() => {
@@ -94,18 +97,53 @@ export default function WalletScreen({ navigation }) {
   };
 
   const handleOpenWithdraw = () => {
+    const minLimit = walletData.minWithdrawalAmount || 2000;
     if ((walletData.walletBalance || 0) <= 0) {
       Alert.alert('Zero Balance', 'You currently do not have any available balance to withdraw.');
       return;
     }
+    if ((walletData.walletBalance || 0) < minLimit) {
+      Alert.alert(
+        'Minimum Limit Not Reached',
+        `The minimum withdrawal limit set by admin is ₹${minLimit.toLocaleString('en-IN')}.\n\nYour current available balance is ₹${Number(walletData.walletBalance || 0).toFixed(2)}.`
+      );
+      return;
+    }
     setWithdrawAmount('');
+    setQrImageUri(null);
     setWithdrawModalVisible(true);
+  };
+
+  const handlePickQrCode = async () => {
+    try {
+      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permissionResult.granted) {
+        Alert.alert('Permission Denied', 'Permission to access gallery is required to upload your payment QR code screenshot.');
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        quality: 0.85,
+      });
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        setQrImageUri(result.assets[0].uri);
+      }
+    } catch (err) {
+      Alert.alert('Error', 'Failed to pick QR image: ' + err.message);
+    }
   };
 
   const handleWithdrawSubmit = async () => {
     const amountVal = parseFloat(withdrawAmount);
+    const minLimit = walletData.minWithdrawalAmount || 2000;
+
     if (isNaN(amountVal) || amountVal <= 0) {
       Alert.alert('Invalid Amount', 'Please enter a valid withdrawal amount.');
+      return;
+    }
+    if (amountVal < minLimit) {
+      Alert.alert('Minimum Limit Not Met', `Minimum withdrawal amount configured by admin is ₹${minLimit.toLocaleString('en-IN')}.`);
       return;
     }
     if (amountVal > walletData.walletBalance) {
@@ -125,29 +163,50 @@ export default function WalletScreen({ navigation }) {
       }
     }
 
+    if (!qrImageUri) {
+      Alert.alert(
+        'QR Code Screenshot Required',
+        'Please upload a screenshot of your UPI / Payment QR code (PhonePe, GPay, or Paytm QR) so the admin can scan and transfer funds directly to you.'
+      );
+      return;
+    }
+
     setSubmittingWithdraw(true);
     try {
       const baseUrl = await getBaseApiUrl();
+      const formData = new FormData();
+      formData.append('amount', String(amountVal));
+      formData.append('payoutMethod', payoutMethod);
+      if (payoutMethod === 'upi') {
+        formData.append('upiId', upiId.trim());
+      } else {
+        formData.append('accountName', accountName.trim());
+        formData.append('accountNumber', accountNumber.trim());
+        formData.append('ifscCode', ifscCode.trim().toUpperCase());
+        if (bankName.trim()) formData.append('bankName', bankName.trim());
+      }
+
+      const filename = qrImageUri.split('/').pop() || 'qr_code.jpg';
+      const match = /\.(\w+)$/.exec(filename);
+      const type = match ? `image/${match[1]}` : 'image/jpeg';
+      formData.append('qrImage', {
+        uri: qrImageUri,
+        name: filename,
+        type,
+      });
+
       const res = await fetch(`${baseUrl}/wallet/withdraw`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({
-          amount: amountVal,
-          payoutMethod,
-          upiId: upiId.trim(),
-          accountName: accountName.trim(),
-          accountNumber: accountNumber.trim(),
-          ifscCode: ifscCode.trim().toUpperCase(),
-          bankName: bankName.trim(),
-        }),
+        body: formData,
       });
 
       const resData = await res.json();
       if (res.ok) {
         setWithdrawModalVisible(false);
+        setQrImageUri(null);
         Alert.alert('Request Sent!', resData.message || 'Withdrawal request submitted successfully.');
         fetchWalletData();
       } else {
@@ -313,18 +372,30 @@ export default function WalletScreen({ navigation }) {
                       <Text style={styles.adminNoteText}>Note: {req.adminNotes}</Text>
                     ) : null}
 
-                    {/* Button to view receipt screenshot if uploaded by admin */}
-                    {req.adminReceiptImage ? (
-                      <TouchableOpacity
-                        style={styles.viewProofBtn}
-                        onPress={() => setSelectedReceipt(req.adminReceiptImage)}
-                        activeOpacity={0.8}
-                      >
-                        <Text style={styles.viewProofBtnText}>📸 View Admin Payment Receipt</Text>
-                      </TouchableOpacity>
-                    ) : isApproved ? (
-                      <Text style={styles.proofPendingText}>Receipt proof marked verified by admin</Text>
-                    ) : null}
+                    {/* Buttons to view receipt screenshot & QR code */}
+                    <View style={{ flexDirection: 'row', gap: 8, marginTop: 6 }}>
+                      {req.ownerQrCodeImage ? (
+                        <TouchableOpacity
+                          style={[styles.viewProofBtn, { flex: 1, backgroundColor: '#7c3aed20', borderColor: '#7c3aed60' }]}
+                          onPress={() => setSelectedReceipt(req.ownerQrCodeImage)}
+                          activeOpacity={0.8}
+                        >
+                          <Text style={[styles.viewProofBtnText, { color: '#c4b5fd' }]}>📱 View My QR</Text>
+                        </TouchableOpacity>
+                      ) : null}
+
+                      {req.adminReceiptImage ? (
+                        <TouchableOpacity
+                          style={[styles.viewProofBtn, { flex: 1 }]}
+                          onPress={() => setSelectedReceipt(req.adminReceiptImage)}
+                          activeOpacity={0.8}
+                        >
+                          <Text style={styles.viewProofBtnText}>📸 Admin Receipt</Text>
+                        </TouchableOpacity>
+                      ) : isApproved ? (
+                        <Text style={[styles.proofPendingText, { alignSelf: 'center' }]}>Verified by admin</Text>
+                      ) : null}
+                    </View>
                   </View>
                 );
               })
@@ -338,7 +409,7 @@ export default function WalletScreen({ navigation }) {
                 <Text style={styles.emptyIcon}>📜</Text>
                 <Text style={styles.emptyTitle}>No Transaction History</Text>
                 <Text style={styles.emptySubtitle}>
-                  Credits from bookings and withdrawals will appear here in chronological order.
+                  Credits from bookings (net 85% after platform fee) and withdrawals will appear here in chronological order.
                 </Text>
               </View>
             ) : (
@@ -350,7 +421,7 @@ export default function WalletScreen({ navigation }) {
                       <Text style={styles.txIcon}>{isCredit ? '⬇️' : '⬆️'}</Text>
                     </View>
                     <View style={styles.txInfo}>
-                      <Text style={styles.txDescription}>{tx.description || (isCredit ? 'Booking Credit' : 'Withdrawal')}</Text>
+                      <Text style={styles.txDescription}>{tx.description || (isCredit ? 'Booking Credit (Net 85%)' : 'Withdrawal')}</Text>
                       <Text style={styles.txDate}>
                         {new Date(tx.date || Date.now()).toLocaleDateString('en-IN', {
                           month: 'short',
@@ -376,7 +447,12 @@ export default function WalletScreen({ navigation }) {
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Withdraw to Bank / UPI</Text>
+              <View>
+                <Text style={styles.modalTitle}>Withdraw to Bank / UPI</Text>
+                <Text style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>
+                  Admin clearance via PhonePe / GPay / NEFT
+                </Text>
+              </View>
               <TouchableOpacity onPress={() => setWithdrawModalVisible(false)}>
                 <Text style={styles.modalCloseText}>✕</Text>
               </TouchableOpacity>
@@ -384,16 +460,25 @@ export default function WalletScreen({ navigation }) {
 
             <ScrollView showsVerticalScrollIndicator={false}>
               <View style={styles.modalBalanceBox}>
-                <Text style={styles.modalBalanceLabel}>Available Balance</Text>
-                <Text style={styles.modalBalanceValue}>₹{Number(walletData.walletBalance || 0).toFixed(2)}</Text>
+                <View>
+                  <Text style={styles.modalBalanceLabel}>Available Balance</Text>
+                  <Text style={styles.modalBalanceValue}>₹{Number(walletData.walletBalance || 0).toFixed(2)}</Text>
+                </View>
+                <View style={styles.minLimitBadge}>
+                  <Text style={styles.minLimitBadgeText}>
+                    Min Payout: ₹{Number(walletData.minWithdrawalAmount || 2000).toLocaleString('en-IN')}
+                  </Text>
+                </View>
               </View>
 
               {/* Amount Input */}
-              <Text style={styles.inputLabel}>Withdrawal Amount (₹)</Text>
+              <Text style={styles.inputLabel}>
+                Withdrawal Amount (₹) <Text style={{ color: '#ef4444' }}>*</Text>
+              </Text>
               <View style={styles.amountInputRow}>
                 <TextInput
                   style={styles.amountInput}
-                  placeholder="e.g. 500"
+                  placeholder={`Min ₹${walletData.minWithdrawalAmount || 2000}`}
                   placeholderTextColor="#64748b"
                   keyboardType="numeric"
                   value={withdrawAmount}
@@ -404,6 +489,39 @@ export default function WalletScreen({ navigation }) {
                   onPress={() => setWithdrawAmount(String(walletData.walletBalance || 0))}
                 >
                   <Text style={styles.maxBtnText}>MAX</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Quick Preset Buttons */}
+              <View style={styles.presetRow}>
+                {[2000, 3000, 5000].map((preset) => (
+                  <TouchableOpacity
+                    key={preset}
+                    style={[
+                      styles.presetChip,
+                      withdrawAmount === String(preset) && styles.presetChipActive,
+                    ]}
+                    onPress={() => setWithdrawAmount(String(preset))}
+                  >
+                    <Text
+                      style={[
+                        styles.presetChipText,
+                        withdrawAmount === String(preset) && styles.presetChipTextActive,
+                      ]}
+                    >
+                      ₹{preset.toLocaleString('en-IN')}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+                <TouchableOpacity
+                  style={[
+                    styles.presetChip,
+                    styles.presetChipMax,
+                    withdrawAmount === String(walletData.walletBalance || 0) && styles.presetChipActive,
+                  ]}
+                  onPress={() => setWithdrawAmount(String(walletData.walletBalance || 0))}
+                >
+                  <Text style={styles.presetChipTextMax}>MAX</Text>
                 </TouchableOpacity>
               </View>
 
@@ -430,7 +548,9 @@ export default function WalletScreen({ navigation }) {
 
               {payoutMethod === 'upi' ? (
                 <View>
-                  <Text style={styles.inputLabel}>UPI ID (GPay / PhonePe / Paytm)</Text>
+                  <Text style={styles.inputLabel}>
+                    UPI ID (GPay / PhonePe / Paytm) <Text style={{ color: '#ef4444' }}>*</Text>
+                  </Text>
                   <TextInput
                     style={styles.textInput}
                     placeholder="e.g. username@okhdfcbank"
@@ -442,7 +562,9 @@ export default function WalletScreen({ navigation }) {
                 </View>
               ) : (
                 <View>
-                  <Text style={styles.inputLabel}>Account Holder Name</Text>
+                  <Text style={styles.inputLabel}>
+                    Account Holder Name <Text style={{ color: '#ef4444' }}>*</Text>
+                  </Text>
                   <TextInput
                     style={styles.textInput}
                     placeholder="Full name as per bank passbook"
@@ -451,7 +573,9 @@ export default function WalletScreen({ navigation }) {
                     onChangeText={setAccountName}
                   />
 
-                  <Text style={styles.inputLabel}>Account Number</Text>
+                  <Text style={styles.inputLabel}>
+                    Account Number <Text style={{ color: '#ef4444' }}>*</Text>
+                  </Text>
                   <TextInput
                     style={styles.textInput}
                     placeholder="Bank Account Number"
@@ -461,7 +585,9 @@ export default function WalletScreen({ navigation }) {
                     onChangeText={setAccountNumber}
                   />
 
-                  <Text style={styles.inputLabel}>IFSC Code</Text>
+                  <Text style={styles.inputLabel}>
+                    IFSC Code <Text style={{ color: '#ef4444' }}>*</Text>
+                  </Text>
                   <TextInput
                     style={styles.textInput}
                     placeholder="e.g. HDFC0001234"
@@ -482,9 +608,40 @@ export default function WalletScreen({ navigation }) {
                 </View>
               )}
 
+              {/* QR Code Screenshot Upload */}
+              <Text style={styles.inputLabel}>
+                UPI / Payment QR Code Screenshot <Text style={{ color: '#ef4444' }}>*</Text>
+              </Text>
+              {qrImageUri ? (
+                <View style={styles.qrPreviewCard}>
+                  <Image source={{ uri: qrImageUri }} style={styles.qrPreviewThumb} resizeMode="contain" />
+                  <View style={{ flex: 1, marginLeft: 12 }}>
+                    <Text style={styles.qrSuccessText}>✅ QR Screenshot Attached</Text>
+                    <Text style={styles.qrHelpText}>Admin will scan this to pay via PhonePe/GPay.</Text>
+                    <View style={{ flexDirection: 'row', gap: 10, marginTop: 8 }}>
+                      <TouchableOpacity style={styles.qrActionBtn} onPress={handlePickQrCode}>
+                        <Text style={styles.qrActionBtnText}>Change</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.qrActionBtn, { borderColor: '#ef444460' }]}
+                        onPress={() => setQrImageUri(null)}
+                      >
+                        <Text style={[styles.qrActionBtnText, { color: '#ef4444' }]}>Remove</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                </View>
+              ) : (
+                <TouchableOpacity style={styles.uploadQrBox} onPress={handlePickQrCode} activeOpacity={0.8}>
+                  <Text style={{ fontSize: 26, marginBottom: 4 }}>📷</Text>
+                  <Text style={styles.uploadQrTitle}>Upload Payment QR Screenshot</Text>
+                  <Text style={styles.uploadQrSubtitle}>Tap to select PhonePe / GPay / Paytm QR from Gallery</Text>
+                </TouchableOpacity>
+              )}
+
               <Text style={styles.modalNotice}>
-                • Admin will verify and transfer funds directly to your UPI/Bank.
-                {'\n'}• Transfer receipt screenshot will be attached to your request upon approval.
+                • Minimum withdrawal limit configured by admin is ₹{Number(walletData.minWithdrawalAmount || 2000).toLocaleString('en-IN')}.
+                {'\n'}• Platform administrator will scan your QR / transfer to your bank and attach the payment proof receipt.
               </Text>
 
               <TouchableOpacity
@@ -503,12 +660,14 @@ export default function WalletScreen({ navigation }) {
         </View>
       </Modal>
 
-      {/* RECEIPT PROOF PREVIEW MODAL */}
+      {/* RECEIPT / QR PREVIEW MODAL */}
       <Modal visible={!!selectedReceipt} animationType="fade" transparent>
         <View style={styles.receiptOverlay}>
           <View style={styles.receiptContainer}>
             <View style={styles.receiptHeader}>
-              <Text style={styles.receiptTitle}>Payment Receipt Proof</Text>
+              <Text style={styles.receiptTitle}>
+                {selectedReceipt?.toLowerCase().includes('qr') ? '📱 Payment QR Code' : '📸 Payment Receipt Proof'}
+              </Text>
               <TouchableOpacity onPress={() => setSelectedReceipt(null)}>
                 <Text style={styles.receiptClose}>✕</Text>
               </TouchableOpacity>
@@ -517,9 +676,11 @@ export default function WalletScreen({ navigation }) {
             {selectedReceipt && (
               <Image
                 source={{
-                  uri: selectedReceipt.startsWith('http')
-                    ? selectedReceipt
-                    : `https://api.plantopark.com${selectedReceipt}`,
+                  uri: getImageUrl ? getImageUrl(selectedReceipt) : (
+                    selectedReceipt.startsWith('http')
+                      ? selectedReceipt
+                      : `https://api.plantopark.com${selectedReceipt}`
+                  ),
                 }}
                 style={styles.receiptImage}
                 resizeMode="contain"
@@ -527,7 +688,9 @@ export default function WalletScreen({ navigation }) {
             )}
 
             <Text style={styles.receiptFootnote}>
-              Official transfer proof uploaded by PlanToPark Platform Administrator.
+              {selectedReceipt?.toLowerCase().includes('qr')
+                ? 'Owner payment QR code submitted for payout transfer.'
+                : 'Official transfer proof uploaded by PlanToPark Platform Administrator.'}
             </Text>
           </View>
         </View>
@@ -1008,6 +1171,116 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 16,
     fontWeight: '900',
+  },
+  minLimitBadge: {
+    backgroundColor: '#7c3aed20',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#7c3aed50',
+  },
+  minLimitBadgeText: {
+    color: '#c4b5fd',
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  presetRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 8,
+    marginBottom: 6,
+  },
+  presetChip: {
+    flex: 1,
+    backgroundColor: '#090d16',
+    paddingVertical: 8,
+    borderRadius: 10,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#1e293b',
+  },
+  presetChipActive: {
+    backgroundColor: '#7c3aed25',
+    borderColor: '#7c3aed',
+  },
+  presetChipText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#94a3b8',
+  },
+  presetChipTextActive: {
+    color: '#c4b5fd',
+  },
+  presetChipMax: {
+    backgroundColor: '#7c3aed',
+    borderColor: '#7c3aed',
+  },
+  presetChipTextMax: {
+    fontSize: 11,
+    fontWeight: '900',
+    color: '#ffffff',
+  },
+  uploadQrBox: {
+    backgroundColor: '#090d16',
+    borderWidth: 1.5,
+    borderColor: '#7c3aed60',
+    borderStyle: 'dashed',
+    borderRadius: 16,
+    padding: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 4,
+  },
+  uploadQrTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#c4b5fd',
+    marginBottom: 2,
+  },
+  uploadQrSubtitle: {
+    fontSize: 11,
+    color: '#64748b',
+    textAlign: 'center',
+  },
+  qrPreviewCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#090d16',
+    borderRadius: 16,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#10b98150',
+    marginTop: 4,
+  },
+  qrPreviewThumb: {
+    width: 68,
+    height: 68,
+    borderRadius: 12,
+    backgroundColor: '#ffffff',
+  },
+  qrSuccessText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#10b981',
+  },
+  qrHelpText: {
+    fontSize: 11,
+    color: '#94a3b8',
+    marginTop: 2,
+  },
+  qrActionBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#7c3aed60',
+    backgroundColor: '#131b2e',
+  },
+  qrActionBtnText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#c4b5fd',
   },
   receiptOverlay: {
     flex: 1,

@@ -31,6 +31,10 @@ const payoutRequestSchema = new mongoose.Schema(
       default: 'pending',
       index: true,
     },
+    ownerQrCodeImage: {
+      type: String,
+      default: '', // URL/Path to QR code screenshot uploaded by owner
+    },
     adminReceiptImage: {
       type: String,
       default: '', // URL to payment proof screenshot uploaded by admin

@@ -7,7 +7,7 @@ import {
   Bell, ChevronDown, Calendar, Search, LogOut, Settings,
   AlertTriangle, ShieldAlert, Heart, ClipboardList, HelpCircle, Star, MessageSquare,
   Menu, X, Send, Tag, Sparkles, Megaphone, FileText, Edit2, Trash2, Plus,
-  Percent, Upload, Eye, Landmark, Smartphone, Check, ExternalLink
+  Percent, Upload, Eye, Landmark, Smartphone, Check, ExternalLink, QrCode
 } from 'lucide-react';
 import Invoice from './Invoice';
 
@@ -67,8 +67,10 @@ const AdminDashboard = () => {
 
   // ── Wallet & Payout Management States ──
   const [payoutRequests, setPayoutRequests] = useState([]);
-  const [commissionRate, setCommissionRate] = useState(10);
-  const [commissionInput, setCommissionInput] = useState('10');
+  const [commissionRate, setCommissionRate] = useState(15);
+  const [commissionInput, setCommissionInput] = useState('15');
+  const [minWithdrawalAmount, setMinWithdrawalAmount] = useState(2000);
+  const [minWithdrawalInput, setMinWithdrawalInput] = useState('2000');
   const [savingCommission, setSavingCommission] = useState(false);
   const [approvingPayout, setApprovingPayout] = useState(null);
   const [payoutReceiptFile, setPayoutReceiptFile] = useState(null);
@@ -453,8 +455,12 @@ const AdminDashboard = () => {
         }
         if (rComm.ok) {
           const cData = await rComm.json();
-          setCommissionRate(cData.commissionPercentage || 10);
-          setCommissionInput(String(cData.commissionPercentage || 10));
+          const comm = cData.commissionPercentage !== undefined ? cData.commissionPercentage : 15;
+          const minW = cData.minWithdrawalAmount !== undefined ? cData.minWithdrawalAmount : 2000;
+          setCommissionRate(comm);
+          setCommissionInput(String(comm));
+          setMinWithdrawalAmount(minW);
+          setMinWithdrawalInput(String(minW));
         }
       } catch (e) {}
 
@@ -694,14 +700,19 @@ const AdminDashboard = () => {
       const res = await fetch(`${API_URL}/wallet/admin/commission`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ commissionPercentage: Number(commissionInput) }),
+        body: JSON.stringify({
+          commissionPercentage: Number(commissionInput),
+          minWithdrawalAmount: Number(minWithdrawalInput),
+        }),
       });
       if (res.ok) {
+        const data = await res.json();
         setCommissionRate(Number(commissionInput));
-        alert(`Platform commission rate updated to ${commissionInput}% successfully!`);
+        setMinWithdrawalAmount(Number(minWithdrawalInput));
+        alert(`Financial settings updated! Commission: ${commissionInput}%, Min Withdrawal: ₹${minWithdrawalInput}`);
       } else {
         const err = await res.json();
-        alert(err.message || 'Failed to update commission rate.');
+        alert(err.message || 'Failed to update financial settings.');
       }
     } catch (err) {
       alert(err.message);
@@ -4507,40 +4518,59 @@ const AdminDashboard = () => {
                       </div>
                     </div>
 
-                    {/* Platform Commission Rate Config Box */}
+                    {/* Platform Commission & Minimum Withdrawal Config Box */}
                     <div className="bg-gradient-to-br from-indigo-900 via-slate-900 to-slate-950 text-white rounded-3xl p-6 shadow-md border border-slate-800 flex flex-col justify-between">
                       <div>
                         <div className="flex items-center justify-between">
                           <span className="text-[11px] font-black uppercase tracking-wider text-indigo-300 flex items-center gap-1.5">
-                            <Percent className="h-3.5 w-3.5" /> Platform Commission
+                            <Percent className="h-3.5 w-3.5" /> Platform Fee &amp; Limits
                           </span>
                           <span className="text-xs px-2.5 py-0.5 rounded-full bg-indigo-500/30 text-indigo-300 font-extrabold border border-indigo-400/30">
-                            Active: {commissionRate}%
+                            Fee: {commissionRate}% | Min: ₹{Number(minWithdrawalAmount).toLocaleString('en-IN')}
                           </span>
                         </div>
                         <p className="text-xs text-slate-300 mt-1.5 leading-relaxed">
-                          Deducted on every seeker payment before crediting host wallet.
+                          Commission is debited from each seeker booking. Minimum withdrawal determines host payout eligibility.
                         </p>
                       </div>
-                      <form onSubmit={handleSaveCommission} className="flex items-center gap-2 mt-4">
-                        <div className="relative flex-1">
-                          <input
-                            type="number"
-                            min="0"
-                            max="100"
-                            step="0.5"
-                            value={commissionInput}
-                            onChange={(e) => setCommissionInput(e.target.value)}
-                            className="w-full bg-white/10 border border-white/20 rounded-xl px-3 py-2 text-sm text-white font-bold placeholder-slate-400 focus:outline-none focus:border-indigo-400 pr-7"
-                          />
-                          <span className="absolute right-3 top-2 text-sm text-slate-300 font-bold">%</span>
+                      <form onSubmit={handleSaveCommission} className="space-y-3 mt-4">
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="block text-[10px] font-bold uppercase text-slate-300 mb-1">Fee (%)</label>
+                            <div className="relative">
+                              <input
+                                type="number"
+                                min="0"
+                                max="100"
+                                step="0.5"
+                                value={commissionInput}
+                                onChange={(e) => setCommissionInput(e.target.value)}
+                                className="w-full bg-white/10 border border-white/20 rounded-xl px-2.5 py-1.5 text-xs text-white font-bold placeholder-slate-400 focus:outline-none focus:border-indigo-400 pr-6"
+                              />
+                              <span className="absolute right-2 top-1.5 text-xs text-slate-400 font-bold">%</span>
+                            </div>
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-bold uppercase text-slate-300 mb-1">Min Payout (₹)</label>
+                            <div className="relative">
+                              <input
+                                type="number"
+                                min="1"
+                                step="100"
+                                value={minWithdrawalInput}
+                                onChange={(e) => setMinWithdrawalInput(e.target.value)}
+                                className="w-full bg-white/10 border border-white/20 rounded-xl px-2.5 py-1.5 text-xs text-white font-bold placeholder-slate-400 focus:outline-none focus:border-indigo-400 pl-6"
+                              />
+                              <span className="absolute left-2 top-1.5 text-xs text-slate-400 font-bold">₹</span>
+                            </div>
+                          </div>
                         </div>
                         <button
                           type="submit"
                           disabled={savingCommission}
-                          className="px-4 py-2 bg-indigo-500 hover:bg-indigo-600 active:scale-95 disabled:opacity-50 text-white text-xs font-black rounded-xl transition shadow flex items-center gap-1"
+                          className="w-full py-2 bg-indigo-500 hover:bg-indigo-600 active:scale-95 disabled:opacity-50 text-white text-xs font-black rounded-xl transition shadow flex items-center justify-center gap-1"
                         >
-                          {savingCommission ? 'Saving...' : 'Update'}
+                          {savingCommission ? 'Saving...' : 'Save Financial Rules'}
                         </button>
                       </form>
                     </div>
@@ -4660,6 +4690,18 @@ const AdminDashboard = () => {
                                         {payout.payoutDetails?.bankName && (
                                           <p><span className="text-slate-400 font-bold">Bank:</span> {payout.payoutDetails.bankName}</p>
                                         )}
+                                      </div>
+                                    )}
+                                    {payout.ownerQrCodeImage && (
+                                      <div className="mt-2">
+                                        <button
+                                          type="button"
+                                          onClick={() => setViewingReceiptUrl(payout.ownerQrCodeImage.startsWith('http') ? payout.ownerQrCodeImage : `${API_URL}${payout.ownerQrCodeImage}`)}
+                                          className="inline-flex items-center gap-1 text-[11px] font-bold text-purple-700 bg-purple-50 hover:bg-purple-100 px-2 py-0.5 rounded border border-purple-200 transition"
+                                        >
+                                          <QrCode className="h-3 w-3 text-purple-600" />
+                                          View Owner QR
+                                        </button>
                                       </div>
                                     )}
                                   </td>
@@ -4979,6 +5021,40 @@ const AdminDashboard = () => {
                   </div>
                 )}
               </div>
+
+              {approvingPayout.ownerQrCodeImage && (
+                <div className="mt-3 pt-3 border-t border-slate-200/60 flex items-center gap-3">
+                  <div
+                    className="relative group cursor-pointer shrink-0"
+                    onClick={() => setViewingReceiptUrl(approvingPayout.ownerQrCodeImage.startsWith('http') ? approvingPayout.ownerQrCodeImage : `${API_URL}${approvingPayout.ownerQrCodeImage}`)}
+                    title="Click to view full size"
+                  >
+                    <img
+                      src={approvingPayout.ownerQrCodeImage.startsWith('http') ? approvingPayout.ownerQrCodeImage : `${API_URL}${approvingPayout.ownerQrCodeImage}`}
+                      alt="Owner QR Code"
+                      className="h-20 w-20 object-contain rounded-xl border border-purple-200 bg-white p-1 shadow-sm hover:scale-105 transition"
+                    />
+                    <div className="absolute inset-0 bg-black/40 rounded-xl opacity-0 group-hover:opacity-100 flex items-center justify-center transition">
+                      <Eye className="h-5 w-5 text-white" />
+                    </div>
+                  </div>
+                  <div>
+                    <span className="inline-flex items-center gap-1 text-[11px] font-extrabold text-purple-700 bg-purple-50 px-2 py-0.5 rounded border border-purple-200">
+                      <QrCode className="h-3 w-3" /> Owner's Payment QR
+                    </span>
+                    <p className="text-[11px] text-slate-500 mt-1">
+                      Scan directly with PhonePe / GPay / Paytm to pay.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setViewingReceiptUrl(approvingPayout.ownerQrCodeImage.startsWith('http') ? approvingPayout.ownerQrCodeImage : `${API_URL}${approvingPayout.ownerQrCodeImage}`)}
+                      className="text-[11px] text-purple-600 font-bold hover:underline mt-0.5 inline-block"
+                    >
+                      Enlarge QR Screenshot
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
 
             <form onSubmit={handleApprovePayoutSubmit} className="space-y-4">

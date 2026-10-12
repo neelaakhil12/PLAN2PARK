@@ -11,20 +11,30 @@ const SystemSetting = require('../models/SystemSetting');
 const Notification = require('../models/Notification');
 const { protect, adminOnly, ownerOnly } = require('../middleware/auth');
 
-// Receipts upload directory
+// Upload directories
 const receiptsDir = path.join(__dirname, '../uploads/receipts');
 if (!fs.existsSync(receiptsDir)) {
   fs.mkdirSync(receiptsDir, { recursive: true });
 }
 
-// Multer storage for payment proof screenshots
+const qrCodesDir = path.join(__dirname, '../uploads/qr_codes');
+if (!fs.existsSync(qrCodesDir)) {
+  fs.mkdirSync(qrCodesDir, { recursive: true });
+}
+
+// Multer storage for payment receipts & owner QR code screenshots
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    cb(null, receiptsDir);
+    if (file.fieldname === 'qrImage') {
+      cb(null, qrCodesDir);
+    } else {
+      cb(null, receiptsDir);
+    }
   },
   filename: function (req, file, cb) {
     const ext = path.extname(file.originalname) || '.jpg';
-    cb(null, `receipt-${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`);
+    const prefix = file.fieldname === 'qrImage' ? 'qr' : 'receipt';
+    cb(null, `${prefix}-${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`);
   },
 });
 
@@ -35,21 +45,34 @@ const upload = multer({
     if (file.mimetype.startsWith('image/')) {
       cb(null, true);
     } else {
-      cb(new Error('Only image files are allowed as payment receipt proofs!'));
+      cb(new Error('Only image files are allowed!'));
     }
   },
 });
 
-// Helper: Get active commission rate
+// Helper: Get active commission rate (Default 15%)
 const getCommissionRate = async () => {
   try {
     const setting = await SystemSetting.findOne({ key: 'platformCommissionRate' });
     if (setting && typeof setting.value === 'number') {
       return setting.value;
     }
-    return 10; // Default 10%
+    return 15; // Default 15% platform commission
   } catch (err) {
-    return 10;
+    return 15;
+  }
+};
+
+// Helper: Get active minimum withdrawal amount (Default ₹2000)
+const getMinWithdrawalAmount = async () => {
+  try {
+    const setting = await SystemSetting.findOne({ key: 'minWithdrawalAmount' });
+    if (setting && typeof setting.value === 'number') {
+      return setting.value;
+    }
+    return 2000; // Default ₹2000 minimum withdrawal
+  } catch (err) {
+    return 2000;
   }
 };
 
@@ -75,6 +98,7 @@ router.get('/owner', protect, ownerOnly, async (req, res) => {
     const transactions = (user.walletTransactions || []).slice().reverse();
 
     const commissionRate = await getCommissionRate();
+    const minWithdrawalAmount = await getMinWithdrawalAmount();
 
     res.json({
       walletBalance: Number((user.walletBalance || 0).toFixed(2)),
@@ -82,6 +106,7 @@ router.get('/owner', protect, ownerOnly, async (req, res) => {
       totalWithdrawn: Number(totalWithdrawn.toFixed(2)),
       totalGrossEarned: Number(((user.walletBalance || 0) + totalWithdrawn + pendingWithdrawal).toFixed(2)),
       platformCommissionRate: commissionRate,
+      minWithdrawalAmount,
       bankAccountDetails: user.bankAccountDetails || {},
       transactions,
       payoutRequests,
@@ -93,16 +118,23 @@ router.get('/owner', protect, ownerOnly, async (req, res) => {
 });
 
 // ─── 2. OWNER: SUBMIT WITHDRAWAL REQUEST ──────────────────────────────────────
-// @desc    Request a payout/withdrawal from available wallet balance
+// @desc    Request a payout/withdrawal from available wallet balance (with Bank/UPI and QR Code)
 // @route   POST /api/wallet/withdraw
 // @access  Private (Owner)
-router.post('/withdraw', protect, ownerOnly, async (req, res) => {
+router.post('/withdraw', protect, ownerOnly, upload.single('qrImage'), async (req, res) => {
   try {
     const { amount, payoutMethod, upiId, accountName, accountNumber, ifscCode, bankName } = req.body;
     const withdrawAmount = Number(amount);
 
     if (isNaN(withdrawAmount) || withdrawAmount <= 0) {
       return res.status(400).json({ message: 'Please enter a valid withdrawal amount.' });
+    }
+
+    const minWithdrawalAmount = await getMinWithdrawalAmount();
+    if (withdrawAmount < minWithdrawalAmount) {
+      return res.status(400).json({
+        message: `Minimum withdrawal amount is ₹${minWithdrawalAmount}. You cannot withdraw less than ₹${minWithdrawalAmount}.`,
+      });
     }
 
     const user = await User.findById(req.user._id);
@@ -133,6 +165,14 @@ router.post('/withdraw', protect, ownerOnly, async (req, res) => {
     if (ifscCode) user.bankAccountDetails.ifscCode = ifscCode.trim().toUpperCase();
     if (bankName) user.bankAccountDetails.bankName = bankName.trim();
 
+    // Owner QR screenshot
+    let ownerQrCodeImage = '';
+    if (req.file) {
+      ownerQrCodeImage = `/uploads/qr_codes/${req.file.filename}`;
+    } else if (req.body.ownerQrCodeImage) {
+      ownerQrCodeImage = req.body.ownerQrCodeImage;
+    }
+
     // Deduct from wallet balance
     user.walletBalance = Number((currentBalance - withdrawAmount).toFixed(2));
     if (!user.walletTransactions) user.walletTransactions = [];
@@ -150,6 +190,7 @@ router.post('/withdraw', protect, ownerOnly, async (req, res) => {
       amount: withdrawAmount,
       payoutMethod: payoutMethod || 'upi',
       payoutDetails,
+      ownerQrCodeImage,
       status: 'pending',
       requestedAt: new Date(),
     });
@@ -222,6 +263,7 @@ router.get('/admin/requests', protect, adminOnly, async (req, res) => {
     ]);
 
     const commissionRate = await getCommissionRate();
+    const minWithdrawalAmount = await getMinWithdrawalAmount();
 
     res.json({
       requests,
@@ -231,6 +273,7 @@ router.get('/admin/requests', protect, adminOnly, async (req, res) => {
         totalRequests: requests.length,
       },
       platformCommissionRate: commissionRate,
+      minWithdrawalAmount,
     });
   } catch (error) {
     console.error('Admin payout list error:', error);
@@ -369,14 +412,18 @@ router.post('/admin/reject/:id', protect, adminOnly, async (req, res) => {
   }
 });
 
-// ─── 6. ADMIN: COMMISSION CONFIGURATION ───────────────────────────────────────
-// @desc    Get & Update platform commission rate
+// ─── 6. ADMIN: FINANCIAL CONFIGURATION (COMMISSION & MIN WITHDRAWAL) ──────────
+// @desc    Get & Update platform commission rate and minimum withdrawal amount
 // @route   GET & PUT /api/wallet/admin/commission
 // @access  Private (Admin)
 router.get('/admin/commission', protect, adminOnly, async (req, res) => {
   try {
     const rate = await getCommissionRate();
-    res.json({ commissionPercentage: rate });
+    const minWithdrawal = await getMinWithdrawalAmount();
+    res.json({
+      commissionPercentage: rate,
+      minWithdrawalAmount: minWithdrawal,
+    });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -384,24 +431,52 @@ router.get('/admin/commission', protect, adminOnly, async (req, res) => {
 
 router.put('/admin/commission', protect, adminOnly, async (req, res) => {
   try {
-    const { commissionPercentage } = req.body;
-    const rate = Number(commissionPercentage);
+    const { commissionPercentage, minWithdrawalAmount } = req.body;
 
-    if (isNaN(rate) || rate < 0 || rate > 100) {
-      return res.status(400).json({ message: 'Commission rate must be between 0 and 100 percent.' });
+    let updatedRate;
+    if (commissionPercentage !== undefined) {
+      const rate = Number(commissionPercentage);
+      if (isNaN(rate) || rate < 0 || rate > 100) {
+        return res.status(400).json({ message: 'Commission rate must be between 0 and 100 percent.' });
+      }
+      await SystemSetting.findOneAndUpdate(
+        { key: 'platformCommissionRate' },
+        {
+          key: 'platformCommissionRate',
+          value: rate,
+          description: 'Platform commission percentage charged on booking payments before owner wallet credit.',
+        },
+        { upsert: true, new: true }
+      );
+      updatedRate = rate;
     }
 
-    await SystemSetting.findOneAndUpdate(
-      { key: 'platformCommissionRate' },
-      {
-        key: 'platformCommissionRate',
-        value: rate,
-        description: 'Platform commission percentage charged on booking payments before owner wallet credit.',
-      },
-      { upsert: true, new: true }
-    );
+    let updatedMin;
+    if (minWithdrawalAmount !== undefined) {
+      const minAmount = Number(minWithdrawalAmount);
+      if (isNaN(minAmount) || minAmount < 0) {
+        return res.status(400).json({ message: 'Minimum withdrawal amount must be a positive number.' });
+      }
+      await SystemSetting.findOneAndUpdate(
+        { key: 'minWithdrawalAmount' },
+        {
+          key: 'minWithdrawalAmount',
+          value: minAmount,
+          description: 'Minimum withdrawal amount required for owners to request payouts.',
+        },
+        { upsert: true, new: true }
+      );
+      updatedMin = minAmount;
+    }
 
-    res.json({ message: `Platform commission rate updated to ${rate}%!`, commissionPercentage: rate });
+    const currentRate = updatedRate !== undefined ? updatedRate : await getCommissionRate();
+    const currentMin = updatedMin !== undefined ? updatedMin : await getMinWithdrawalAmount();
+
+    res.json({
+      message: 'Financial settings updated successfully!',
+      commissionPercentage: currentRate,
+      minWithdrawalAmount: currentMin,
+    });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -410,4 +485,5 @@ router.put('/admin/commission', protect, adminOnly, async (req, res) => {
 module.exports = {
   router,
   getCommissionRate,
+  getMinWithdrawalAmount,
 };
