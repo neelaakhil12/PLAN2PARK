@@ -26,6 +26,12 @@ const upload = multer({ storage: diskStorage });
 // Helper to calculate commission split and credit net earnings to owner's wallet
 const processBookingPaymentAndCreditOwner = async (booking) => {
   try {
+    // STRICT GUARD: Only credit owner if payment is genuinely completed and paid
+    if (booking.paymentStatus !== 'paid' && booking.status !== 'paid') {
+      console.warn('[Wallet] Refusing to credit owner: booking is not paid. Status:', booking.status, 'PaymentStatus:', booking.paymentStatus);
+      return;
+    }
+
     const grossAmount = (booking.totalAmount || 0) + (booking.walletAmountUsed || 0);
     if (grossAmount <= 0) return;
 
@@ -43,6 +49,12 @@ const processBookingPaymentAndCreditOwner = async (booking) => {
     if (space && space.ownerId) {
       const owner = await User.findById(space.ownerId);
       if (owner) {
+        // Prevent duplicate crediting for the same booking
+        if (owner.walletTransactions && owner.walletTransactions.some((t) => t.bookingId && t.bookingId.toString() === booking._id.toString())) {
+          console.log('[Wallet] Booking already credited to owner wallet:', booking._id);
+          return;
+        }
+
         owner.walletBalance = Number(((owner.walletBalance || 0) + ownerEarnings).toFixed(2));
         if (!owner.walletTransactions) owner.walletTransactions = [];
         owner.walletTransactions.push({
