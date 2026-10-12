@@ -44,7 +44,9 @@
         {
           "icon": "./assets/icon.png",
           "color": "#10b981",
-          "sounds": []
+          "sounds": [
+            "./assets/sounds/car_horn.wav"
+          ]
         }
       ],
       [

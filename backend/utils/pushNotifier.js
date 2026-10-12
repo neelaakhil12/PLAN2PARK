@@ -23,7 +23,7 @@ async function sendPushNotification(pushTokens, title, body, data = {}) {
 
   const messages = tokens.map((to) => ({
     to,
-    sound: 'default',
+    sound: 'car_horn.wav',
     title,
     body,
     data,

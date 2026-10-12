@@ -42,7 +42,9 @@
         {
           "icon": "./assets/icon.png",
           "color": "#3b82f6",
-          "sounds": []
+          "sounds": [
+            "./assets/sounds/car_horn.wav"
+          ]
         }
       ],
       [
