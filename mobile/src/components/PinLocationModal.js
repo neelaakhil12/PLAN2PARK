@@ -9,6 +9,7 @@ import {
   ScrollView,
   Platform,
   Alert,
+  KeyboardAvoidingView,
 } from 'react-native';
 import * as Location from 'expo-location';
 import { COLORS } from '../theme/colors';
@@ -140,87 +141,128 @@ export default function PinLocationModal({ visible, currentLocation, onSelectLoc
   };
 
   const modalBody = (
-    <View style={styles.overlay}>
-      <View style={styles.modalCard}>
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.modalTitle}>📍 Pin Your Location</Text>
-          <Text style={styles.modalSub}>
-            Pin where you need parking so we can show you the nearest spots!
-          </Text>
-        </View>
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      style={styles.keyboardAvoid}
+    >
+      <View style={styles.overlay}>
+        {/* Backdrop overlay touch to close */}
+        <TouchableOpacity
+          style={styles.backdrop}
+          activeOpacity={1}
+          onPress={onClose}
+        />
 
-        <ScrollView style={styles.body} showsVerticalScrollIndicator={false}>
-          {/* GPS Locate Button */}
-          <TouchableOpacity style={styles.gpsBtn} onPress={handleUseGps} activeOpacity={0.8} disabled={locating}>
-            <Text style={styles.gpsIcon}>🎯</Text>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.gpsTitle}>Use Current GPS Location</Text>
-              <Text style={styles.gpsSub}>
-                {locating ? 'Detecting your real-time colony & GPS location...' : 'Auto-detect colony, landmark & GPS coordinates'}
+        <View style={styles.modalCard}>
+          {/* Header with Title and Close Button */}
+          <View style={styles.header}>
+            <View style={{ flex: 1, paddingRight: 8 }}>
+              <Text style={styles.modalTitle}>📍 Pin Your Location</Text>
+              <Text style={styles.modalSub}>
+                Pin where you need parking so we can show you the nearest spots!
               </Text>
             </View>
-          </TouchableOpacity>
+            {onClose && (
+              <TouchableOpacity
+                style={styles.closeBtn}
+                onPress={onClose}
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.closeTxt}>✕</Text>
+              </TouchableOpacity>
+            )}
+          </View>
 
-          {/* Custom Input */}
-          <Text style={styles.sectionLabel}>Or Search / Edit Specific Plot, Colony or Landmark</Text>
-          <View style={styles.searchBox}>
-            <Text style={styles.searchIcon}>📍</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="e.g. Plot 89, Chaitanya Hills, Hyderabad..."
-              placeholderTextColor={COLORS.textMuted}
-              value={customAddress}
-              onChangeText={(txt) => {
-                setCustomAddress(txt);
-                if (txt) setSelectedArea(txt);
-              }}
+          {/* Scrollable Body: Always scrollable on all device heights */}
+          <ScrollView
+            style={styles.body}
+            contentContainerStyle={styles.bodyContent}
+            showsVerticalScrollIndicator={true}
+            keyboardShouldPersistTaps="handled"
+          >
+            {/* GPS Locate Button */}
+            <TouchableOpacity style={styles.gpsBtn} onPress={handleUseGps} activeOpacity={0.8} disabled={locating}>
+              <Text style={styles.gpsIcon}>🎯</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.gpsTitle}>Use Current GPS Location</Text>
+                <Text style={styles.gpsSub}>
+                  {locating ? 'Detecting your real-time colony & GPS location...' : 'Auto-detect colony, landmark & GPS coordinates'}
+                </Text>
+              </View>
+            </TouchableOpacity>
+
+            {/* Custom Input */}
+            <Text style={styles.sectionLabel}>Or Search / Edit Specific Plot, Colony or Landmark</Text>
+            <View style={styles.searchBox}>
+              <Text style={styles.searchIcon}>📍</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="e.g. Plot 89, Chaitanya Hills, Hyderabad..."
+                placeholderTextColor={COLORS.textMuted}
+                value={customAddress}
+                onChangeText={(txt) => {
+                  setCustomAddress(txt);
+                  if (txt) setSelectedArea(txt);
+                }}
+              />
+              {customAddress ? (
+                <TouchableOpacity
+                  onPress={() => {
+                    setCustomAddress('');
+                    setSelectedArea('');
+                  }}
+                  style={{ padding: 4 }}
+                >
+                  <Text style={{ color: '#94A3B8', fontSize: 14 }}>✕</Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
+
+            {/* Quick Popular Locations */}
+            <Text style={styles.sectionLabel}>Popular Parking Hotspots</Text>
+            <View style={styles.chipContainer}>
+              {POPULAR_LOCATIONS.map((loc) => {
+                const isSelected = selectedArea.includes(loc.name) && !customAddress;
+                return (
+                  <TouchableOpacity
+                    key={loc.name}
+                    style={[styles.chip, isSelected && styles.chipActive]}
+                    onPress={() => handleSelectPopular(loc)}
+                  >
+                    <Text style={[styles.chipTxt, isSelected && styles.chipTxtActive]}>
+                      {loc.name}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {/* Simulated Map Pin Card */}
+            <View style={styles.mapPinPreview}>
+              <Text style={styles.mapPinEmoji}>📌</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.previewTitle}>Pinned Destination:</Text>
+                <Text style={styles.previewLocation} numberOfLines={2}>
+                  {customAddress || selectedArea || 'No location selected yet'}
+                </Text>
+              </View>
+              <Text style={styles.activeBadge}>PINNED</Text>
+            </View>
+          </ScrollView>
+
+          {/* Sticky Guaranteed-Visible Action Footer */}
+          <View style={styles.footer}>
+            <Button
+              title={locating ? "Detecting Location..." : "Confirm Pinned Location 🚀"}
+              onPress={handleConfirm}
+              variant="primary"
+              disabled={locating}
             />
           </View>
-
-          {/* Quick Popular Locations */}
-          <Text style={styles.sectionLabel}>Popular Parking Hotspots</Text>
-          <View style={styles.chipContainer}>
-            {POPULAR_LOCATIONS.map((loc) => {
-              const isSelected = selectedArea.includes(loc.name) && !customAddress;
-              return (
-                <TouchableOpacity
-                  key={loc.name}
-                  style={[styles.chip, isSelected && styles.chipActive]}
-                  onPress={() => handleSelectPopular(loc)}
-                >
-                  <Text style={[styles.chipTxt, isSelected && styles.chipTxtActive]}>
-                    {loc.name}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-
-          {/* Simulated Map Pin Card */}
-          <View style={styles.mapPinPreview}>
-            <Text style={styles.mapPinEmoji}>📌</Text>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.previewTitle}>Pinned Destination:</Text>
-              <Text style={styles.previewLocation} numberOfLines={2}>
-                {customAddress || selectedArea || 'No location selected yet'}
-              </Text>
-            </View>
-            <Text style={styles.activeBadge}>PINNED</Text>
-          </View>
-        </ScrollView>
-
-        {/* Footer Action */}
-        <View style={styles.footer}>
-          <Button
-            title={locating ? "Detecting Location..." : "Confirm Pinned Location 🚀"}
-            onPress={handleConfirm}
-            variant="primary"
-            disabled={locating}
-          />
         </View>
       </View>
-    </View>
+    </KeyboardAvoidingView>
   );
 
   if (Platform.OS === 'web') {
@@ -235,26 +277,42 @@ export default function PinLocationModal({ visible, currentLocation, onSelectLoc
 }
 
 const styles = StyleSheet.create({
+  keyboardAvoid: {
+    flex: 1,
+  },
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.65)',
     justifyContent: 'flex-end',
   },
+  backdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
   modalCard: {
     backgroundColor: COLORS.white,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
-    maxHeight: '88%',
-    paddingBottom: Platform.OS === 'ios' ? 36 : 24,
+    height: Platform.OS === 'web' ? 'auto' : '86%',
+    maxHeight: '92%',
+    display: 'flex',
+    flexDirection: 'column',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.15,
     shadowRadius: 16,
     elevation: 20,
+    overflow: 'hidden',
   },
   header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 22,
-    paddingTop: 22,
+    paddingTop: 18,
     paddingBottom: 14,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.borderLight,
@@ -265,14 +323,31 @@ const styles = StyleSheet.create({
     color: COLORS.textDark,
   },
   modalSub: {
-    fontSize: 13,
+    fontSize: 12,
     color: COLORS.textMuted,
-    marginTop: 4,
-    lineHeight: 18,
+    marginTop: 3,
+    lineHeight: 17,
+  },
+  closeBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  closeTxt: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#64748B',
   },
   body: {
+    flex: 1,
+  },
+  bodyContent: {
     paddingHorizontal: 22,
     paddingTop: 16,
+    paddingBottom: 20,
   },
   gpsBtn: {
     flexDirection: 'row',
@@ -362,7 +437,7 @@ const styles = StyleSheet.create({
     borderColor: '#22C55E',
     borderRadius: 16,
     padding: 16,
-    marginBottom: 24,
+    marginBottom: 20,
     gap: 12,
   },
   mapPinEmoji: {
@@ -393,6 +468,15 @@ const styles = StyleSheet.create({
   },
   footer: {
     paddingHorizontal: 22,
-    paddingTop: 12,
+    paddingTop: 14,
+    paddingBottom: Platform.OS === 'ios' ? 36 : 24,
+    backgroundColor: COLORS.white,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.borderLight,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -3 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 4,
   },
 });

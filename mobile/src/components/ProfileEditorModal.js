@@ -135,7 +135,12 @@ export default function ProfileEditorModal({
           </View>
         ) : null}
 
-        <ScrollView style={styles.body} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          style={styles.body}
+          contentContainerStyle={{ paddingBottom: 24 }}
+          showsVerticalScrollIndicator={true}
+          keyboardShouldPersistTaps="handled"
+        >
           {/* Avatar / Pass Photo Selection */}
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
             <Text style={styles.fieldLabel}>Select Pass Photo / Avatar</Text>
@@ -366,7 +371,8 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   body: {
-    maxHeight: 380,
+    flexShrink: 1,
+    maxHeight: 460,
   },
   fieldLabel: {
     color: COLORS.white,
