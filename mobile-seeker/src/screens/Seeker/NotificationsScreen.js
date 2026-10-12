@@ -67,6 +67,8 @@ function SwipeableNotificationItem({ item, onDelete, onMarkRead, onCopyCode, cop
         return '💳';
       case 'booking_confirmation':
         return '🎟️';
+      case 'booking_extended':
+        return '⏳';
       case 'booking_expiry':
         return '⏰';
       case 'cancellation':
@@ -84,6 +86,8 @@ function SwipeableNotificationItem({ item, onDelete, onMarkRead, onCopyCode, cop
         return { bg: '#064e3b30', border: '#10b981', text: '#34d399', label: 'PAYMENT' };
       case 'booking_confirmation':
         return { bg: '#1e3a8a30', border: '#3b82f6', text: '#60a5fa', label: 'BOOKING' };
+      case 'booking_extended':
+        return { bg: '#854d0e30', border: '#eab308', text: '#facc15', label: 'EXTENDED' };
       case 'booking_expiry':
         return { bg: '#7c2d1230', border: '#f97316', text: '#fb923c', label: 'EXPIRY' };
       case 'cancellation':
@@ -178,7 +182,7 @@ function SwipeableNotificationItem({ item, onDelete, onMarkRead, onCopyCode, cop
         )}
 
         {/* Action Button for Bookings */}
-        {['booking_confirmation', 'payment_success'].includes(item.type) && (
+        {['booking_confirmation', 'payment_success', 'booking_extended'].includes(item.type) && (
           <TouchableOpacity
             style={styles.viewPassBtn}
             onPress={() => {
@@ -301,9 +305,9 @@ export default function NotificationsScreen({ navigation }) {
   };
 
   const filteredNotifications = notifications.filter((n) => {
-    if (activeFilter === 'offers') return n.type === 'promotional_offer';
+    if (activeFilter === 'offers') return n.type === 'promotional_offer' || !!n.promoCode;
     if (activeFilter === 'bookings') {
-      return ['booking_confirmation', 'payment_success', 'booking_expiry', 'cancellation'].includes(n.type);
+      return ['booking_confirmation', 'payment_success', 'booking_expiry', 'cancellation', 'booking_extended'].includes(n.type);
     }
     return true;
   });

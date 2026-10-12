@@ -53,7 +53,18 @@ function AppContent() {
         const list = Array.isArray(data.notifications) ? data.notifications : [];
 
         if (!initialLoadDone) {
-          list.forEach((n) => seenNotifIds.add(n._id));
+          const now = Date.now();
+          list.forEach((n) => {
+            const ageMs = now - new Date(n.createdAt || 0).getTime();
+            if (!n.isRead && ageMs < 60 * 1000) {
+              triggerExternalNotification({
+                title: n.title || 'PlanToPark Alert',
+                body: n.message || 'You have a new update regarding your parking spot.',
+                data: { screen: 'Notifications', id: n._id },
+              });
+            }
+            seenNotifIds.add(n._id);
+          });
           initialLoadDone = true;
           return;
         }

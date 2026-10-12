@@ -21,19 +21,32 @@ Notifications.setNotificationHandler({
 export async function setupNotificationChannels() {
   if (Platform.OS === 'android') {
     try {
-      await Notifications.setNotificationChannelAsync('plantopark_alerts_v2', {
-        name: 'PlanToPark Alerts',
+      // Clean up previous cached channels so Android recreates with custom car horn sound
+      await Notifications.deleteNotificationChannelAsync('plantopark_alerts_v2').catch(() => {});
+      await Notifications.deleteNotificationChannelAsync('plantopark_alerts').catch(() => {});
+    } catch (_) {}
+
+    try {
+      await Notifications.setNotificationChannelAsync('plantopark_horn_v3', {
+        name: 'PlanToPark Horn Alerts',
         importance: Notifications.AndroidImportance.MAX,
         vibrationPattern: [0, 250, 250, 250],
         lightColor: '#10b981',
         sound: 'car_horn.wav',
+        audioAttributes: {
+          usage: Notifications.AndroidAudioUsage.NOTIFICATION_EVENT,
+          contentType: Notifications.AndroidAudioContentType.SONIFICATION,
+          flags: {
+            enforceAudibility: true,
+          },
+        },
         enableVibrate: true,
         showBadge: true,
         lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
         bypassDnd: true,
       });
     } catch (e) {
-      console.warn('Primary channel creation notice:', e?.message);
+      console.warn('Horn channel creation notice:', e?.message);
     }
 
     try {
@@ -42,6 +55,11 @@ export async function setupNotificationChannels() {
         importance: Notifications.AndroidImportance.MAX,
         vibrationPattern: [0, 250, 250, 250],
         lightColor: '#10b981',
+        sound: 'car_horn.wav',
+        audioAttributes: {
+          usage: Notifications.AndroidAudioUsage.NOTIFICATION_EVENT,
+          contentType: Notifications.AndroidAudioContentType.SONIFICATION,
+        },
         enableVibrate: true,
         showBadge: true,
         lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
@@ -76,7 +94,7 @@ export async function registerForPushNotificationsAsync(authToken) {
     const projectId =
       Constants?.expoConfig?.extra?.eas?.projectId ??
       Constants?.easConfig?.projectId ??
-      'ccbd4650-78fe-4739-bfc4-be371f21b54c';
+      '503958ef-bf1d-4ed5-93b2-5d0fb8bddc7c';
 
     const tokenData = await Notifications.getExpoPushTokenAsync({
       projectId,
@@ -133,7 +151,7 @@ export async function triggerExternalNotification({ title, body, data = {} }) {
         body,
         data,
         sound: 'car_horn.wav',
-        channelId: 'plantopark_alerts_v2',
+        channelId: 'plantopark_horn_v3',
         priority: Notifications.AndroidNotificationPriority.MAX,
       },
       trigger: null,

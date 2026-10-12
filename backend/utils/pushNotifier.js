@@ -28,8 +28,9 @@ async function sendPushNotification(pushTokens, title, body, data = {}) {
     body,
     data,
     priority: 'high',
-    channelId: 'default',
+    channelId: 'plantopark_horn_v3',
     badge: 1,
+    _displayInForeground: true,
   }));
 
   try {

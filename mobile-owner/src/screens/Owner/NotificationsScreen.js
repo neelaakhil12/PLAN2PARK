@@ -64,6 +64,8 @@ function SwipeableOwnerNotificationItem({ item, onDelete, onMarkRead, navigation
         return '💰';
       case 'slot_allotted':
         return '🅿️';
+      case 'booking_extended':
+        return '⏳';
       case 'booking_confirmation':
         return '🎟️';
       case 'cancellation':
@@ -83,6 +85,8 @@ function SwipeableOwnerNotificationItem({ item, onDelete, onMarkRead, navigation
       case 'payment_credit':
       case 'wallet_credit':
         return { bg: '#064e3b30', border: '#10b981', text: '#34d399', label: 'PAYMENT' };
+      case 'booking_extended':
+        return { bg: '#854d0e30', border: '#eab308', text: '#facc15', label: 'PASS EXTENDED' };
       case 'slot_allotted':
         return { bg: '#854d0e30', border: '#eab308', text: '#facc15', label: 'SLOT ALLOTTED' };
       case 'cancellation':
@@ -148,11 +152,11 @@ function SwipeableOwnerNotificationItem({ item, onDelete, onMarkRead, navigation
         <Text style={styles.messageTxt}>{item.message}</Text>
 
         {/* Action Button for Bookings */}
-        {['booking_request', 'new_booking', 'booking_confirmation', 'slot_allotted'].includes(item.type) && (
+        {['booking_request', 'new_booking', 'booking_confirmation', 'slot_allotted', 'booking_extended'].includes(item.type) && (
           <TouchableOpacity
             style={styles.actionBtn}
             onPress={() => {
-              navigation.navigate('Orders');
+              navigation.navigate('OwnerMain', { screen: 'Orders' });
             }}
             activeOpacity={0.8}
           >
@@ -160,12 +164,12 @@ function SwipeableOwnerNotificationItem({ item, onDelete, onMarkRead, navigation
           </TouchableOpacity>
         )}
 
-        {/* Action Button for Payments */}
-        {['payment_credit', 'wallet_credit'].includes(item.type) && (
+        {/* Action Button for Payments & Earnings */}
+        {['payment_credit', 'wallet_credit', 'booking_extended'].includes(item.type) && (
           <TouchableOpacity
             style={[styles.actionBtn, { borderColor: '#10b981', backgroundColor: '#064e3b30' }]}
             onPress={() => {
-              navigation.navigate('Wallet');
+              navigation.navigate('OwnerMain', { screen: 'Wallet' });
             }}
             activeOpacity={0.8}
           >
@@ -274,10 +278,10 @@ export default function NotificationsScreen({ navigation }) {
 
   const filteredNotifications = notifications.filter((n) => {
     if (activeFilter === 'bookings') {
-      return ['booking_request', 'new_booking', 'booking_confirmation', 'slot_allotted', 'cancellation'].includes(n.type);
+      return ['booking_request', 'new_booking', 'booking_confirmation', 'slot_allotted', 'cancellation', 'booking_extended'].includes(n.type);
     }
     if (activeFilter === 'payments') {
-      return ['payment_credit', 'wallet_credit'].includes(n.type);
+      return ['payment_credit', 'wallet_credit', 'booking_extended'].includes(n.type);
     }
     return true;
   });

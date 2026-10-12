@@ -1323,10 +1323,86 @@ router.post('/:id/extend', protect, seekerOnly, async (req, res) => {
     const extensionEndTime = new Date(currentEndTime.getTime() + Number(extendHours) * 60 * 60 * 1000);
     const additionalAmount = Number(extendHours) * space.pricePerHour;
 
+    const additionalOwnerEarning = Number((additionalAmount * 0.9).toFixed(2));
+    const additionalCommission = Number((additionalAmount * 0.1).toFixed(2));
+
     booking.totalAmount += additionalAmount;
     booking.hours += Number(extendHours);
     booking.endTime = extensionEndTime;
+    booking.ownerEarnings = Number(((booking.ownerEarnings || 0) + additionalOwnerEarning).toFixed(2));
+    booking.adminCommission = Number(((booking.adminCommission || 0) + additionalCommission).toFixed(2));
     await booking.save();
+
+    // Credit additional earnings to space owner's wallet
+    const owner = await User.findById(space.ownerId);
+    if (owner) {
+      owner.walletBalance = Number(((owner.walletBalance || 0) + additionalOwnerEarning).toFixed(2));
+      if (!owner.walletTransactions) owner.walletTransactions = [];
+      owner.walletTransactions.push({
+        type: 'credit',
+        amount: additionalOwnerEarning,
+        description: `Pass extension payout for Slot ${booking.slotId || 'Slot-1'} at ${space.title} (+${extendHours} hrs)`,
+        date: new Date(),
+        bookingId: booking._id,
+      });
+      await owner.save();
+
+      // In-app Notification for Owner
+      try {
+        await Notification.create({
+          userId: owner._id,
+          targetRole: 'owner',
+          type: 'booking_extended',
+          title: '⏳ Parking Pass Extended!',
+          message: `Commuter extended reservation for Slot ${booking.slotId || 'Slot-1'} at '${space.title}' by +${extendHours} hr(s). ₹${additionalOwnerEarning} credited to your wallet!`,
+          data: {
+            bookingId: booking._id,
+            slot: booking.slotId,
+            extendHours: Number(extendHours),
+            additionalAmount,
+          },
+        });
+
+        if (owner.pushToken) {
+          sendPushNotification(
+            owner.pushToken,
+            '⏳ Parking Pass Extended!',
+            `Commuter extended reservation for Slot ${booking.slotId || 'Slot-1'} at '${space.title}' by +${extendHours} hr(s).`,
+            { screen: 'Orders', bookingId: booking._id }
+          );
+        }
+      } catch (notifErr) {
+        console.warn('Owner extension notification error:', notifErr.message);
+      }
+    }
+
+    // In-app Notification for Seeker
+    try {
+      await Notification.create({
+        userId: req.user._id,
+        targetRole: 'seeker',
+        type: 'booking_extended',
+        title: '🎉 Pass Extended Successfully!',
+        message: `Your reservation for slot ${booking.slotId || 'Slot-1'} at '${space.title}' has been extended by +${extendHours} hr(s). New end time: ${extensionEndTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}.`,
+        data: {
+          bookingId: booking._id,
+          slot: booking.slotId,
+          extendHours: Number(extendHours),
+          additionalAmount,
+        },
+      });
+
+      if (req.user.pushToken) {
+        sendPushNotification(
+          req.user.pushToken,
+          '🎉 Pass Extended Successfully!',
+          `Your reservation for slot ${booking.slotId || 'Slot-1'} at '${space.title}' has been extended by +${extendHours} hr(s).`,
+          { screen: 'Bookings', bookingId: booking._id }
+        );
+      }
+    } catch (notifErr) {
+      console.warn('Seeker extension notification error:', notifErr.message);
+    }
 
     res.json({ message: 'Booking extended successfully!', booking });
   } catch (error) {

@@ -3,6 +3,7 @@ const router = express.Router();
 const jwt = require('jsonwebtoken');
 const Notification = require('../models/Notification');
 const User = require('../models/User');
+const { sendPushNotification } = require('../utils/pushNotifier');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'secret123';
 
@@ -186,6 +187,28 @@ router.post('/admin/broadcast', authMiddleware, adminMiddleware, async (req, res
     });
 
     await notification.save();
+
+    // Broadcast external push notifications to devices with push tokens
+    try {
+      const userQuery = { pushToken: { $exists: true, $ne: null } };
+      if (targetRole && targetRole !== 'all') {
+        userQuery.role = targetRole;
+      }
+      const targetUsers = await User.find(userQuery).select('pushToken').lean();
+      const tokens = targetUsers.map((u) => u.pushToken).filter(Boolean);
+
+      if (tokens.length > 0) {
+        sendPushNotification(
+          tokens,
+          title,
+          message,
+          { screen: 'Notifications', type: 'promotional_offer', promoCode }
+        );
+        console.log(`[broadcast] Sent push notifications to ${tokens.length} ${targetRole} devices.`);
+      }
+    } catch (pushErr) {
+      console.warn('[broadcast] Push notification broadcast error:', pushErr.message);
+    }
 
     res.status(201).json({
       success: true,
