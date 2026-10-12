@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useContext, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -11,10 +11,12 @@ import {
   Linking,
   Platform,
   ActivityIndicator,
+  Image,
+  useWindowDimensions,
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { AuthContext } from '../../context/AuthContext';
-import { endpoints, getBaseApiUrl, PUBLIC_ONLINE_URL } from '../../config/api';
+import { endpoints, getBaseApiUrl, getImageUrl, PUBLIC_ONLINE_URL } from '../../config/api';
 import { COLORS } from '../../theme/colors';
 import Button from '../../components/Button';
 import Header from '../../components/Header';
@@ -61,9 +63,7 @@ const generateRazorpayHtml = (booking, orderData, user, space, finalPrice) => {
   <title>PlanToPark - Secure Checkout</title>
   <link rel="dns-prefetch" href="//checkout.razorpay.com">
   <link rel="preconnect" href="https://checkout.razorpay.com" crossorigin>
-  <link rel="dns-prefetch" href="//api.razorpay.com">
-  <link rel="preconnect" href="https://api.razorpay.com" crossorigin>
-  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+  <link rel="preload" href="https://checkout.razorpay.com/v1/checkout.js" as="script">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -91,22 +91,35 @@ const generateRazorpayHtml = (booking, orderData, user, space, finalPrice) => {
     .title { font-size: 16px; font-weight: 800; color: #ffffff; margin-bottom: 6px; }
     .sub { font-size: 13px; color: #94a3b8; }
     .amount { font-size: 22px; font-weight: 900; color: #10b981; margin: 10px 0; }
+    .btn {
+      display: none;
+      margin-top: 20px;
+      padding: 12px 24px;
+      background: #10b981;
+      color: #ffffff;
+      font-weight: 800;
+      border: none;
+      border-radius: 12px;
+      font-size: 14px;
+      cursor: pointer;
+    }
   </style>
 </head>
 <body>
   <div class="spinner"></div>
   <div class="title">PlanToPark Secure Checkout</div>
   <div class="amount">₹${finalPrice || booking?.totalAmount || 0}.00</div>
-  <div class="sub">Launching Razorpay Payment Sheet...</div>
+  <div id="subText" class="sub">Launching Razorpay Payment Sheet...</div>
+  <button id="retryBtn" class="btn" onclick="tryOpenRazorpay()">Open Payment Window</button>
 
   <script>
     var options = {
       key: "${keyId}",
-      order_id: "${orderId}",
       amount: ${amountInPaise},
       currency: "INR",
       name: "PlanToPark",
       description: "Parking Reservation - ${spotTitle}",
+      image: "https://plantopark.com/favicon.png",
       prefill: {
         name: "${userName}",
         email: "${userEmail}",
@@ -139,7 +152,16 @@ const generateRazorpayHtml = (booking, orderData, user, space, finalPrice) => {
             signature: response.razorpay_signature || ''
           }));
         }
+      }
+    };
+    ${orderId ? `options.order_id = "${orderId}";` : ''}
+
+    var attempts = 0;
+    var opened = false;
+
     function tryOpenRazorpay() {
+      if (opened) return;
+      attempts++;
       if (typeof Razorpay !== 'undefined') {
         try {
           var rzp = new Razorpay(options);
@@ -152,21 +174,33 @@ const generateRazorpayHtml = (booking, orderData, user, space, finalPrice) => {
             }
           });
           rzp.open();
+          opened = true;
+          var sub = document.getElementById('subText');
+          if (sub) sub.innerText = "Complete payment in the Razorpay window...";
         } catch (e) {
-          setTimeout(tryOpenRazorpay, 50);
+          console.error("Razorpay open error:", e);
+          if (attempts < 15) {
+            setTimeout(tryOpenRazorpay, 100);
+          } else {
+            var btn = document.getElementById('retryBtn');
+            if (btn) btn.style.display = 'block';
+            var sub = document.getElementById('subText');
+            if (sub) sub.innerText = "Tap button below to launch payment:";
+          }
         }
       } else {
-        setTimeout(tryOpenRazorpay, 30);
+        if (attempts < 60) {
+          setTimeout(tryOpenRazorpay, 40);
+        } else {
+          var btn = document.getElementById('retryBtn');
+          if (btn) btn.style.display = 'block';
+          var sub = document.getElementById('subText');
+          if (sub) sub.innerText = "Tap button below to retry loading:";
+        }
       }
     }
-
-    if (document.readyState === 'complete' || document.readyState === 'interactive') {
-      tryOpenRazorpay();
-    } else {
-      document.addEventListener('DOMContentLoaded', tryOpenRazorpay);
-      window.addEventListener('load', tryOpenRazorpay);
-    }
   </script>
+  <script src="https://checkout.razorpay.com/v1/checkout.js" onload="tryOpenRazorpay()"></script>
 </body>
 </html>`;
 };
@@ -175,13 +209,53 @@ export default function SpotDetailsScreen({ route, navigation }) {
   const space = route.params?.space || {};
   const { user, token } = useContext(AuthContext);
 
-  const [vehicleNumber, setVehicleNumber] = useState('TS07AB1234');
+  const { width: windowWidth } = useWindowDimensions();
+  const imageScrollRef = useRef(null);
+  const [activeImgIndex, setActiveImgIndex] = useState(0);
+  const [carouselWidth, setCarouselWidth] = useState(Math.max(windowWidth - 68, 280));
+
+  const spotImagesList = useMemo(() => {
+    let list = [];
+    if (space.images && Array.isArray(space.images) && space.images.length > 0) {
+      list = space.images;
+    } else if (typeof space.images === 'string') {
+      try {
+        const parsed = JSON.parse(space.images);
+        if (Array.isArray(parsed)) list = parsed;
+      } catch (e) {
+        list = space.images.split(',').map((s) => s.trim()).filter(Boolean);
+      }
+    }
+    if (list.length === 0 && (space.image || space.imageUrl)) {
+      list = [space.image || space.imageUrl];
+    }
+    return list.filter(Boolean);
+  }, [space.images, space.image, space.imageUrl]);
+
+  const getUserPlateNumber = () => {
+    return (
+      user?.vehiclePlateNumber ||
+      user?.vehicleNumber ||
+      (user?.vehicles && user.vehicles[0]?.plateNumber) ||
+      ''
+    );
+  };
+
+  const [vehicleNumber, setVehicleNumber] = useState(getUserPlateNumber() || '');
   const [vehicleType, setVehicleType] = useState('4-wheeler');
   const [durationHours, setDurationHours] = useState('2');
   const [loading, setLoading] = useState(false);
   const [bookingSuccessModal, setBookingSuccessModal] = useState(null);
   const [walletBalance, setWalletBalance] = useState(0);
   const [useWallet, setUseWallet] = useState(true);
+
+  // Automatically update vehicle plate number when user profile updates (e.g. edited in Profile tab)
+  useEffect(() => {
+    const currentPlate = getUserPlateNumber();
+    if (currentPlate) {
+      setVehicleNumber(currentPlate);
+    }
+  }, [user?.vehiclePlateNumber, user?.vehicleNumber, user?.vehicles]);
 
   useEffect(() => {
     const fetchWallet = async () => {
@@ -286,27 +360,29 @@ export default function SpotDetailsScreen({ route, navigation }) {
         return;
       }
 
-      // 2. Fetch Razorpay Order from backend
-      let orderData = {
+      // 2. Fetch Razorpay Order from backend (or use pre-generated orderData from create booking)
+      let orderData = data.orderData || {
         orderId: '',
         amount: Math.round(finalPayablePrice * 100),
         keyId: 'rzp_live_TidhMuvoj4fV3b',
       };
 
-      try {
-        const orderRes = await fetch(`${baseUrl}/bookings/${newBooking._id}/razorpay-order`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-        });
-        if (orderRes.ok) {
-          const fetchedOrder = await orderRes.json();
-          orderData = { ...orderData, ...fetchedOrder };
+      if (!data.orderData) {
+        try {
+          const orderRes = await fetch(`${baseUrl}/bookings/${newBooking._id}/razorpay-order`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+          });
+          if (orderRes.ok) {
+            const fetchedOrder = await orderRes.json();
+            orderData = { ...orderData, ...fetchedOrder };
+          }
+        } catch (orderErr) {
+          console.log('Order fetch fallback:', orderErr);
         }
-      } catch (orderErr) {
-        console.log('Order fetch fallback:', orderErr);
       }
 
       // If running on Web / Browser, launch official Razorpay Checkout directly
@@ -465,6 +541,192 @@ export default function SpotDetailsScreen({ route, navigation }) {
               <Text style={styles.evBadge}>⚡ EV CHARGING</Text>
             )}
           </View>
+
+          {/* Horizontal Scrollable Images of Parking Spot */}
+          {spotImagesList.length > 1 ? (
+            <View
+              style={{ marginVertical: 10 }}
+              onLayout={(e) => {
+                const w = Math.round(e.nativeEvent.layout.width);
+                if (w > 0 && Math.abs(w - carouselWidth) > 1) {
+                  setCarouselWidth(w);
+                }
+              }}
+            >
+              <View style={{ position: 'relative', borderRadius: 14, overflow: 'hidden', width: carouselWidth }}>
+                <ScrollView
+                  ref={imageScrollRef}
+                  horizontal
+                  pagingEnabled={false}
+                  snapToInterval={carouselWidth}
+                  snapToAlignment="center"
+                  decelerationRate="fast"
+                  showsHorizontalScrollIndicator={false}
+                  onScroll={(e) => {
+                    const contentOffset = e.nativeEvent.contentOffset.x;
+                    const w = carouselWidth > 0 ? carouselWidth : e.nativeEvent.layoutMeasurement.width;
+                    if (w > 0) {
+                      const idx = Math.max(0, Math.min(spotImagesList.length - 1, Math.round(contentOffset / w)));
+                      setActiveImgIndex(idx);
+                    }
+                  }}
+                  scrollEventThrottle={16}
+                >
+                  {spotImagesList.map((imgItem, idx) => (
+                    <View
+                      key={idx}
+                      style={{
+                        width: carouselWidth,
+                        height: 200,
+                        backgroundColor: '#0f172a',
+                      }}
+                    >
+                      <Image
+                        source={{ uri: getImageUrl(imgItem) }}
+                        style={{ width: '100%', height: '100%' }}
+                        resizeMode="cover"
+                      />
+                    </View>
+                  ))}
+                </ScrollView>
+
+                {/* Floating Photo Counter Badge */}
+                <View
+                  style={{
+                    position: 'absolute',
+                    top: 10,
+                    right: 10,
+                    backgroundColor: 'rgba(15, 23, 42, 0.85)',
+                    paddingHorizontal: 10,
+                    paddingVertical: 4,
+                    borderRadius: 14,
+                    borderWidth: 1,
+                    borderColor: 'rgba(255, 255, 255, 0.25)',
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 4,
+                  }}
+                >
+                  <Text style={{ color: '#fff', fontSize: 11, fontWeight: '800' }}>
+                    📷 {activeImgIndex + 1} / {spotImagesList.length}
+                  </Text>
+                </View>
+
+                {/* Left / Right Chevron arrows */}
+                {activeImgIndex > 0 && (
+                  <TouchableOpacity
+                    style={{
+                      position: 'absolute',
+                      left: 8,
+                      top: '42%',
+                      backgroundColor: 'rgba(15, 23, 42, 0.75)',
+                      width: 28,
+                      height: 28,
+                      borderRadius: 14,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                    onPress={() => {
+                      const prevIdx = activeImgIndex - 1;
+                      setActiveImgIndex(prevIdx);
+                      imageScrollRef.current?.scrollTo({ x: prevIdx * carouselWidth, animated: true });
+                    }}
+                  >
+                    <Text style={{ color: '#fff', fontSize: 13, fontWeight: '900' }}>‹</Text>
+                  </TouchableOpacity>
+                )}
+
+                {activeImgIndex < spotImagesList.length - 1 && (
+                  <TouchableOpacity
+                    style={{
+                      position: 'absolute',
+                      right: 8,
+                      top: '42%',
+                      backgroundColor: 'rgba(15, 23, 42, 0.75)',
+                      width: 28,
+                      height: 28,
+                      borderRadius: 14,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                    onPress={() => {
+                      const nextIdx = activeImgIndex + 1;
+                      setActiveImgIndex(nextIdx);
+                      imageScrollRef.current?.scrollTo({ x: nextIdx * carouselWidth, animated: true });
+                    }}
+                  >
+                    <Text style={{ color: '#fff', fontSize: 13, fontWeight: '900' }}>›</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+
+              {/* Pagination Dots Indicator */}
+              <View
+                style={{
+                  flexDirection: 'row',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  gap: 6,
+                  marginTop: 8,
+                }}
+              >
+                {spotImagesList.map((_, idx) => (
+                  <TouchableOpacity
+                    key={idx}
+                    onPress={() => {
+                      setActiveImgIndex(idx);
+                      imageScrollRef.current?.scrollTo({ x: idx * carouselWidth, animated: true });
+                    }}
+                    style={{
+                      width: idx === activeImgIndex ? 18 : 6,
+                      height: 6,
+                      borderRadius: 3,
+                      backgroundColor: idx === activeImgIndex ? '#38bdf8' : '#475569',
+                    }}
+                  />
+                ))}
+              </View>
+
+              {/* Quick Thumbnails Row */}
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ gap: 8, marginTop: 8 }}
+              >
+                {spotImagesList.map((imgItem, idx) => (
+                  <TouchableOpacity
+                    key={idx}
+                    onPress={() => {
+                      setActiveImgIndex(idx);
+                      imageScrollRef.current?.scrollTo({ x: idx * carouselWidth, animated: true });
+                    }}
+                    style={{
+                      width: 52,
+                      height: 42,
+                      borderRadius: 8,
+                      overflow: 'hidden',
+                      borderWidth: 2,
+                      borderColor: idx === activeImgIndex ? '#38bdf8' : 'transparent',
+                      opacity: idx === activeImgIndex ? 1 : 0.65,
+                    }}
+                    activeOpacity={0.8}
+                  >
+                    <Image
+                      source={{ uri: getImageUrl(imgItem) }}
+                      style={{ width: '100%', height: '100%' }}
+                      resizeMode="cover"
+                    />
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          ) : (
+            <Image
+              source={{ uri: getImageUrl(spotImagesList[0] || space.image || space.imageUrl) }}
+              style={{ width: '100%', height: 190, borderRadius: 12, marginVertical: 10 }}
+              resizeMode="cover"
+            />
+          )}
 
           <Text style={styles.spotTitle}>{space.title || 'Central Safe Parking'}</Text>
           <Text style={styles.spotAddress}>📍 {space.address || 'Hitech City Road'}, {space.city || 'Hyderabad'}</Text>
@@ -914,15 +1176,15 @@ const styles = StyleSheet.create({
     zIndex: 99999,
   },
   rzpModalCard: {
-    backgroundColor: '#0f172a',
+    backgroundColor: '#ffffff',
     borderRadius: 24,
     width: '100%',
-    maxWidth: 400,
-    height: '82%',
-    minHeight: 520,
+    maxWidth: 420,
+    height: '94%',
+    minHeight: 580,
     borderWidth: 1.5,
-    borderColor: '#3395ff',
-    shadowColor: '#3395ff',
+    borderColor: '#334155',
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.35,
     shadowRadius: 18,

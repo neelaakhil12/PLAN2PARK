@@ -238,11 +238,56 @@ router.post('/', protect, seekerOnly, upload.single('driverImageFile'), async (r
       console.log('Notification trigger error:', notifErr.message);
     }
 
+    // ── Generate Razorpay Order immediately so payment sheet launches instantly ──
+    let orderData = null;
+    if (!isFullyPaidByWallet && finalPayableAmount > 0) {
+      const keyId = process.env.RAZORPAY_KEY_ID || 'rzp_live_TidhMuvoj4fV3b';
+      const keySecret = process.env.RAZORPAY_KEY_SECRET || 'w94G6QL64Q8y9RIOBOXZZE2r';
+      try {
+        if (!isRazorpayMock()) {
+          const razorpay = new Razorpay({
+            key_id: keyId,
+            key_secret: keySecret,
+          });
+          const order = await razorpay.orders.create({
+            amount: Math.round(finalPayableAmount * 100),
+            currency: 'INR',
+            receipt: `receipt_${booking._id}`,
+          });
+          orderData = {
+            orderId: order.id,
+            amount: order.amount,
+            currency: order.currency,
+            keyId,
+            isMock: false,
+          };
+        } else {
+          orderData = {
+            orderId: 'order_mock_' + crypto.randomBytes(8).toString('hex'),
+            amount: Math.round(finalPayableAmount * 100),
+            currency: 'INR',
+            keyId,
+            isMock: true,
+          };
+        }
+      } catch (orderErr) {
+        console.warn('Direct Razorpay order creation warning:', orderErr.message);
+        orderData = {
+          orderId: '',
+          amount: Math.round(finalPayableAmount * 100),
+          currency: 'INR',
+          keyId,
+          isMock: false,
+        };
+      }
+    }
+
     res.status(201).json({
       message: isFullyPaidByWallet
         ? 'Booking confirmed and 100% paid using PlanToPark Wallet!'
         : 'Booking created successfully with your selected slot! Proceed to pay.',
       booking,
+      orderData,
       walletAmountUsed,
       finalPayableAmount,
     });

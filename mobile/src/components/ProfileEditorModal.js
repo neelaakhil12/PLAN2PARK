@@ -59,8 +59,11 @@ export default function ProfileEditorModal({
       setName(currentUser.name || '');
       setEmail(currentUser.email || '');
       setContact(currentUser.contact || '');
-      const primaryVeh = currentUser.vehicles && currentUser.vehicles[0];
-      setVehicleNumber(primaryVeh ? primaryVeh.plateNumber : 'TS 07 AB 1234');
+      const savedPlate = currentUser.vehiclePlateNumber ||
+        currentUser.vehicleNumber ||
+        (currentUser.vehicles && currentUser.vehicles[0]?.plateNumber) ||
+        '';
+      setVehicleNumber(savedPlate);
       if (currentUser.profileImage && currentUser.profileImage.length <= 4) {
         setSelectedAvatar(currentUser.profileImage);
       } else if (isBankUser) {
@@ -96,8 +99,12 @@ export default function ProfileEditorModal({
         profileImage: selectedAvatar,
       };
       if (!isBankUser) {
-        const finalVehicle = vehicleNumber.trim() || 'TS 07 AB 1234';
-        payload.vehicleNumber = finalVehicle.toUpperCase();
+        const finalVehicle = vehicleNumber.trim().toUpperCase();
+        payload.vehicleNumber = finalVehicle;
+        payload.vehiclePlateNumber = finalVehicle;
+        if (finalVehicle) {
+          payload.vehicles = [{ plateNumber: finalVehicle, vehicleType: 'Car' }];
+        }
       }
       await onSave(payload);
     } catch (err) {

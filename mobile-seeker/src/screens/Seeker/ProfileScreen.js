@@ -38,7 +38,7 @@ export default function ProfileScreen({ navigation }) {
 
   const primaryVehicle = user?.vehicles && user.vehicles.length > 0
     ? user.vehicles[0]
-    : { plateNumber: 'TS 07 AB 1234', vehicleType: 'Car' };
+    : { plateNumber: user?.vehiclePlateNumber || user?.vehicleNumber || 'Add Vehicle Plate', vehicleType: 'Car' };
 
   const handleSaveProfile = async (profileData) => {
     setImageLoadError(false);

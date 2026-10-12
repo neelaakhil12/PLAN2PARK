@@ -35,7 +35,9 @@ export default function ProfileScreen() {
         {/* Saved Vehicles */}
         <Text style={styles.sectionTitle}>Saved Vehicles</Text>
         <View style={styles.itemCard}>
-          <Text style={styles.itemTitle}>🚗 TS 07 AB 1234 (Primary Car)</Text>
+          <Text style={styles.itemTitle}>
+            🚗 {user?.vehiclePlateNumber || user?.vehicleNumber || user?.vehicles?.[0]?.plateNumber || 'TS 07 AB 1234'} (Primary Car)
+          </Text>
           <Text style={styles.itemSub}>Honda City • Sedan</Text>
         </View>
 

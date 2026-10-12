@@ -63,9 +63,7 @@ const generateRazorpayHtml = (booking, orderData, user, space, finalPrice) => {
   <title>PlanToPark - Secure Checkout</title>
   <link rel="dns-prefetch" href="//checkout.razorpay.com">
   <link rel="preconnect" href="https://checkout.razorpay.com" crossorigin>
-  <link rel="dns-prefetch" href="//api.razorpay.com">
-  <link rel="preconnect" href="https://api.razorpay.com" crossorigin>
-  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+  <link rel="preload" href="https://checkout.razorpay.com/v1/checkout.js" as="script">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -93,22 +91,35 @@ const generateRazorpayHtml = (booking, orderData, user, space, finalPrice) => {
     .title { font-size: 16px; font-weight: 800; color: #ffffff; margin-bottom: 6px; }
     .sub { font-size: 13px; color: #94a3b8; }
     .amount { font-size: 22px; font-weight: 900; color: #10b981; margin: 10px 0; }
+    .btn {
+      display: none;
+      margin-top: 20px;
+      padding: 12px 24px;
+      background: #10b981;
+      color: #ffffff;
+      font-weight: 800;
+      border: none;
+      border-radius: 12px;
+      font-size: 14px;
+      cursor: pointer;
+    }
   </style>
 </head>
 <body>
   <div class="spinner"></div>
   <div class="title">PlanToPark Secure Checkout</div>
   <div class="amount">₹${finalPrice || booking?.totalAmount || 0}.00</div>
-  <div class="sub">Launching Razorpay Payment Sheet...</div>
+  <div id="subText" class="sub">Launching Razorpay Payment Sheet...</div>
+  <button id="retryBtn" class="btn" onclick="tryOpenRazorpay()">Open Payment Window</button>
 
   <script>
     var options = {
       key: "${keyId}",
-      order_id: "${orderId}",
       amount: ${amountInPaise},
       currency: "INR",
       name: "PlanToPark",
       description: "Parking Reservation - ${spotTitle}",
+      image: "https://plantopark.com/favicon.png",
       prefill: {
         name: "${userName}",
         email: "${userEmail}",
@@ -141,7 +152,16 @@ const generateRazorpayHtml = (booking, orderData, user, space, finalPrice) => {
             signature: response.razorpay_signature || ''
           }));
         }
+      }
+    };
+    ${orderId ? `options.order_id = "${orderId}";` : ''}
+
+    var attempts = 0;
+    var opened = false;
+
     function tryOpenRazorpay() {
+      if (opened) return;
+      attempts++;
       if (typeof Razorpay !== 'undefined') {
         try {
           var rzp = new Razorpay(options);
@@ -154,21 +174,33 @@ const generateRazorpayHtml = (booking, orderData, user, space, finalPrice) => {
             }
           });
           rzp.open();
+          opened = true;
+          var sub = document.getElementById('subText');
+          if (sub) sub.innerText = "Complete payment in the Razorpay window...";
         } catch (e) {
-          setTimeout(tryOpenRazorpay, 50);
+          console.error("Razorpay open error:", e);
+          if (attempts < 15) {
+            setTimeout(tryOpenRazorpay, 100);
+          } else {
+            var btn = document.getElementById('retryBtn');
+            if (btn) btn.style.display = 'block';
+            var sub = document.getElementById('subText');
+            if (sub) sub.innerText = "Tap button below to launch payment:";
+          }
         }
       } else {
-        setTimeout(tryOpenRazorpay, 30);
+        if (attempts < 60) {
+          setTimeout(tryOpenRazorpay, 40);
+        } else {
+          var btn = document.getElementById('retryBtn');
+          if (btn) btn.style.display = 'block';
+          var sub = document.getElementById('subText');
+          if (sub) sub.innerText = "Tap button below to retry loading:";
+        }
       }
     }
-
-    if (document.readyState === 'complete' || document.readyState === 'interactive') {
-      tryOpenRazorpay();
-    } else {
-      document.addEventListener('DOMContentLoaded', tryOpenRazorpay);
-      window.addEventListener('load', tryOpenRazorpay);
-    }
   </script>
+  <script src="https://checkout.razorpay.com/v1/checkout.js" onload="tryOpenRazorpay()"></script>
 </body>
 </html>`;
 };
@@ -180,6 +212,7 @@ export default function SpotDetailsScreen({ route, navigation }) {
   const { width: windowWidth } = useWindowDimensions();
   const imageScrollRef = useRef(null);
   const [activeImgIndex, setActiveImgIndex] = useState(0);
+  const [carouselWidth, setCarouselWidth] = useState(Math.max(windowWidth - 68, 280));
 
   const spotImagesList = useMemo(() => {
     let list = [];
@@ -199,13 +232,30 @@ export default function SpotDetailsScreen({ route, navigation }) {
     return list.filter(Boolean);
   }, [space.images, space.image, space.imageUrl]);
 
-  const [vehicleNumber, setVehicleNumber] = useState('TS07AB1234');
+  const getUserPlateNumber = () => {
+    return (
+      user?.vehiclePlateNumber ||
+      user?.vehicleNumber ||
+      (user?.vehicles && user.vehicles[0]?.plateNumber) ||
+      ''
+    );
+  };
+
+  const [vehicleNumber, setVehicleNumber] = useState(getUserPlateNumber() || '');
   const [vehicleType, setVehicleType] = useState('4-wheeler');
   const [durationHours, setDurationHours] = useState('2');
   const [loading, setLoading] = useState(false);
   const [bookingSuccessModal, setBookingSuccessModal] = useState(null);
   const [walletBalance, setWalletBalance] = useState(0);
   const [useWallet, setUseWallet] = useState(true);
+
+  // Automatically update vehicle plate number when user profile updates (e.g. edited in Profile tab)
+  useEffect(() => {
+    const currentPlate = getUserPlateNumber();
+    if (currentPlate) {
+      setVehicleNumber(currentPlate);
+    }
+  }, [user?.vehiclePlateNumber, user?.vehicleNumber, user?.vehicles]);
 
   useEffect(() => {
     const fetchWallet = async () => {
@@ -310,27 +360,29 @@ export default function SpotDetailsScreen({ route, navigation }) {
         return;
       }
 
-      // 2. Fetch Razorpay Order from backend
-      let orderData = {
+      // 2. Fetch Razorpay Order from backend (or use pre-generated orderData from create booking)
+      let orderData = data.orderData || {
         orderId: '',
         amount: Math.round(finalPayablePrice * 100),
         keyId: 'rzp_live_TidhMuvoj4fV3b',
       };
 
-      try {
-        const orderRes = await fetch(`${baseUrl}/bookings/${newBooking._id}/razorpay-order`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-        });
-        if (orderRes.ok) {
-          const fetchedOrder = await orderRes.json();
-          orderData = { ...orderData, ...fetchedOrder };
+      if (!data.orderData) {
+        try {
+          const orderRes = await fetch(`${baseUrl}/bookings/${newBooking._id}/razorpay-order`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+          });
+          if (orderRes.ok) {
+            const fetchedOrder = await orderRes.json();
+            orderData = { ...orderData, ...fetchedOrder };
+          }
+        } catch (orderErr) {
+          console.log('Order fetch fallback:', orderErr);
         }
-      } catch (orderErr) {
-        console.log('Order fetch fallback:', orderErr);
       }
 
       // If running on Web / Browser, launch official Razorpay Checkout directly
@@ -492,18 +544,29 @@ export default function SpotDetailsScreen({ route, navigation }) {
 
           {/* Horizontal Scrollable Images of Parking Spot */}
           {spotImagesList.length > 1 ? (
-            <View style={{ marginVertical: 10 }}>
-              <View style={{ position: 'relative', borderRadius: 14, overflow: 'hidden' }}>
+            <View
+              style={{ marginVertical: 10 }}
+              onLayout={(e) => {
+                const w = Math.round(e.nativeEvent.layout.width);
+                if (w > 0 && Math.abs(w - carouselWidth) > 1) {
+                  setCarouselWidth(w);
+                }
+              }}
+            >
+              <View style={{ position: 'relative', borderRadius: 14, overflow: 'hidden', width: carouselWidth }}>
                 <ScrollView
                   ref={imageScrollRef}
                   horizontal
-                  pagingEnabled
+                  pagingEnabled={false}
+                  snapToInterval={carouselWidth}
+                  snapToAlignment="center"
+                  decelerationRate="fast"
                   showsHorizontalScrollIndicator={false}
                   onScroll={(e) => {
                     const contentOffset = e.nativeEvent.contentOffset.x;
-                    const viewWidth = e.nativeEvent.layoutMeasurement.width;
-                    if (viewWidth > 0) {
-                      const idx = Math.round(contentOffset / viewWidth);
+                    const w = carouselWidth > 0 ? carouselWidth : e.nativeEvent.layoutMeasurement.width;
+                    if (w > 0) {
+                      const idx = Math.max(0, Math.min(spotImagesList.length - 1, Math.round(contentOffset / w)));
                       setActiveImgIndex(idx);
                     }
                   }}
@@ -513,7 +576,7 @@ export default function SpotDetailsScreen({ route, navigation }) {
                     <View
                       key={idx}
                       style={{
-                        width: Math.min(windowWidth - 32, 400),
+                        width: carouselWidth,
                         height: 200,
                         backgroundColor: '#0f172a',
                       }}
@@ -566,8 +629,7 @@ export default function SpotDetailsScreen({ route, navigation }) {
                     onPress={() => {
                       const prevIdx = activeImgIndex - 1;
                       setActiveImgIndex(prevIdx);
-                      const targetWidth = Math.min(windowWidth - 32, 400);
-                      imageScrollRef.current?.scrollTo({ x: prevIdx * targetWidth, animated: true });
+                      imageScrollRef.current?.scrollTo({ x: prevIdx * carouselWidth, animated: true });
                     }}
                   >
                     <Text style={{ color: '#fff', fontSize: 13, fontWeight: '900' }}>‹</Text>
@@ -590,8 +652,7 @@ export default function SpotDetailsScreen({ route, navigation }) {
                     onPress={() => {
                       const nextIdx = activeImgIndex + 1;
                       setActiveImgIndex(nextIdx);
-                      const targetWidth = Math.min(windowWidth - 32, 400);
-                      imageScrollRef.current?.scrollTo({ x: nextIdx * targetWidth, animated: true });
+                      imageScrollRef.current?.scrollTo({ x: nextIdx * carouselWidth, animated: true });
                     }}
                   >
                     <Text style={{ color: '#fff', fontSize: 13, fontWeight: '900' }}>›</Text>
@@ -614,8 +675,7 @@ export default function SpotDetailsScreen({ route, navigation }) {
                     key={idx}
                     onPress={() => {
                       setActiveImgIndex(idx);
-                      const targetWidth = Math.min(windowWidth - 32, 400);
-                      imageScrollRef.current?.scrollTo({ x: idx * targetWidth, animated: true });
+                      imageScrollRef.current?.scrollTo({ x: idx * carouselWidth, animated: true });
                     }}
                     style={{
                       width: idx === activeImgIndex ? 18 : 6,
@@ -638,8 +698,7 @@ export default function SpotDetailsScreen({ route, navigation }) {
                     key={idx}
                     onPress={() => {
                       setActiveImgIndex(idx);
-                      const targetWidth = Math.min(windowWidth - 32, 400);
-                      imageScrollRef.current?.scrollTo({ x: idx * targetWidth, animated: true });
+                      imageScrollRef.current?.scrollTo({ x: idx * carouselWidth, animated: true });
                     }}
                     style={{
                       width: 52,

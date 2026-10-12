@@ -1,4 +1,4 @@
-import React, { useState, useContext } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import {
   View,
   Text,
@@ -17,12 +17,29 @@ import Header from '../../components/Header';
 
 export default function SpotDetailsScreen({ route, navigation }) {
   const space = route.params?.space || {};
-  const { token } = useContext(AuthContext);
+  const { user, token } = useContext(AuthContext);
 
-  const [vehicleNumber, setVehicleNumber] = useState('TS07AB1234');
+  const getUserPlateNumber = () => {
+    return (
+      user?.vehiclePlateNumber ||
+      user?.vehicleNumber ||
+      (user?.vehicles && user.vehicles[0]?.plateNumber) ||
+      ''
+    );
+  };
+
+  const [vehicleNumber, setVehicleNumber] = useState(getUserPlateNumber() || '');
   const [vehicleType, setVehicleType] = useState('4-wheeler');
   const [durationHours, setDurationHours] = useState('2');
   const [loading, setLoading] = useState(false);
+
+  // Automatically update vehicle plate number when user profile updates (e.g. edited in Profile tab)
+  useEffect(() => {
+    const currentPlate = getUserPlateNumber();
+    if (currentPlate) {
+      setVehicleNumber(currentPlate);
+    }
+  }, [user?.vehiclePlateNumber, user?.vehicleNumber, user?.vehicles]);
 
   const hourlyRate = space.hourlyRate || 40;
   const totalPrice = Number(durationHours || 1) * hourlyRate;
