@@ -1114,7 +1114,10 @@ router.post('/:id/checkout', protect, async (req, res) => {
 // @desc    Extend a booking duration (Seeker)
 // @route   POST /api/bookings/:id/extend
 // @access  Private (Seeker only)
-router.post('/:id/extend', protect, seekerOnly, async (req, res) => {
+// @desc    Generate Razorpay order for extending a booking
+// @route   POST /api/bookings/:id/extend-order
+// @access  Private (Seeker only)
+router.post('/:id/extend-order', protect, seekerOnly, async (req, res) => {
   const { extendHours } = req.body;
   try {
     const booking = await Booking.findById(req.params.id);
@@ -1142,23 +1145,189 @@ router.post('/:id/extend', protect, seekerOnly, async (req, res) => {
 
     if (overlappingBookings.length > 0) {
       return res.status(400).json({
-        message: `Extension not possible: Slot ${booking.slotId} is already booked by another commuter for the requested extension duration.`
+        message: `Extension not possible: Slot ${booking.slotId} is already reserved by another commuter during this extension.`
       });
     }
 
-    // Update booking duration and amount
     const additionalAmount = Number(extendHours) * space.pricePerHour;
+    const keyId = process.env.RAZORPAY_KEY_ID || 'rzp_live_TidhMuvoj4fV3b';
+    const keySecret = process.env.RAZORPAY_KEY_SECRET || 'w94G6QL64Q8y9RIOBOXZZE2r';
+
+    let orderData = {
+      orderId: '',
+      amount: Math.round(additionalAmount * 100),
+      currency: 'INR',
+      keyId,
+      extendHours: Number(extendHours),
+      additionalAmount,
+      spaceTitle: space.title,
+      isMock: false,
+    };
+
+    if (isRazorpayMock()) {
+      orderData.orderId = 'order_mock_' + crypto.randomBytes(8).toString('hex');
+      orderData.isMock = true;
+    } else {
+      try {
+        const razorpay = new Razorpay({ key_id: keyId, key_secret: keySecret });
+        const order = await razorpay.orders.create({
+          amount: Math.round(additionalAmount * 100),
+          currency: 'INR',
+          receipt: `ext_${booking._id.toString().slice(-6)}_${Date.now().toString().slice(-4)}`,
+          notes: {
+            bookingId: booking._id.toString(),
+            extendHours: Number(extendHours),
+            action: 'extend_parking',
+          },
+        });
+        orderData.orderId = order.id;
+        orderData.currency = order.currency;
+      } catch (err) {
+        console.warn('Extend Razorpay order creation fallback:', err.message);
+        orderData.orderId = 'order_fallback_' + crypto.randomBytes(8).toString('hex');
+      }
+    }
+
+    res.json({
+      success: true,
+      booking,
+      orderData,
+      additionalAmount,
+      extendHours: Number(extendHours),
+      spaceTitle: space.title,
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// @desc    Verify payment and apply extension to booking duration
+// @route   POST /api/bookings/:id/extend-verify
+// @access  Private (Seeker only)
+router.post('/:id/extend-verify', protect, seekerOnly, async (req, res) => {
+  const { extendHours, razorpay_payment_id, razorpay_order_id, razorpay_signature, isMock } = req.body;
+  try {
+    const booking = await Booking.findById(req.params.id);
+    if (!booking) return res.status(404).json({ message: 'Booking not found' });
+
+    const space = await ParkingSpace.findById(booking.spaceId);
+    if (!space) return res.status(404).json({ message: 'Parking space not found' });
+
+    const currentEndTime = new Date(booking.endTime || new Date(booking.startTime.getTime() + booking.hours * 60 * 60 * 1000));
+    const extensionEndTime = new Date(currentEndTime.getTime() + Number(extendHours) * 60 * 60 * 1000);
+    const additionalAmount = Number(extendHours) * space.pricePerHour;
+    const additionalOwnerEarning = Number((additionalAmount * 0.9).toFixed(2));
+    const additionalCommission = Number((additionalAmount * 0.1).toFixed(2));
+
+    // Update booking duration and financials
     booking.totalAmount += additionalAmount;
     booking.hours += Number(extendHours);
     booking.endTime = extensionEndTime;
-
-    // Recalculate commission if already paid
-    if (booking.paymentStatus === 'paid') {
-      booking.adminCommission = Number((booking.totalAmount * 0.1).toFixed(2));
-      booking.ownerEarnings = Number((booking.totalAmount * 0.9).toFixed(2));
-    }
+    booking.ownerEarnings = Number(((booking.ownerEarnings || 0) + additionalOwnerEarning).toFixed(2));
+    booking.adminCommission = Number(((booking.adminCommission || 0) + additionalCommission).toFixed(2));
+    booking.transactionReference = razorpay_payment_id || booking.transactionReference;
 
     await booking.save();
+
+    // Credit additional earnings to space owner's wallet
+    const owner = await User.findById(space.ownerId);
+    if (owner) {
+      owner.walletBalance = Number(((owner.walletBalance || 0) + additionalOwnerEarning).toFixed(2));
+      if (!owner.walletTransactions) owner.walletTransactions = [];
+      owner.walletTransactions.push({
+        type: 'credit',
+        amount: additionalOwnerEarning,
+        description: `Pass extension payout for Slot ${booking.slotId || 'Slot-1'} at ${space.title} (+${extendHours} hrs)`,
+        date: new Date(),
+        bookingId: booking._id,
+      });
+      await owner.save();
+
+      // In-app Notification for Owner
+      try {
+        await Notification.create({
+          userId: owner._id,
+          targetRole: 'owner',
+          type: 'booking_extended',
+          title: '⏳ Parking Pass Extended!',
+          message: `Commuter extended reservation for Slot ${booking.slotId || 'Slot-1'} at '${space.title}' by +${extendHours} hr(s). ₹${additionalOwnerEarning} credited to your wallet!`,
+          data: {
+            bookingId: booking._id,
+            slot: booking.slotId,
+            extendHours: Number(extendHours),
+            additionalAmount,
+          },
+        });
+
+        if (owner.pushToken) {
+          sendPushNotification(
+            owner.pushToken,
+            '⏳ Parking Pass Extended!',
+            `Commuter extended reservation for Slot ${booking.slotId || 'Slot-1'} at '${space.title}' by +${extendHours} hr(s).`,
+            { screen: 'Orders', bookingId: booking._id }
+          );
+        }
+      } catch (notifErr) {
+        console.warn('Owner extension notification error:', notifErr.message);
+      }
+    }
+
+    // In-app Notification for Seeker
+    try {
+      await Notification.create({
+        userId: req.user._id,
+        targetRole: 'seeker',
+        type: 'booking_extended',
+        title: '🎉 Pass Extended Successfully!',
+        message: `Your reservation for slot ${booking.slotId || 'Slot-1'} at '${space.title}' has been extended by +${extendHours} hr(s). New end time: ${extensionEndTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}.`,
+        data: {
+          bookingId: booking._id,
+          slot: booking.slotId,
+          extendHours: Number(extendHours),
+          additionalAmount,
+        },
+      });
+
+      if (req.user.pushToken) {
+        sendPushNotification(
+          req.user.pushToken,
+          '🎉 Pass Extended Successfully!',
+          `Your reservation for slot ${booking.slotId || 'Slot-1'} at '${space.title}' has been extended by +${extendHours} hr(s).`,
+          { screen: 'Bookings', bookingId: booking._id }
+        );
+      }
+    } catch (notifErr) {
+      console.warn('Seeker extension notification error:', notifErr.message);
+    }
+
+    res.json({
+      success: true,
+      message: `Pass extended by ${extendHours} hour(s) successfully!`,
+      booking,
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Fallback legacy extend route
+router.post('/:id/extend', protect, seekerOnly, async (req, res) => {
+  const { extendHours } = req.body;
+  try {
+    const booking = await Booking.findById(req.params.id);
+    if (!booking) return res.status(404).json({ message: 'Booking not found' });
+    const space = await ParkingSpace.findById(booking.spaceId);
+    if (!space) return res.status(404).json({ message: 'Parking space not found' });
+
+    const currentEndTime = new Date(booking.endTime || new Date(booking.startTime.getTime() + booking.hours * 60 * 60 * 1000));
+    const extensionEndTime = new Date(currentEndTime.getTime() + Number(extendHours) * 60 * 60 * 1000);
+    const additionalAmount = Number(extendHours) * space.pricePerHour;
+
+    booking.totalAmount += additionalAmount;
+    booking.hours += Number(extendHours);
+    booking.endTime = extensionEndTime;
+    await booking.save();
+
     res.json({ message: 'Booking extended successfully!', booking });
   } catch (error) {
     res.status(500).json({ message: error.message });

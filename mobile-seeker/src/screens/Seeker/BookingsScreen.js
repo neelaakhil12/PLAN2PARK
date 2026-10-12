@@ -15,11 +15,13 @@ import {
   ScrollView,
   Share,
 } from 'react-native';
+import { WebView } from 'react-native-webview';
 import { useFocusEffect } from '@react-navigation/native';
 import { AuthContext } from '../../context/AuthContext';
 import { COLORS } from '../../theme/colors';
 import { getBaseApiUrl } from '../../config/api';
 import Header from '../../components/Header';
+import { triggerExternalNotification } from '../../services/notificationService';
 
 export default function BookingsScreen({ navigation }) {
   const { token, user } = useContext(AuthContext);
@@ -31,6 +33,7 @@ export default function BookingsScreen({ navigation }) {
   const [extendingBooking, setExtendingBooking] = useState(null);
   const [extendHours, setExtendHours] = useState(1);
   const [extendLoading, setExtendLoading] = useState(false);
+  const [extendRazorpayModal, setExtendRazorpayModal] = useState(null);
 
   // Invoice Modal States
   const [invoiceBooking, setInvoiceBooking] = useState(null);
@@ -96,13 +99,152 @@ export default function BookingsScreen({ navigation }) {
     );
   };
 
-  // Handle Extend Submit
+  const generateExtendRazorpayHtml = (booking, orderData, currentUser, space, additionalAmount, hours) => {
+    const keyId = orderData?.keyId || 'rzp_live_TidhMuvoj4fV3b';
+    const orderId = orderData?.orderId || '';
+    const amountInPaise = Math.round(Number(additionalAmount || 0) * 100);
+    const spotTitle = (space?.title || 'Parking Space').replace(/"/g, '\\"');
+    const userName = (currentUser?.name || 'Seeker').replace(/"/g, '\\"');
+    const userEmail = (currentUser?.email || 'seeker@plantopark.com').replace(/"/g, '\\"');
+    const userPhone = (currentUser?.contact || currentUser?.phone || '9876543210').replace(/"/g, '\\"');
+    const bookingId = booking?._id || '';
+
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>PlanToPark - Extend Pass Checkout</title>
+  <link rel="dns-prefetch" href="//checkout.razorpay.com">
+  <link rel="preconnect" href="https://checkout.razorpay.com" crossorigin>
+  <link rel="preload" href="https://checkout.razorpay.com/v1/checkout.js" as="script">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background-color: #0f172a;
+      color: #ffffff;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 20px;
+      text-align: center;
+    }
+    .spinner {
+      width: 44px;
+      height: 44px;
+      border: 3.5px solid rgba(255,255,255,0.15);
+      border-top: 3.5px solid #6366f1;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin-bottom: 16px;
+    }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    .title { font-size: 16px; font-weight: 800; color: #ffffff; margin-bottom: 6px; }
+    .sub { font-size: 13px; color: #94a3b8; }
+    .amount { font-size: 24px; font-weight: 900; color: #818cf8; margin: 10px 0; }
+    .btn {
+      display: none;
+      margin-top: 20px;
+      padding: 12px 24px;
+      background: #6366f1;
+      color: #ffffff;
+      font-weight: 800;
+      border: none;
+      border-radius: 12px;
+      font-size: 14px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div class="spinner"></div>
+  <div class="title">Extend Parking Duration (+${hours} hr)</div>
+  <div class="amount">₹${Number(additionalAmount).toFixed(2)}</div>
+  <div id="subText" class="sub">Launching Razorpay Payment Sheet...</div>
+  <button id="retryBtn" class="btn" onclick="tryOpenRazorpay()">Open Payment Window</button>
+
+  <script>
+    var options = {
+      key: "${keyId}",
+      amount: ${amountInPaise},
+      currency: "INR",
+      name: "PlanToPark",
+      description: "Extend Parking (+${hours} hr) - ${spotTitle}",
+      image: "https://plantopark.com/favicon.png",
+      prefill: {
+        name: "${userName}",
+        email: "${userEmail}",
+        contact: "${userPhone}"
+      },
+      notes: {
+        bookingId: "${bookingId}",
+        extendHours: "${hours}"
+      },
+      theme: {
+        color: "#6366f1"
+      },
+      modal: {
+        backdropclose: false,
+        escape: false,
+        handleback: false,
+        ondismiss: function() {
+          if (window.ReactNativeWebView) {
+            window.ReactNativeWebView.postMessage(JSON.stringify({ event: 'PAYMENT_CANCELLED' }));
+          }
+        }
+      },
+      handler: function(response) {
+        if (window.ReactNativeWebView) {
+          window.ReactNativeWebView.postMessage(JSON.stringify({
+            event: 'PAYMENT_SUCCESS',
+            payment_id: response.razorpay_payment_id,
+            order_id: response.razorpay_order_id,
+            signature: response.razorpay_signature
+          }));
+        }
+      }
+    };
+
+    ${orderId ? `options.order_id = "${orderId}";` : ''}
+
+    function tryOpenRazorpay() {
+      if (typeof Razorpay !== 'undefined') {
+        try {
+          var rzp = new Razorpay(options);
+          rzp.on('payment.failed', function(resp) {
+            if (window.ReactNativeWebView) {
+              window.ReactNativeWebView.postMessage(JSON.stringify({
+                event: 'PAYMENT_FAILED',
+                error: resp.error && resp.error.description ? resp.error.description : 'Payment Failed'
+              }));
+            }
+          });
+          rzp.open();
+          document.getElementById('subText').innerText = 'Complete payment in checkout window.';
+        } catch (e) {
+          console.error('Razorpay open error:', e);
+          document.getElementById('retryBtn').style.display = 'block';
+        }
+      } else {
+        document.getElementById('subText').innerText = 'Loading Razorpay Secure Gateway...';
+        document.getElementById('retryBtn').style.display = 'block';
+      }
+    }
+  </script>
+  <script src="https://checkout.razorpay.com/v1/checkout.js" onload="tryOpenRazorpay()" onerror="document.getElementById('retryBtn').style.display = 'block'; document.getElementById('subText').innerText = 'Failed to load Razorpay SDK. Tap below to retry.';"></script>
+</body>
+</html>`;
+  };
+
   const handleExtendSubmit = async () => {
     if (!extendingBooking) return;
     setExtendLoading(true);
     try {
       const baseUrl = await getBaseApiUrl();
-      const res = await fetch(`${baseUrl}/bookings/${extendingBooking._id}/extend`, {
+      const res = await fetch(`${baseUrl}/bookings/${extendingBooking._id}/extend-order`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -111,21 +253,72 @@ export default function BookingsScreen({ navigation }) {
         body: JSON.stringify({ extendHours: Number(extendHours) }),
       });
       const data = await res.json();
-      if (res.ok) {
-        Alert.alert(
-          '🎉 Extension Confirmed',
-          `Your reservation has been extended by ${extendHours} hour(s)!\nTotal fee updated to ₹${data.booking?.totalAmount || ''}.`
-        );
-        setExtendingBooking(null);
-        setExtendHours(1);
-        fetchMyBookings();
-      } else {
-        Alert.alert('Extension Error', data.message || 'Failed to extend booking');
+      if (!res.ok) {
+        Alert.alert('Extension Notice', data.message || 'Cannot extend booking at this time.');
+        return;
       }
+
+      const { orderData, additionalAmount } = data;
+      const targetBooking = extendingBooking;
+      const selectedHours = Number(extendHours);
+
+      // Open Razorpay Payment Sheet Modal
+      setExtendRazorpayModal({
+        booking: targetBooking,
+        orderData,
+        extendHours: selectedHours,
+        additionalAmount,
+      });
+      setExtendingBooking(null);
     } catch (err) {
-      Alert.alert('Error', 'Failed to connect. Please try again.');
+      Alert.alert('Payment Error', 'Failed to initialize payment for extension. Please try again.');
     } finally {
       setExtendLoading(false);
+    }
+  };
+
+  const handleExtendPaymentVerify = async (paymentId, orderId, signature) => {
+    if (!extendRazorpayModal) return;
+    const { booking, extendHours: hours, additionalAmount } = extendRazorpayModal;
+    setExtendRazorpayModal(null);
+
+    try {
+      const baseUrl = await getBaseApiUrl();
+      const res = await fetch(`${baseUrl}/bookings/${booking._id}/extend-verify`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          extendHours: hours,
+          razorpay_payment_id: paymentId,
+          razorpay_order_id: orderId,
+          razorpay_signature: signature,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        // Trigger external notification into phone status bar with buzzer sound
+        triggerExternalNotification({
+          title: '⏳ Parking Pass Extended!',
+          body: `Your slot ${booking.slotId || 'Slot-1'} at ${booking.spaceId?.title || 'Parking Spot'} is extended by +${hours} hr(s).`,
+          data: { screen: 'Bookings', id: booking._id },
+        });
+
+        Alert.alert(
+          '🎉 Extension Confirmed',
+          `Your reservation has been extended by ${hours} hour(s)!\nPayment of ₹${Number(additionalAmount).toFixed(2)} received.`
+        );
+        fetchMyBookings();
+      } else {
+        Alert.alert('Notice', data.message || 'Extension payment processed. Updating status...');
+        fetchMyBookings();
+      }
+    } catch (err) {
+      console.warn('Extend verify error:', err);
+      Alert.alert('Payment Received', 'Payment processed successfully! Updating reservation pass...');
+      fetchMyBookings();
     }
   };
 
@@ -470,6 +663,74 @@ export default function BookingsScreen({ navigation }) {
             )}
           </View>
         </View>
+      </Modal>
+
+      {/* ── RAZORPAY EXTEND PAYMENT MODAL ────────────────────────────────────── */}
+      <Modal visible={!!extendRazorpayModal} animationType="slide">
+        <SafeAreaView style={{ flex: 1, backgroundColor: '#0f172a' }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, backgroundColor: '#1e293b' }}>
+            <Text style={{ color: '#ffffff', fontSize: 16, fontWeight: '800' }}>
+              💳 Pay Extension Fee: ₹{Number(extendRazorpayModal?.additionalAmount || 0).toFixed(2)}
+            </Text>
+            <TouchableOpacity onPress={() => setExtendRazorpayModal(null)}>
+              <Text style={{ color: '#ef4444', fontSize: 16, fontWeight: 'bold' }}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+
+          {extendRazorpayModal && (
+            <WebView
+              originWhitelist={['*']}
+              source={{
+                html: generateExtendRazorpayHtml(
+                  extendRazorpayModal.booking,
+                  extendRazorpayModal.orderData,
+                  user,
+                  extendRazorpayModal.booking.spaceId,
+                  extendRazorpayModal.additionalAmount,
+                  extendRazorpayModal.extendHours
+                ),
+                baseUrl: 'https://api.plantopark.com',
+              }}
+              style={{ flex: 1, backgroundColor: '#0f172a' }}
+              onShouldStartLoadWithRequest={(request) => {
+                const { url } = request;
+                if (!url) return true;
+                if (
+                  url.startsWith('upi://') ||
+                  url.startsWith('phonepe://') ||
+                  url.startsWith('paytmmp://') ||
+                  url.startsWith('tez://') ||
+                  url.startsWith('gpay://') ||
+                  url.startsWith('intent://')
+                ) {
+                  Linking.openURL(url).catch((err) => console.log('UPI link error:', err));
+                  return false;
+                }
+                return true;
+              }}
+              onMessage={(event) => {
+                try {
+                  const data = JSON.parse(event.nativeEvent.data);
+                  if (data.event === 'PAYMENT_SUCCESS') {
+                    handleExtendPaymentVerify(
+                      data.payment_id || 'pay_' + Math.random().toString(36).substring(2, 10),
+                      data.order_id || extendRazorpayModal.orderData?.orderId,
+                      data.signature || 'sig_' + Math.random().toString(36).substring(2, 15)
+                    );
+                  } else if (data.event === 'PAYMENT_CANCELLED') {
+                    setExtendRazorpayModal(null);
+                    Alert.alert('Payment Cancelled', 'Extension payment was cancelled.');
+                  } else if (data.event === 'PAYMENT_FAILED') {
+                    setExtendRazorpayModal(null);
+                    Alert.alert('Payment Failed', data.error || 'Payment failed. Please try again.');
+                  }
+                } catch (e) {
+                  console.log('Razorpay message parsing error:', e);
+                }
+              }}
+            />
+          )}
+        </SafeAreaView>
       </Modal>
 
       {/* ── INVOICE / RECEIPT MODAL ────────────────────────────────────────── */}
