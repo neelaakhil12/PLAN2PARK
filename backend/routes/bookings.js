@@ -932,7 +932,10 @@ router.get('/revenue-report', protect, adminOnly, async (req, res) => {
   const { startDate, endDate } = req.query;
 
   try {
-    const matchQuery = { paymentStatus: 'paid' };
+    const matchQuery = { 
+      paymentStatus: 'paid',
+      status: { $nin: ['cancelled'] },
+    };
 
     if (startDate || endDate) {
       matchQuery.createdAt = {};
@@ -982,8 +985,11 @@ router.get('/owner-revenue-summary', protect, adminOnly, async (req, res) => {
     // 1. Get all owners/hosts
     const owners = await User.find({ role: 'owner' }).select('name email contact ownerPaidRevenue bankAccountDetails walletBalance status createdAt');
 
-    // 2. Fetch all paid bookings populate spaceId
-    const paidBookings = await Booking.find({ paymentStatus: 'paid' }).populate('spaceId');
+    // 2. Fetch all paid non-cancelled bookings populate spaceId
+    const paidBookings = await Booking.find({ 
+      paymentStatus: 'paid',
+      status: { $nin: ['cancelled'] },
+    }).populate('spaceId');
 
     // 3. Fetch all parking spaces
     const spaces = await ParkingSpace.find({}).select('ownerId title address');
@@ -1510,6 +1516,8 @@ const cancelBookingHandler = async (req, res) => {
     }
 
     if (booking.paymentStatus === 'paid' && booking.totalAmount > 0) {
+      const previousOwnerEarnings = booking.ownerEarnings || 0;
+
       if (policyApplied === 'full') {
         refundAmount = booking.totalAmount;
       } else if (policyApplied === 'half') {
@@ -1522,12 +1530,70 @@ const cancelBookingHandler = async (req, res) => {
       booking.refundStatus = policyApplied === 'full' ? 'full' : policyApplied === 'half' ? 'half' : 'rejected';
       booking.refundPolicyApplied = policyApplied;
 
-      // Adjust owner earnings to retained portion after refund (100% full retained payout)
-      const retainedAmount = Math.max(0, booking.totalAmount - refundAmount);
-      booking.ownerEarnings = Number(retainedAmount.toFixed(2));
+      // Calculate retained amounts after refund
+      const retainedTotal = Math.max(0, booking.totalAmount - refundAmount);
+      let newAdminCommission = 0;
+      let newOwnerEarnings = 0;
 
+      if (retainedTotal > 0) {
+        const commissionRate = await getCommissionRate();
+        newAdminCommission = Math.round(retainedTotal * (commissionRate / 100) * 100) / 100;
+        newOwnerEarnings = Math.max(0, Math.round((retainedTotal - newAdminCommission) * 100) / 100);
+      }
+
+      booking.adminCommission = newAdminCommission;
+      booking.ownerEarnings = newOwnerEarnings;
+
+      // 1. Debit previously credited earnings from Space Owner's wallet
+      const ownerDebitAmount = Math.max(0, Number((previousOwnerEarnings - newOwnerEarnings).toFixed(2)));
+      if (space && space.ownerId && ownerDebitAmount > 0) {
+        const owner = await User.findById(space.ownerId);
+        if (owner) {
+          const alreadyDebited = owner.walletTransactions && owner.walletTransactions.some(
+            (t) => t.bookingId && t.bookingId.toString() === booking._id.toString() && t.type === 'debit'
+          );
+          if (!alreadyDebited) {
+            owner.walletBalance = Number(Math.max(0, (owner.walletBalance || 0) - ownerDebitAmount).toFixed(2));
+            if (!owner.walletTransactions) owner.walletTransactions = [];
+            owner.walletTransactions.push({
+              type: 'debit',
+              amount: ownerDebitAmount,
+              description: `Booking #${booking._id.toString().slice(-6).toUpperCase()} cancelled & refunded to commuter - Payout reversed`,
+              bookingId: booking._id,
+              date: new Date(),
+            });
+            await owner.save();
+
+            try {
+              await Notification.create({
+                userId: owner._id,
+                targetRole: 'owner',
+                type: 'wallet_debit',
+                title: '⚠️ Wallet Debited (Booking Cancelled)',
+                message: `₹${ownerDebitAmount} debited from your wallet as Booking #${booking._id.toString().slice(-6).toUpperCase()} was cancelled and refunded.`,
+                data: {
+                  bookingId: booking._id,
+                  spaceId: space._id,
+                  amount: ownerDebitAmount,
+                },
+              });
+              if (owner.pushToken) {
+                sendPushNotification(
+                  owner.pushToken,
+                  '⚠️ Wallet Debited (Booking Cancelled)',
+                  `₹${ownerDebitAmount} debited from your wallet as Booking #${booking._id.toString().slice(-6).toUpperCase()} was cancelled.`,
+                  { screen: 'Wallet', bookingId: booking._id }
+                );
+              }
+            } catch (notifErr) {
+              console.warn('Owner cancellation debit notification error:', notifErr.message);
+            }
+          }
+        }
+      }
+
+      // 2. Credit refund to commuter/seeker's wallet
       if (refundAmount > 0) {
-        // Credit refund to seeker's wallet
         const seeker = await User.findById(booking.seekerId);
         if (seeker) {
           seeker.walletBalance = Number(((seeker.walletBalance || 0) + refundAmount).toFixed(2));

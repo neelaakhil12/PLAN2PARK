@@ -42,17 +42,21 @@ router.get('/admin', protect, adminOnly, async (req, res) => {
     // 4. Complaints counts
     const activeComplaints = await Complaint.countDocuments({ status: { $ne: 'resolved' } });
 
-    // 5. Financial totals
-    const bookingsData = await Booking.find({ paymentStatus: 'paid' });
+    // 5. Financial totals (Strictly exclude cancelled/refunded bookings)
+    const bookingsData = await Booking.find({
+      paymentStatus: 'paid',
+      status: { $nin: ['cancelled'] },
+    });
     const totalRevenue = bookingsData.reduce((sum, b) => sum + (b.totalAmount || 0), 0);
     const totalCommission = bookingsData.reduce((sum, b) => sum + (b.adminCommission || 0), 0);
     const totalOwnerPayout = bookingsData.reduce((sum, b) => sum + (b.ownerEarnings || 0), 0);
 
-    // Today's revenue calculation
+    // Today's revenue calculation (Excluding cancelled)
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
     const todayBookings = await Booking.find({
       paymentStatus: 'paid',
+      status: { $nin: ['cancelled'] },
       createdAt: { $gte: todayStart }
     });
     const todayRevenue = todayBookings.reduce((sum, b) => sum + (b.totalAmount || 0), 0);
@@ -82,7 +86,7 @@ router.get('/admin', protect, adminOnly, async (req, res) => {
       const idx = chartLabels.indexOf(bDateStr);
       if (idx !== -1) {
         chartBookings[idx] += 1;
-        if (b.paymentStatus === 'paid') {
+        if (b.paymentStatus === 'paid' && b.status !== 'cancelled') {
           chartRevenue[idx] += b.totalAmount || 0;
         }
       }
@@ -168,12 +172,12 @@ router.get('/owner', protect, ownerOnly, async (req, res) => {
       }
     });
 
-    // 3. Earnings (all paid bookings and retained cancellation earnings)
+    // 3. Earnings (all paid non-cancelled bookings or retained cancellation earnings)
     const bookings = await Booking.find({
       spaceId: { $in: spaceIds },
       $or: [
-        { paymentStatus: 'paid' },
-        { ownerEarnings: { $gt: 0 } },
+        { paymentStatus: 'paid', status: { $nin: ['cancelled'] } },
+        { status: 'cancelled', ownerEarnings: { $gt: 0 } },
       ],
     });
     const totalEarnings = bookings.reduce((sum, b) => sum + (b.ownerEarnings || 0), 0);
@@ -200,6 +204,7 @@ router.get('/owner', protect, ownerOnly, async (req, res) => {
     const lastWeekBookings = await Booking.find({
       spaceId: { $in: spaceIds },
       paymentStatus: 'paid',
+      status: { $nin: ['cancelled'] },
       createdAt: { $gte: sevenDaysAgo }
     });
 

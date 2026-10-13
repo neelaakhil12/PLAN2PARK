@@ -1558,7 +1558,7 @@ const AdminDashboard = () => {
                               type="number"
                               min="0"
                               max="100"
-                              step="0.5"
+                              step="any"
                               value={commissionInput}
                               onChange={(e) => setCommissionInput(e.target.value)}
                               className="w-full bg-white border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm font-bold text-slate-800 placeholder-slate-400 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 pr-10"
@@ -1587,8 +1587,8 @@ const AdminDashboard = () => {
                           <div className="relative">
                             <input
                               type="number"
-                              min="1"
-                              step="50"
+                              min="0"
+                              step="any"
                               value={minWithdrawalInput}
                               onChange={(e) => setMinWithdrawalInput(e.target.value)}
                               className="w-full bg-white border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm font-bold text-slate-800 placeholder-slate-400 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 pl-8"
@@ -2148,8 +2148,23 @@ const AdminDashboard = () => {
                               <td className="px-6 py-4 font-mono font-bold text-slate-600 text-xs uppercase">{b.vehicleNumber}</td>
                               <td className="px-6 py-4 text-slate-500 truncate max-w-[150px]">{b.spaceId?.address || 'Deleted Space'}</td>
                               <td className="px-6 py-4 text-slate-500">{b.hours} hrs</td>
-                              <td className="px-6 py-4 font-bold text-slate-900">₹{b.totalAmount}</td>
-                              <td className="px-6 py-4 font-bold text-emerald-600">₹{b.adminCommission}</td>
+                              <td className="px-6 py-4 font-bold text-slate-900">
+                                {b.status === 'cancelled' ? (
+                                  <div className="flex flex-col">
+                                    <span className="line-through text-slate-400">₹{b.totalAmount}</span>
+                                    <span className="text-[10px] text-rose-500 font-extrabold uppercase tracking-wider">Refunded</span>
+                                  </div>
+                                ) : (
+                                  `₹${b.totalAmount}`
+                                )}
+                              </td>
+                              <td className="px-6 py-4 font-bold">
+                                {b.status === 'cancelled' ? (
+                                  <span className="text-slate-400 font-bold text-xs px-2 py-0.5 rounded-md bg-slate-100">₹0 (Void)</span>
+                                ) : (
+                                  <span className="text-emerald-600">₹{b.adminCommission || 0}</span>
+                                )}
+                              </td>
                               <td className="px-6 py-4"><StatusBadge status={b.status} /></td>
                             </tr>
                           ))}
