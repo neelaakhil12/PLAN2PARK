@@ -118,6 +118,9 @@ const AdminDashboard = () => {
   const [showAddTermModal, setShowAddTermModal] = useState(false);
   const [showBulkEditTermsModal, setShowBulkEditTermsModal] = useState(false);
   const [bulkTermsList, setBulkTermsList] = useState([]);
+  const [showBulkEditFaqsModal, setShowBulkEditFaqsModal] = useState(false);
+  const [bulkFaqsList, setBulkFaqsList] = useState([]);
+  const [savingBulkFaqs, setSavingBulkFaqs] = useState(false);
   const [savingBulkTerms, setSavingBulkTerms] = useState(false);
 
   // ── Chatbot FAQs Management States ──
@@ -322,6 +325,51 @@ const AdminDashboard = () => {
       }
     } catch (err) {
       console.error(err);
+    }
+  };
+
+  const openBulkEditFaqs = () => {
+    const list = faqs
+      .filter(f => (f.audience || 'parking_seeker') === faqsAudience)
+      .sort((a, b) => (a.order || 0) - (b.order || 0))
+      .map(f => ({
+        category: f.category || 'General',
+        question: f.question || '',
+        answer: f.answer || '',
+        isActive: f.isActive !== false,
+      }));
+    setBulkFaqsList(list.length > 0 ? list : [{ category: 'General', question: '', answer: '', isActive: true }]);
+    setShowBulkEditFaqsModal(true);
+  };
+
+  const handleSaveBulkFaqs = async () => {
+    const cleaned = bulkFaqsList.filter(f => f.question.trim() && f.answer.trim());
+    if (cleaned.length === 0) {
+      alert('Please provide at least one FAQ with a question and answer');
+      return;
+    }
+    setSavingBulkFaqs(true);
+    try {
+      const res = await fetch(`${API_URL}/faqs/admin/bulk/${faqsAudience}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ faqs: cleaned }),
+      });
+      const data = await res.json();
+      if (res.ok && data.faqs) {
+        setFaqs(data.faqs);
+        setShowBulkEditFaqsModal(false);
+        alert(`🎉 All ${cleaned.length} FAQs saved successfully in one click!`);
+      } else {
+        alert(data.message || 'Failed to save FAQs');
+      }
+    } catch (err) {
+      alert('Error saving FAQs: ' + err.message);
+    } finally {
+      setSavingBulkFaqs(false);
     }
   };
 
@@ -2661,19 +2709,10 @@ const AdminDashboard = () => {
                       </div>
 
                       <button
-                        onClick={() => {
-                          setEditingFaq(null);
-                          setFaqAudienceInput(faqsAudience);
-                          setFaqCategoryInput(uniqueCategories.find(c => c !== 'all') || 'General');
-                          setFaqQuestionInput('');
-                          setFaqAnswerInput('');
-                          const maxOrd = Math.max(0, ...audienceFaqs.map(f => f.order || 0));
-                          setFaqOrderInput(maxOrd + 1);
-                          setShowAddFaqModal(true);
-                        }}
-                        className="bg-cyan-600 hover:bg-cyan-700 text-white font-bold px-4 py-2.5 rounded-xl text-xs flex items-center gap-2 shadow-md shadow-cyan-600/20 transition-all shrink-0 cursor-pointer"
+                        onClick={openBulkEditFaqs}
+                        className="bg-cyan-600 hover:bg-cyan-700 text-white font-extrabold px-5 py-2.5 rounded-xl text-xs flex items-center gap-2 shadow-lg shadow-cyan-600/25 transition-all shrink-0 cursor-pointer"
                       >
-                        <Plus className="h-4 w-4" /> Add New FAQ
+                        <Edit2 className="h-4 w-4" /> ✏️ Edit All FAQs (One-Click)
                       </button>
                     </div>
 
@@ -2757,7 +2796,7 @@ const AdminDashboard = () => {
                             </span>
                           </h3>
                           <p className="text-[11px] text-slate-400 mt-0.5">
-                            Click the pencil icon on any row to edit questions and answers directly.
+                            Use "Edit All FAQs (One-Click)" to edit, add or delete every question and answer at once.
                           </p>
                         </div>
                       </div>
@@ -2770,13 +2809,12 @@ const AdminDashboard = () => {
                               <th className="px-5 py-3 w-44">Category</th>
                               <th className="px-5 py-3">Question & Answer</th>
                               <th className="px-5 py-3 w-28 text-center">Status</th>
-                              <th className="px-5 py-3 w-28 text-right">Actions</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-100 font-medium">
                             {filteredFaqs.length === 0 ? (
                               <tr>
-                                <td colSpan="5" className="text-center py-12 text-slate-400">
+                                <td colSpan="4" className="text-center py-12 text-slate-400">
                                   No FAQs found matching your query.
                                 </td>
                               </tr>
@@ -2815,32 +2853,6 @@ const AdminDashboard = () => {
                                       {faq.isActive !== false ? '✓ Active' : 'Inactive'}
                                     </button>
                                   </td>
-                                  <td className="px-5 py-4 align-top text-right">
-                                    <div className="flex items-center justify-end gap-1.5">
-                                      <button
-                                        onClick={() => {
-                                          setEditingFaq(faq);
-                                          setFaqAudienceInput(faq.audience || faqsAudience);
-                                          setFaqCategoryInput(faq.category || '');
-                                          setFaqQuestionInput(faq.question || '');
-                                          setFaqAnswerInput(faq.answer || '');
-                                          setFaqOrderInput(faq.order || idx + 1);
-                                          setShowAddFaqModal(true);
-                                        }}
-                                        className="h-8 w-8 rounded-lg bg-slate-50 border border-slate-200 text-slate-600 hover:text-cyan-600 hover:border-cyan-300 flex items-center justify-center transition-colors cursor-pointer"
-                                        title="Edit FAQ"
-                                      >
-                                        <Edit2 className="h-3.5 w-3.5" />
-                                      </button>
-                                      <button
-                                        onClick={() => handleDeleteFaq(faq._id)}
-                                        className="h-8 w-8 rounded-lg bg-slate-50 border border-slate-200 text-slate-600 hover:text-rose-600 hover:border-rose-300 flex items-center justify-center transition-colors cursor-pointer"
-                                        title="Delete FAQ"
-                                      >
-                                        <Trash2 className="h-3.5 w-3.5" />
-                                      </button>
-                                    </div>
-                                  </td>
                                 </tr>
                               ))
                             )}
@@ -2848,6 +2860,132 @@ const AdminDashboard = () => {
                         </table>
                       </div>
                     </div>
+
+                    {/* ── BULK FAQ LIVE EDITOR MODAL (EDIT ALL AT ONCE IN 1-CLICK) ── */}
+                    {showBulkEditFaqsModal && (
+                      <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
+                        <div className="bg-white rounded-3xl border border-slate-200 max-w-4xl w-full max-h-[92vh] flex flex-col shadow-2xl overflow-hidden">
+                          <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/80 shrink-0">
+                            <div>
+                              <h3 className="font-black text-slate-900 text-base flex items-center gap-2">
+                                <HelpCircle className="h-5 w-5 text-cyan-600" />
+                                Edit All FAQs (1-Click) — {faqsAudience === 'bank_finance' ? '🏦 Bank & Finance' : '🚗 Parking Seeker'}
+                              </h3>
+                              <p className="text-[11px] text-slate-500 mt-0.5">
+                                Edit every question and answer below, add new ones, or remove any. Click "Save All FAQs" once to apply live in the chatbot.
+                              </p>
+                            </div>
+                            <button
+                              onClick={() => setShowBulkEditFaqsModal(false)}
+                              className="h-8 w-8 rounded-full hover:bg-slate-200 flex items-center justify-center text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
+                            >
+                              <X className="h-4 w-4" />
+                            </button>
+                          </div>
+
+                          <div className="p-6 overflow-y-auto space-y-4 flex-1">
+                            {bulkFaqsList.map((item, idx) => (
+                              <div key={idx} className="flex items-start gap-3 bg-slate-50 border border-slate-200 rounded-2xl p-3.5 focus-within:border-cyan-400 focus-within:ring-2 focus-within:ring-cyan-100 transition-all">
+                                <div className="h-7 w-7 rounded-lg bg-cyan-100 text-cyan-700 font-black text-xs flex items-center justify-center shrink-0 mt-0.5">
+                                  {idx + 1}
+                                </div>
+                                <div className="flex-1 space-y-2 min-w-0">
+                                  <div className="flex flex-col sm:flex-row gap-2">
+                                    <input
+                                      type="text"
+                                      value={item.category}
+                                      onChange={(e) => {
+                                        const updated = [...bulkFaqsList];
+                                        updated[idx] = { ...updated[idx], category: e.target.value };
+                                        setBulkFaqsList(updated);
+                                      }}
+                                      placeholder="Category"
+                                      className="sm:w-48 bg-white border border-slate-200 rounded-xl px-2.5 py-2 text-xs font-bold text-slate-700 focus:outline-none focus:border-cyan-500"
+                                    />
+                                    <input
+                                      type="text"
+                                      value={item.question}
+                                      onChange={(e) => {
+                                        const updated = [...bulkFaqsList];
+                                        updated[idx] = { ...updated[idx], question: e.target.value };
+                                        setBulkFaqsList(updated);
+                                      }}
+                                      placeholder={`Question #${idx + 1}`}
+                                      className="flex-1 bg-white border border-slate-200 rounded-xl px-2.5 py-2 text-xs font-bold text-slate-900 focus:outline-none focus:border-cyan-500"
+                                    />
+                                  </div>
+                                  <textarea
+                                    rows={3}
+                                    value={item.answer}
+                                    onChange={(e) => {
+                                      const updated = [...bulkFaqsList];
+                                      updated[idx] = { ...updated[idx], answer: e.target.value };
+                                      setBulkFaqsList(updated);
+                                    }}
+                                    placeholder="Answer..."
+                                    className="w-full bg-white border border-slate-200 rounded-xl p-2.5 text-xs text-slate-800 font-medium focus:outline-none focus:border-cyan-500 resize-y"
+                                  />
+                                  <label className="inline-flex items-center gap-1.5 text-[11px] font-bold text-slate-500 cursor-pointer">
+                                    <input
+                                      type="checkbox"
+                                      checked={item.isActive}
+                                      onChange={(e) => {
+                                        const updated = [...bulkFaqsList];
+                                        updated[idx] = { ...updated[idx], isActive: e.target.checked };
+                                        setBulkFaqsList(updated);
+                                      }}
+                                    />
+                                    Active in chatbot
+                                  </label>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const updated = bulkFaqsList.filter((_, i) => i !== idx);
+                                    setBulkFaqsList(updated.length > 0 ? updated : [{ category: 'General', question: '', answer: '', isActive: true }]);
+                                  }}
+                                  title="Remove this FAQ"
+                                  className="h-8 w-8 rounded-lg bg-white border border-slate-200 text-slate-400 hover:text-rose-600 hover:border-rose-200 flex items-center justify-center transition-colors shrink-0 mt-0.5 cursor-pointer"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                              </div>
+                            ))}
+
+                            <button
+                              type="button"
+                              onClick={() => setBulkFaqsList([...bulkFaqsList, { category: bulkFaqsList[bulkFaqsList.length - 1]?.category || 'General', question: '', answer: '', isActive: true }])}
+                              className="w-full py-3 border-2 border-dashed border-cyan-200 hover:border-cyan-400 rounded-2xl text-xs font-bold text-cyan-600 hover:bg-cyan-50/50 flex items-center justify-center gap-2 transition-all cursor-pointer"
+                            >
+                              <Plus className="h-4 w-4" /> Add Another FAQ
+                            </button>
+                          </div>
+
+                          <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-between bg-slate-50/80 shrink-0">
+                            <span className="text-xs text-slate-500 font-semibold">
+                              Total FAQs: {bulkFaqsList.filter(f => f.question.trim() && f.answer.trim()).length}
+                            </span>
+                            <div className="flex items-center gap-3">
+                              <button
+                                type="button"
+                                onClick={() => setShowBulkEditFaqsModal(false)}
+                                className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-200 transition-colors cursor-pointer"
+                              >
+                                Cancel
+                              </button>
+                              <button
+                                type="button"
+                                onClick={handleSaveBulkFaqs}
+                                disabled={savingBulkFaqs}
+                                className="bg-cyan-600 hover:bg-cyan-700 disabled:opacity-50 text-white font-extrabold px-5 py-2.5 rounded-xl text-xs shadow-lg shadow-cyan-600/25 transition-all cursor-pointer"
+                              >
+                                {savingBulkFaqs ? '💾 Saving All FAQs...' : '💾 Save All FAQs (1-Click)'}
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
 
                     {/* Add / Edit FAQ Modal */}
                     {showAddFaqModal && (

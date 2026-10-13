@@ -162,6 +162,51 @@ router.post('/admin', protect, adminOnly, async (req, res) => {
   }
 });
 
+// @desc    Admin: Bulk replace ALL FAQs of an audience in one request
+// @route   PUT /api/faqs/admin/bulk/:audience
+// @access  Private (Admin)
+router.put('/admin/bulk/:audience', protect, adminOnly, async (req, res) => {
+  const targetAudience = normalizeAudience(req.params.audience);
+  const { faqs } = req.body;
+
+  if (!Array.isArray(faqs)) {
+    return res.status(400).json({ message: 'faqs must be an array' });
+  }
+
+  const cleaned = faqs
+    .map((f) => ({
+      category: (f.category || '').trim(),
+      question: (f.question || '').trim(),
+      answer: (f.answer || '').trim(),
+      isActive: f.isActive !== undefined ? Boolean(f.isActive) : true,
+    }))
+    .filter((f) => f.question && f.answer);
+
+  if (cleaned.length === 0) {
+    return res.status(400).json({ message: 'Provide at least one FAQ with a question and answer' });
+  }
+
+  try {
+    await Faq.deleteMany({ audience: targetAudience });
+    await Faq.insertMany(
+      cleaned.map((f, idx) => ({
+        faqId: idx + 1,
+        audience: targetAudience,
+        category: f.category || 'General',
+        question: f.question,
+        answer: f.answer,
+        order: idx + 1,
+        isActive: f.isActive,
+      }))
+    );
+
+    const all = await Faq.find({}).sort({ audience: 1, order: 1, createdAt: 1 });
+    res.json({ success: true, message: `Saved ${cleaned.length} FAQs`, faqs: all });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 // @desc    Admin: Update FAQ
 // @route   PUT /api/faqs/admin/:id
 // @access  Private (Admin)
