@@ -5,6 +5,7 @@ const { protect, adminOnly } = require('../middleware/auth');
 
 const DEFAULT_SUPPORT_SETTINGS = {
   supportEmail: 'plantopark@gmail.com',
+  supportResponseNote: 'Contact us through email. If you have any query, response will be received within 24 to 48 hours.',
   supportPhone: '+91 8919360467',
   supportWhatsapp: '+91 8919360467',
   supportHours: '24/7 Dedicated Concierge & Emergency Desk',

@@ -88,13 +88,13 @@ export default function SupportModal({ visible, onClose, isStorageYard = false }
             <View style={{ flex: 1 }}>
               <View style={styles.badgeRow}>
                 <View style={styles.liveDot} />
-                <Text style={styles.badgeTxt}>LIVE 24/7 HELPDESK</Text>
+                <Text style={styles.badgeTxt}>OFFICIAL HELPDESK</Text>
               </View>
               <Text style={styles.title}>
-                {isStorageYard ? '🚜 Storage Yard Help Desk' : '📞 24/7 Owner Support Desk'}
+                {isStorageYard ? '🚜 Storage Yard Help Desk' : '✉️ Owner Support Desk'}
               </Text>
               <Text style={styles.subtitle}>
-                Official Plan2Park Support • Immediate Concierge Assistance
+                Official Plan2Park Support • Email Concierge Assistance
               </Text>
             </View>
             <TouchableOpacity style={styles.closeBtn} onPress={onClose} activeOpacity={0.7}>
@@ -105,42 +105,14 @@ export default function SupportModal({ visible, onClose, isStorageYard = false }
           <ScrollView style={styles.body} showsVerticalScrollIndicator={false}>
             {/* Main Call-to-Action Card */}
             <View style={styles.priorityCard}>
-              <Text style={styles.priorityTitle}>Need Immediate Help?</Text>
+              <Text style={styles.priorityTitle}>Need Help or Have a Query?</Text>
               <Text style={styles.priorityDesc}>
                 Connect directly with the Plan2Park platform management and operations desk for spot listings, vehicle repossession holding, gate inquiries, or wallet payouts.
               </Text>
 
-              {/* Direct Call Button */}
-              <TouchableOpacity
-                style={styles.actionBtnPrimary}
-                onPress={handleCall}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.actionBtnIcon}>📞</Text>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.actionBtnLabel}>Call Official Support</Text>
-                  <Text style={styles.actionBtnVal}>{activePhone}</Text>
-                </View>
-                <Text style={styles.actionBtnArrow}>→</Text>
-              </TouchableOpacity>
-
-              {/* WhatsApp Button */}
-              <TouchableOpacity
-                style={styles.actionBtnWhatsapp}
-                onPress={handleWhatsapp}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.actionBtnIcon}>💬</Text>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.actionBtnLabel}>Chat on WhatsApp</Text>
-                  <Text style={styles.actionBtnVal}>{activeWhatsapp}</Text>
-                </View>
-                <Text style={styles.actionBtnArrow}>→</Text>
-              </TouchableOpacity>
-
               {/* Email Button */}
               <TouchableOpacity
-                style={styles.actionBtnEmail}
+                style={styles.actionBtnPrimary}
                 onPress={handleEmail}
                 activeOpacity={0.8}
               >
@@ -153,21 +125,15 @@ export default function SupportModal({ visible, onClose, isStorageYard = false }
               </TouchableOpacity>
             </View>
 
-            {/* Operating Hours & Guarantee */}
+            {/* Expected Response Time Note */}
             <View style={styles.infoBox}>
               <View style={styles.infoRow}>
                 <Text style={styles.infoIcon}>⏱️</Text>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.infoLabel}>Support Hours</Text>
-                  <Text style={styles.infoVal}>{supportData.supportHours}</Text>
-                </View>
-              </View>
-              <View style={styles.infoDivider} />
-              <View style={styles.infoRow}>
-                <Text style={styles.infoIcon}>🛡️</Text>
-                <View style={{ flex: 1 }}>
                   <Text style={styles.infoLabel}>Response Time</Text>
-                  <Text style={styles.infoVal}>Phone & WhatsApp: Under 2 mins • Email: Within 2 hrs</Text>
+                  <Text style={styles.infoVal}>
+                    {supportData.supportResponseNote || 'Contact us through email. If you have any query, response will be received within 24 to 48 hours.'}
+                  </Text>
                 </View>
               </View>
             </View>

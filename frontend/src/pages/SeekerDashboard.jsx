@@ -2975,7 +2975,7 @@ const SeekerDashboard = () => {
           </div>
         )}
 
-        {/* ── 24/7 SEEKER / BANK SUPPORT DESK MODAL ── */}
+        {/* ── SEEKER SUPPORT DESK MODAL ── */}
         {showSeekerSupportModal && (
           <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn">
             <div className="bg-white rounded-3xl border border-slate-200 max-w-md w-full p-6 shadow-2xl relative">
@@ -2987,75 +2987,38 @@ const SeekerDashboard = () => {
               </button>
 
               <div className="mb-4">
-                <span className="px-2.5 py-1 rounded-full text-[10px] font-black bg-emerald-50 text-emerald-700 border border-emerald-200">
-                  LIVE 24/7 HELPDESK
+                <span className="px-2.5 py-1 rounded-full text-[10px] font-black bg-blue-50 text-blue-700 border border-blue-200">
+                  OFFICIAL HELPDESK
                 </span>
                 <h3 className="text-lg font-black text-slate-900 mt-2">
-                  {user?.accountCategory === 'bank_finance_seeker'
-                    ? '🏦 24/7 Bank & Fleet Support Desk'
-                    : '📞 24/7 Customer Support Desk'}
+                  ✉️ Customer Support Desk
                 </h3>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Official Plan2Park Support • Instant concierge for navigation, slots, and assistance.
+                  Official Plan2Park Support • Email assistance for bookings, slots, and inquiries.
                 </p>
               </div>
 
               <div className="space-y-3 mb-5">
                 <a
-                  href={`tel:${(user?.accountCategory === 'bank_finance_seeker' ? (supportContacts.bankFinanceSupportPhone || supportContacts.supportPhone) : (supportContacts.seekerSupportPhone || supportContacts.supportPhone) || '+918919360467').replace(/[^\d+]/g, '')}`}
-                  className="flex items-center justify-between p-3.5 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-2xl text-blue-900 font-bold text-xs transition-colors"
+                  href={`mailto:${supportContacts.supportEmail || 'plantopark@gmail.com'}?subject=Customer%20Support%20Request`}
+                  className="flex items-center justify-between p-4 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-2xl text-indigo-950 font-bold text-xs transition-colors"
                 >
                   <div className="flex items-center gap-3">
-                    <span className="text-lg">📞</span>
+                    <span className="text-xl">✉️</span>
                     <div>
-                      <div className="text-[10px] text-blue-600 uppercase font-extrabold">Call Official Phone</div>
+                      <div className="text-[10px] text-indigo-600 uppercase font-extrabold">Official Support Email</div>
                       <div className="text-sm font-black">
-                        {user?.accountCategory === 'bank_finance_seeker'
-                          ? (supportContacts.bankFinanceSupportPhone || supportContacts.supportPhone || '+91 8919360467')
-                          : (supportContacts.seekerSupportPhone || supportContacts.supportPhone || '+91 8919360467')}
+                        {supportContacts.supportEmail || 'plantopark@gmail.com'}
                       </div>
                     </div>
                   </div>
-                  <span className="text-blue-600 font-black">Call →</span>
-                </a>
-
-                <a
-                  href={`https://wa.me/${(supportContacts.supportWhatsapp || supportContacts.supportPhone || '918919360467').replace(/[^\d]/g, '')}?text=Hello%20Plan2Park%20Support%2C%20I%20am%20a%20customer%20requesting%20assistance.`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="flex items-center justify-between p-3.5 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-2xl text-emerald-900 font-bold text-xs transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="text-lg">💬</span>
-                    <div>
-                      <div className="text-[10px] text-emerald-600 uppercase font-extrabold">Chat on WhatsApp</div>
-                      <div className="text-sm font-black">{supportContacts.supportWhatsapp || supportContacts.supportPhone || '+91 8919360467'}</div>
-                    </div>
-                  </div>
-                  <span className="text-emerald-600 font-black">Chat →</span>
-                </a>
-
-                <a
-                  href={`mailto:${user?.accountCategory === 'bank_finance_seeker' ? (supportContacts.bankFinanceSupportEmail || supportContacts.supportEmail) : (supportContacts.seekerSupportEmail || supportContacts.supportEmail) || 'plantopark@gmail.com'}?subject=Customer%20Support%20Request`}
-                  className="flex items-center justify-between p-3.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-2xl text-slate-800 font-bold text-xs transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="text-lg">✉️</span>
-                    <div>
-                      <div className="text-[10px] text-slate-500 uppercase font-extrabold">Support Email</div>
-                      <div className="text-sm font-black">
-                        {user?.accountCategory === 'bank_finance_seeker'
-                          ? (supportContacts.bankFinanceSupportEmail || supportContacts.supportEmail || 'plantopark@gmail.com')
-                          : (supportContacts.seekerSupportEmail || supportContacts.supportEmail || 'plantopark@gmail.com')}
-                      </div>
-                    </div>
-                  </div>
-                  <span className="text-slate-600 font-black">Email →</span>
+                  <span className="text-indigo-600 font-black">Email →</span>
                 </a>
               </div>
 
-              <div className="p-3 bg-slate-50 rounded-xl text-[11px] text-slate-600 text-center font-medium border border-slate-100">
-                ⏱️ <strong>Operating Hours:</strong> {supportContacts.supportHours || '24/7 Dedicated Support Desk'}
+              <div className="p-3.5 bg-slate-50 rounded-2xl text-xs text-slate-700 font-medium border border-slate-200/80 space-y-1">
+                <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">⏱️ Expected Response Time</div>
+                <div>{supportContacts.supportResponseNote || 'Contact us through email. If you have any query, response will be received within 24 to 48 hours.'}</div>
               </div>
             </div>
           </div>

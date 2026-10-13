@@ -159,17 +159,7 @@ const AdminDashboard = () => {
 
   const [supportSettings, setSupportSettings] = useState({
     supportEmail: 'plantopark@gmail.com',
-    supportPhone: '+91 8919360467',
-    supportWhatsapp: '+91 8919360467',
-    supportHours: '24/7 Dedicated Support Desk',
-    ownerSupportEmail: 'plantopark@gmail.com',
-    ownerSupportPhone: '+91 8919360467',
-    seekerSupportEmail: 'plantopark@gmail.com',
-    seekerSupportPhone: '+91 8919360467',
-    storageYardSupportEmail: 'plantopark@gmail.com',
-    storageYardSupportPhone: '+91 8919360467',
-    bankFinanceSupportEmail: 'plantopark@gmail.com',
-    bankFinanceSupportPhone: '+91 8919360467',
+    supportResponseNote: 'Contact us through email. If you have any query, response will be received within 24 to 48 hours.',
   });
   const [savingSupportSettings, setSavingSupportSettings] = useState(false);
   const [supportSettingsSuccess, setSupportSettingsSuccess] = useState(false);
@@ -2711,15 +2701,15 @@ const AdminDashboard = () => {
                       )}
                     </div>
 
-                    {/* ── 24/7 SUPPORT HELPLINE & CONCIERGE SETTINGS ── */}
+                    {/* ── OFFICIAL PLATFORM SUPPORT DESK & EMAIL SETTINGS ── */}
                     <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-4">
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
                         <div>
                           <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
-                            <span className="text-lg">📞</span> 24/7 Platform Support Desk & Helpline Contacts
+                            <span className="text-lg">✉️</span> Official Platform Support Desk & Email Settings
                           </h3>
                           <p className="text-xs text-slate-500 mt-0.5">
-                            Configure the official Plan2Park support phone number, email, and WhatsApp helpline. Updates reflect instantly across Space Owner App, Seeker App, and Web Dashboards.
+                            Configure the official Plan2Park support email and customer response note. Updates reflect instantly across Space Owner App, Seeker App, and Web Dashboards.
                           </p>
                         </div>
                         {supportSettingsSuccess && (
@@ -2730,122 +2720,46 @@ const AdminDashboard = () => {
                       </div>
 
                       <form onSubmit={handleSaveSupportSettings} className="space-y-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                           <div>
-                            <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                              📞 24/7 General Support Phone
-                            </label>
-                            <input
-                              type="text"
-                              value={supportSettings.supportPhone || ''}
-                              onChange={(e) => setSupportSettings({ ...supportSettings, supportPhone: e.target.value })}
-                              placeholder="+91 8919360467"
-                              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:border-indigo-400"
-                            />
-                          </div>
-
-                          <div>
-                            <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                              ✉️ Official Support Email
+                            <label className="block text-xs font-bold text-slate-700 mb-1">
+                              ✉️ Official Support Email *
                             </label>
                             <input
                               type="email"
+                              required
                               value={supportSettings.supportEmail || ''}
                               onChange={(e) => setSupportSettings({ ...supportSettings, supportEmail: e.target.value })}
                               placeholder="plantopark@gmail.com"
-                              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:border-indigo-400"
+                              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:border-indigo-400"
                             />
+                            <p className="text-[10px] text-slate-400 mt-1">Users will send support queries to this email address.</p>
                           </div>
 
-                          <div>
-                            <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                              💬 Official WhatsApp Helpline
+                          <div className="md:col-span-2">
+                            <label className="block text-xs font-bold text-slate-700 mb-1">
+                              ⏱️ Support Response Note / Expected Resolution Time *
                             </label>
-                            <input
-                              type="text"
-                              value={supportSettings.supportWhatsapp || ''}
-                              onChange={(e) => setSupportSettings({ ...supportSettings, supportWhatsapp: e.target.value })}
-                              placeholder="+91 8919360467"
-                              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:border-indigo-400"
+                            <textarea
+                              rows={2}
+                              required
+                              value={supportSettings.supportResponseNote || ''}
+                              onChange={(e) => setSupportSettings({ ...supportSettings, supportResponseNote: e.target.value })}
+                              placeholder="Contact us through email. If you have any query, response will be received within 24 to 48 hours."
+                              className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:outline-none focus:border-indigo-400 resize-y"
                             />
-                          </div>
-
-                          <div>
-                            <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                              ⏱️ Support Operating Hours
-                            </label>
-                            <input
-                              type="text"
-                              value={supportSettings.supportHours || ''}
-                              onChange={(e) => setSupportSettings({ ...supportSettings, supportHours: e.target.value })}
-                              placeholder="24/7 Dedicated Support Desk"
-                              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:border-indigo-400"
-                            />
+                            <p className="text-[10px] text-slate-400 mt-1">Displayed directly to users in the mobile app and web help desks.</p>
                           </div>
                         </div>
 
-                        {/* Role-Specific Hotlines */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 pt-2 border-t border-slate-100">
-                          <div>
-                            <label className="block text-[10px] font-bold text-slate-500 mb-1">
-                              🏢 Space Owner Hotline
-                            </label>
-                            <input
-                              type="text"
-                              value={supportSettings.ownerSupportPhone || ''}
-                              onChange={(e) => setSupportSettings({ ...supportSettings, ownerSupportPhone: e.target.value })}
-                              placeholder="+91 8919360467"
-                              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:border-indigo-400"
-                            />
-                          </div>
-
-                          <div>
-                            <label className="block text-[10px] font-bold text-slate-500 mb-1">
-                              🚜 Storage Yard Hotline
-                            </label>
-                            <input
-                              type="text"
-                              value={supportSettings.storageYardSupportPhone || ''}
-                              onChange={(e) => setSupportSettings({ ...supportSettings, storageYardSupportPhone: e.target.value })}
-                              placeholder="+91 8919360467"
-                              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:border-indigo-400"
-                            />
-                          </div>
-
-                          <div>
-                            <label className="block text-[10px] font-bold text-slate-500 mb-1">
-                              🚗 Parking Seeker Hotline
-                            </label>
-                            <input
-                              type="text"
-                              value={supportSettings.seekerSupportPhone || ''}
-                              onChange={(e) => setSupportSettings({ ...supportSettings, seekerSupportPhone: e.target.value })}
-                              placeholder="+91 8919360467"
-                              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:border-indigo-400"
-                            />
-                          </div>
-
-                          <div>
-                            <label className="block text-[10px] font-bold text-slate-500 mb-1">
-                              🏦 Bank & Fleet Hotline
-                            </label>
-                            <input
-                              type="text"
-                              value={supportSettings.bankFinanceSupportPhone || ''}
-                              onChange={(e) => setSupportSettings({ ...supportSettings, bankFinanceSupportPhone: e.target.value })}
-                              placeholder="+91 8919360467"
-                              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:border-indigo-400"
-                            />
-                          </div>
-                        </div>
-
-                        <div className="flex justify-end">
+                        <div className="flex justify-end pt-1">
                           <button
                             type="submit"
                             disabled={savingSupportSettings}
                             className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold px-5 py-2.5 rounded-xl text-xs flex items-center gap-2 shadow-md shadow-emerald-600/20 transition-all cursor-pointer"
                           >
-                            {savingSupportSettings ? 'Saving Support Settings...' : '💾 Save Support Helpline Settings'}
+                            <Save className="h-4 w-4" />
+                            {savingSupportSettings ? 'Saving Settings...' : '💾 Save Support Settings'}
                           </button>
                         </div>
                       </form>
