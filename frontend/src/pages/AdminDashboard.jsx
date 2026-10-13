@@ -1612,76 +1612,6 @@ const AdminDashboard = () => {
                       </div>
                     </form>
                   </div>
-
-                  {/* 24/7 Platform Helpline & Concierge Contacts */}
-                  <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-4">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
-                      <div>
-                        <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
-                          <span className="text-lg">📞</span> 24/7 Platform Helpline & Concierge Contacts
-                        </h3>
-                        <p className="text-xs text-slate-500 mt-0.5">
-                          Configure official helpline and support contacts displayed across the Mobile Apps and Web Portal.
-                        </p>
-                      </div>
-                      {supportSettingsSuccess && (
-                        <span className="px-3 py-1 rounded-full text-xs font-black bg-emerald-50 text-emerald-700 border border-emerald-200">
-                          ✓ Support Contacts Saved!
-                        </span>
-                      )}
-                    </div>
-
-                    <form onSubmit={handleSaveSupportSettings} className="space-y-4">
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                        <div>
-                          <label className="block text-[11px] font-bold text-slate-600 mb-1">📞 General Support Phone</label>
-                          <input
-                            type="text"
-                            value={supportSettings.supportPhone || ''}
-                            onChange={(e) => setSupportSettings({ ...supportSettings, supportPhone: e.target.value })}
-                            className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:border-indigo-400"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-[11px] font-bold text-slate-600 mb-1">✉️ General Support Email</label>
-                          <input
-                            type="email"
-                            value={supportSettings.supportEmail || ''}
-                            onChange={(e) => setSupportSettings({ ...supportSettings, supportEmail: e.target.value })}
-                            className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:border-indigo-400"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-[11px] font-bold text-slate-600 mb-1">💬 WhatsApp Helpline</label>
-                          <input
-                            type="text"
-                            value={supportSettings.supportWhatsapp || ''}
-                            onChange={(e) => setSupportSettings({ ...supportSettings, supportWhatsapp: e.target.value })}
-                            className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:border-indigo-400"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-[11px] font-bold text-slate-600 mb-1">⏱️ Support Operating Hours</label>
-                          <input
-                            type="text"
-                            value={supportSettings.supportHours || ''}
-                            onChange={(e) => setSupportSettings({ ...supportSettings, supportHours: e.target.value })}
-                            className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:border-indigo-400"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="flex justify-end">
-                        <button
-                          type="submit"
-                          disabled={savingSupportSettings}
-                          className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold px-5 py-2.5 rounded-xl text-xs flex items-center gap-2 shadow-md shadow-emerald-600/20 transition-all cursor-pointer"
-                        >
-                          {savingSupportSettings ? 'Saving Support Settings...' : '💾 Save Support Helpline Settings'}
-                        </button>
-                      </div>
-                    </form>
-                  </div>
                 </div>
               )}
 
@@ -1741,9 +1671,19 @@ const AdminDashboard = () => {
                       </div>
                     </div>
 
-                    {/* 3. Space Owners Net Earnings (Click to open Global Owner Earnings Breakdown) */}
+                    {/* 3. Space Owners Net Earnings (Click to view Global Owner Earnings Breakdown) */}
                     <div 
-                      onClick={() => setShowOwnerEarningsModal(true)}
+                      onClick={() => {
+                        setShowOwnerEarningsModal(prev => {
+                          const next = !prev;
+                          if (next) {
+                            setTimeout(() => {
+                              document.getElementById('owner-earnings-breakdown-section')?.scrollIntoView({ behavior: 'smooth' });
+                            }, 50);
+                          }
+                          return next;
+                        });
+                      }}
                       className="bg-gradient-to-br from-amber-500/15 via-white to-amber-50/20 border-2 border-amber-500/30 hover:border-amber-500 hover:ring-4 hover:ring-amber-500/10 rounded-2xl p-5 shadow-sm hover:shadow-lg transition-all cursor-pointer group relative overflow-hidden ring-1 ring-amber-400/40"
                     >
                       <div className="flex items-center justify-between mb-3">
@@ -1761,10 +1701,10 @@ const AdminDashboard = () => {
                       </p>
                       <div className="mt-3 pt-2.5 border-t border-amber-100 flex items-center justify-between text-[11px]">
                         <span className="text-amber-800 font-bold flex items-center gap-1">
-                          <span>👆</span> Click to view breakdown
+                          <span>{showOwnerEarningsModal ? '▲ Hide breakdown' : '▼ View breakdown inline'}</span>
                         </span>
                         <span className="bg-amber-500 text-white font-extrabold px-2 py-0.5 rounded-full text-[10px] group-hover:bg-amber-600 transition-colors">
-                          View All Owners ↗
+                          {showOwnerEarningsModal ? 'Hide ✕' : 'View Breakdown ↓'}
                         </span>
                       </div>
                     </div>
@@ -1872,192 +1812,191 @@ const AdminDashboard = () => {
                     const totalNetSum = filtered.reduce((sum, o) => sum + (o.totalEarnings || 0), 0);
 
                     return (
-                      <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/70 backdrop-blur-sm animate-fadeIn">
-                        <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl w-full max-w-5xl max-h-[92vh] flex flex-col overflow-hidden">
-                          {/* Modal Header */}
-                          <div className="px-6 py-5 bg-gradient-to-r from-slate-900 to-slate-800 text-white flex items-center justify-between shrink-0">
-                            <div>
-                              <h3 className="text-lg font-black flex items-center gap-2">
-                                <TrendingUp className="h-5 w-5 text-amber-400" />
-                                Global Space Owner Earnings &amp; Commission Breakdown
-                              </h3>
-                              <p className="text-xs text-slate-300 mt-0.5">
-                                Transparency report detailing individual host gross volume, platform commission, and net earnings.
-                              </p>
-                            </div>
+                      <div id="owner-earnings-breakdown-section" className="bg-white rounded-3xl border-2 border-amber-400/50 shadow-md w-full flex flex-col overflow-hidden animate-fadeIn scroll-mt-6">
+                        {/* Section Header */}
+                        <div className="px-6 py-5 bg-gradient-to-r from-slate-900 via-slate-800 to-amber-950 text-white flex items-center justify-between shrink-0">
+                          <div>
+                            <h3 className="text-lg font-black flex items-center gap-2">
+                              <TrendingUp className="h-5 w-5 text-amber-400" />
+                              Global Space Owner Earnings &amp; Commission Breakdown
+                            </h3>
+                            <p className="text-xs text-slate-300 mt-0.5">
+                              Transparency report detailing individual host gross volume, platform commission, and net earnings.
+                            </p>
+                          </div>
+                          <button
+                            onClick={() => setShowOwnerEarningsModal(false)}
+                            className="px-3.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                          >
+                            <span>Hide Breakdown</span>
+                            <X className="h-4 w-4" />
+                          </button>
+                        </div>
+
+                        {/* Quick Summary Strip */}
+                        <div className="px-6 py-3.5 bg-slate-50 border-b border-slate-200 grid grid-cols-2 sm:grid-cols-4 gap-3 shrink-0">
+                          <div className="bg-white p-3 rounded-xl border border-slate-200">
+                            <p className="text-[10px] font-bold text-slate-400 uppercase">Space Hosts Shown</p>
+                            <p className="text-base font-black text-slate-800 mt-0.5">{filtered.length} Hosts</p>
+                          </div>
+                          <div className="bg-white p-3 rounded-xl border border-slate-200">
+                            <p className="text-[10px] font-bold text-slate-400 uppercase">Gross Booking Volume</p>
+                            <p className="text-base font-black text-slate-900 mt-0.5">₹{totalGrossSum.toLocaleString('en-IN')}</p>
+                          </div>
+                          <div className="bg-white p-3 rounded-xl border border-slate-200">
+                            <p className="text-[10px] font-bold text-slate-400 uppercase">Admin Commission Cut</p>
+                            <p className="text-base font-black text-indigo-600 mt-0.5">₹{totalCommSum.toLocaleString('en-IN')}</p>
+                          </div>
+                          <div className="bg-amber-50 p-3 rounded-xl border border-amber-200">
+                            <p className="text-[10px] font-bold text-amber-800 uppercase">Total Net to Owners</p>
+                            <p className="text-base font-black text-amber-900 mt-0.5">₹{totalNetSum.toLocaleString('en-IN')}</p>
+                          </div>
+                        </div>
+
+                        {/* Search & Sort Controls */}
+                        <div className="px-6 py-3 border-b border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0">
+                          <div className="relative w-full sm:w-72">
+                            <Search className="h-4 w-4 absolute left-3 top-2.5 text-slate-400" />
+                            <input
+                              type="text"
+                              placeholder="Search owner by name, email, phone..."
+                              value={ownerEarningsSearch}
+                              onChange={(e) => setOwnerEarningsSearch(e.target.value)}
+                              className="w-full pl-9 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:border-amber-500"
+                            />
+                          </div>
+
+                          <div className="flex items-center gap-1.5 w-full sm:w-auto">
+                            <span className="text-[11px] font-bold text-slate-500">Sort By:</span>
                             <button
-                              onClick={() => setShowOwnerEarningsModal(false)}
-                              className="h-8 w-8 rounded-xl bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors cursor-pointer"
+                              onClick={() => setOwnerEarningsSort('earnings')}
+                              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-colors ${
+                                ownerEarningsSort === 'earnings' ? 'bg-amber-500 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                              }`}
                             >
-                              <X className="h-5 w-5" />
+                              💰 Net Earnings
+                            </button>
+                            <button
+                              onClick={() => setOwnerEarningsSort('bookings')}
+                              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-colors ${
+                                ownerEarningsSort === 'bookings' ? 'bg-amber-500 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                              }`}
+                            >
+                              📋 Bookings
+                            </button>
+                            <button
+                              onClick={() => setOwnerEarningsSort('name')}
+                              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-colors ${
+                                ownerEarningsSort === 'name' ? 'bg-amber-500 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                              }`}
+                            >
+                              🔤 Name
                             </button>
                           </div>
+                        </div>
 
-                          {/* Quick Summary Strip */}
-                          <div className="px-6 py-3.5 bg-slate-50 border-b border-slate-200 grid grid-cols-2 sm:grid-cols-4 gap-3 shrink-0">
-                            <div className="bg-white p-3 rounded-xl border border-slate-200">
-                              <p className="text-[10px] font-bold text-slate-400 uppercase">Space Hosts Shown</p>
-                              <p className="text-base font-black text-slate-800 mt-0.5">{filtered.length} Hosts</p>
-                            </div>
-                            <div className="bg-white p-3 rounded-xl border border-slate-200">
-                              <p className="text-[10px] font-bold text-slate-400 uppercase">Gross Booking Volume</p>
-                              <p className="text-base font-black text-slate-900 mt-0.5">₹{totalGrossSum.toLocaleString('en-IN')}</p>
-                            </div>
-                            <div className="bg-white p-3 rounded-xl border border-slate-200">
-                              <p className="text-[10px] font-bold text-slate-400 uppercase">Admin Commission Cut</p>
-                              <p className="text-base font-black text-indigo-600 mt-0.5">₹{totalCommSum.toLocaleString('en-IN')}</p>
-                            </div>
-                            <div className="bg-amber-50 p-3 rounded-xl border border-amber-200">
-                              <p className="text-[10px] font-bold text-amber-800 uppercase">Total Net to Owners</p>
-                              <p className="text-base font-black text-amber-900 mt-0.5">₹{totalNetSum.toLocaleString('en-IN')}</p>
-                            </div>
-                          </div>
-
-                          {/* Search & Sort Controls */}
-                          <div className="px-6 py-3 border-b border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0">
-                            <div className="relative w-full sm:w-72">
-                              <Search className="h-4 w-4 absolute left-3 top-2.5 text-slate-400" />
-                              <input
-                                type="text"
-                                placeholder="Search owner by name, email, phone..."
-                                value={ownerEarningsSearch}
-                                onChange={(e) => setOwnerEarningsSearch(e.target.value)}
-                                className="w-full pl-9 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:border-amber-500"
-                              />
-                            </div>
-
-                            <div className="flex items-center gap-1.5 w-full sm:w-auto">
-                              <span className="text-[11px] font-bold text-slate-500">Sort By:</span>
-                              <button
-                                onClick={() => setOwnerEarningsSort('earnings')}
-                                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-colors ${
-                                  ownerEarningsSort === 'earnings' ? 'bg-amber-500 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                                }`}
-                              >
-                                💰 Net Earnings
-                              </button>
-                              <button
-                                onClick={() => setOwnerEarningsSort('bookings')}
-                                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-colors ${
-                                  ownerEarningsSort === 'bookings' ? 'bg-amber-500 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                                }`}
-                              >
-                                📋 Bookings
-                              </button>
-                              <button
-                                onClick={() => setOwnerEarningsSort('name')}
-                                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-colors ${
-                                  ownerEarningsSort === 'name' ? 'bg-amber-500 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                                }`}
-                              >
-                                🔤 Name
-                              </button>
-                            </div>
-                          </div>
-
-                          {/* Owners Table */}
-                          <div className="flex-1 overflow-y-auto">
-                            <table className="w-full text-left text-xs">
-                              <thead className="bg-slate-50 text-slate-400 text-[10px] font-bold uppercase tracking-wider sticky top-0 z-10 border-b border-slate-200">
+                        {/* Owners Table */}
+                        <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
+                          <table className="w-full text-left text-xs">
+                            <thead className="bg-slate-50 text-slate-400 text-[10px] font-bold uppercase tracking-wider sticky top-0 z-10 border-b border-slate-200">
+                              <tr>
+                                <th className="px-6 py-3">Space Owner</th>
+                                <th className="px-4 py-3 text-center">Spots</th>
+                                <th className="px-4 py-3 text-center">Bookings</th>
+                                <th className="px-4 py-3 text-right">Gross Generated</th>
+                                <th className="px-4 py-3 text-right">Admin Fee</th>
+                                <th className="px-6 py-3 text-right">Net Earned (After Comm.)</th>
+                                <th className="px-4 py-3 text-right">Wallet Balance</th>
+                                <th className="px-6 py-3 text-right">Action</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                              {filtered.length === 0 ? (
                                 <tr>
-                                  <th className="px-6 py-3">Space Owner</th>
-                                  <th className="px-4 py-3 text-center">Spots</th>
-                                  <th className="px-4 py-3 text-center">Bookings</th>
-                                  <th className="px-4 py-3 text-right">Gross Generated</th>
-                                  <th className="px-4 py-3 text-right">Admin Fee</th>
-                                  <th className="px-6 py-3 text-right">Net Earned (After Comm.)</th>
-                                  <th className="px-4 py-3 text-right">Wallet Balance</th>
-                                  <th className="px-6 py-3 text-right">Action</th>
+                                  <td colSpan="8" className="text-center py-12 text-slate-400 font-medium">
+                                    No space owners found matching "{ownerEarningsSearch}".
+                                  </td>
                                 </tr>
-                              </thead>
-                              <tbody className="divide-y divide-slate-100">
-                                {filtered.length === 0 ? (
-                                  <tr>
-                                    <td colSpan="8" className="text-center py-12 text-slate-400 font-medium">
-                                      No space owners found matching "{ownerEarningsSearch}".
+                              ) : (
+                                filtered.map((own) => (
+                                  <tr key={own.ownerId} className="hover:bg-amber-50/30 transition-colors">
+                                    <td className="px-6 py-3.5">
+                                      <div className="flex items-center gap-3">
+                                        <div className="h-8 w-8 rounded-full bg-gradient-to-tr from-amber-400 to-amber-600 text-white font-black text-xs flex items-center justify-center shrink-0">
+                                          {(own.name || 'O').charAt(0).toUpperCase()}
+                                        </div>
+                                        <div>
+                                          <p className="font-extrabold text-slate-900 leading-snug">{own.name || 'Owner'}</p>
+                                          <p className="text-[11px] text-slate-400">{own.contact || own.email || '-'}</p>
+                                        </div>
+                                      </div>
+                                    </td>
+                                    <td className="px-4 py-3.5 text-center font-bold text-slate-700">
+                                      <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 font-extrabold">
+                                        {own.spacesCount || 0}
+                                      </span>
+                                    </td>
+                                    <td className="px-4 py-3.5 text-center font-bold text-slate-700">
+                                      <span className="px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 font-extrabold">
+                                        {own.bookingsCount || 0}
+                                      </span>
+                                    </td>
+                                    <td className="px-4 py-3.5 text-right font-bold text-slate-800">
+                                      ₹{(own.grossRevenue || 0).toLocaleString('en-IN')}
+                                    </td>
+                                    <td className="px-4 py-3.5 text-right font-bold text-indigo-600">
+                                      -₹{(own.adminCommission || 0).toLocaleString('en-IN')}
+                                    </td>
+                                    <td className="px-6 py-3.5 text-right">
+                                      <span className="text-sm font-black text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
+                                        ₹{(own.totalEarnings || 0).toLocaleString('en-IN')}
+                                      </span>
+                                    </td>
+                                    <td className="px-4 py-3.5 text-right font-extrabold text-slate-700">
+                                      ₹{(own.walletBalance || 0).toLocaleString('en-IN')}
+                                    </td>
+                                    <td className="px-6 py-3.5 text-right">
+                                      <button
+                                        onClick={() => {
+                                          setShowOwnerEarningsModal(false);
+                                          const fullUser = users.find(u => u._id === own.ownerId);
+                                          if (fullUser) setSelectedOwnerForDetail(fullUser);
+                                          navigate('/admin/owners');
+                                        }}
+                                        className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold transition-colors inline-flex items-center gap-1 cursor-pointer"
+                                      >
+                                        <span>View Spaces</span>
+                                        <ExternalLink className="h-3 w-3" />
+                                      </button>
                                     </td>
                                   </tr>
-                                ) : (
-                                  filtered.map((own) => (
-                                    <tr key={own.ownerId} className="hover:bg-amber-50/30 transition-colors">
-                                      <td className="px-6 py-3.5">
-                                        <div className="flex items-center gap-3">
-                                          <div className="h-8 w-8 rounded-full bg-gradient-to-tr from-amber-400 to-amber-600 text-white font-black text-xs flex items-center justify-center shrink-0">
-                                            {(own.name || 'O').charAt(0).toUpperCase()}
-                                          </div>
-                                          <div>
-                                            <p className="font-extrabold text-slate-900 leading-snug">{own.name || 'Owner'}</p>
-                                            <p className="text-[11px] text-slate-400">{own.contact || own.email || '-'}</p>
-                                          </div>
-                                        </div>
-                                      </td>
-                                      <td className="px-4 py-3.5 text-center font-bold text-slate-700">
-                                        <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 font-extrabold">
-                                          {own.spacesCount || 0}
-                                        </span>
-                                      </td>
-                                      <td className="px-4 py-3.5 text-center font-bold text-slate-700">
-                                        <span className="px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 font-extrabold">
-                                          {own.bookingsCount || 0}
-                                        </span>
-                                      </td>
-                                      <td className="px-4 py-3.5 text-right font-bold text-slate-800">
-                                        ₹{(own.grossRevenue || 0).toLocaleString('en-IN')}
-                                      </td>
-                                      <td className="px-4 py-3.5 text-right font-bold text-indigo-600">
-                                        -₹{(own.adminCommission || 0).toLocaleString('en-IN')}
-                                      </td>
-                                      <td className="px-6 py-3.5 text-right">
-                                        <span className="text-sm font-black text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
-                                          ₹{(own.totalEarnings || 0).toLocaleString('en-IN')}
-                                        </span>
-                                      </td>
-                                      <td className="px-4 py-3.5 text-right font-extrabold text-slate-700">
-                                        ₹{(own.walletBalance || 0).toLocaleString('en-IN')}
-                                      </td>
-                                      <td className="px-6 py-3.5 text-right">
-                                        <button
-                                          onClick={() => {
-                                            setShowOwnerEarningsModal(false);
-                                            const fullUser = users.find(u => u._id === own.ownerId);
-                                            if (fullUser) setSelectedOwnerForDetail(fullUser);
-                                            navigate('/admin/owners');
-                                          }}
-                                          className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold transition-colors inline-flex items-center gap-1 cursor-pointer"
-                                        >
-                                          <span>View Spaces</span>
-                                          <ExternalLink className="h-3 w-3" />
-                                        </button>
-                                      </td>
-                                    </tr>
-                                  ))
-                                )}
-                              </tbody>
-                            </table>
-                          </div>
+                                ))
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
 
-                          {/* Modal Footer */}
-                          <div className="px-6 py-3.5 bg-slate-50 border-t border-slate-200 flex items-center justify-between shrink-0">
-                            <span className="text-xs text-slate-500 font-medium">
-                              💡 Need to process host payouts? Manage them in Owner Withdrawals.
-                            </span>
-                            <div className="flex items-center gap-2">
-                              <button
-                                onClick={() => {
-                                  setShowOwnerEarningsModal(false);
-                                  navigate('/admin/payouts');
-                                }}
-                                className="px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl text-xs font-bold transition-colors cursor-pointer"
-                              >
-                                Manage Withdrawals →
-                              </button>
-                              <button
-                                onClick={() => setShowOwnerEarningsModal(false)}
-                                className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer"
-                              >
-                                Close
-                              </button>
-                            </div>
+                        {/* Section Footer */}
+                        <div className="px-6 py-3.5 bg-slate-50 border-t border-slate-200 flex items-center justify-between shrink-0">
+                          <span className="text-xs text-slate-500 font-medium">
+                            💡 Need to process host payouts? Manage them in Owner Withdrawals.
+                          </span>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => {
+                                setShowOwnerEarningsModal(false);
+                                navigate('/admin/payouts');
+                              }}
+                              className="px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+                            >
+                              Manage Withdrawals →
+                            </button>
+                            <button
+                              onClick={() => setShowOwnerEarningsModal(false)}
+                              className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer"
+                            >
+                              Hide Breakdown
+                            </button>
                           </div>
                         </div>
                       </div>
@@ -2101,24 +2040,6 @@ const AdminDashboard = () => {
                     </div>
                   </div>
 
-                  {/* Bottom Row Dashboard Cards */}
-                  <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-                    {[
-                      { title: 'Pending Verifications', count: users.filter(u => u.status === 'pending').length, color: 'border-blue-200 text-blue-600 bg-blue-50/30', view: 'users' },
-                      { title: 'Active Complaints', count: complaints.filter(c => c.status !== 'resolved').length, color: 'border-amber-200 text-amber-600 bg-amber-50/30', view: 'complaints' },
-                      { title: 'Parkings Awaiting Approval', count: spaces.length, color: 'border-indigo-200 text-indigo-600 bg-indigo-50/30', view: 'spaces' },
-                      { title: "Today's Revenue Payouts", count: `₹${analytics.finances?.todayRevenue || 0}`, color: 'border-emerald-200 text-emerald-600 bg-emerald-50/30', view: 'revenue' },
-                      { title: 'Cancelled Bookings', count: analytics.bookings?.cancelled || 0, color: 'border-rose-200 text-rose-500 bg-rose-50/30', view: 'bookings' },
-                    ].map((card, idx) => (
-                      <div key={idx} className={`border rounded-2xl p-5 shadow-sm flex items-center justify-between transition-transform hover:-translate-y-0.5 cursor-pointer ${card.color}`} onClick={() => navigate(`/admin/dashboard/${card.view}`)}>
-                        <div>
-                          <p className="text-[10px] uppercase font-bold tracking-wider opacity-80 leading-tight">{card.title}</p>
-                          <p className="text-2xl font-black mt-1.5">{card.count}</p>
-                        </div>
-                        <ChevronDown className="h-5 w-5 -rotate-90 opacity-40" />
-                      </div>
-                    ))}
-                  </div>
 
                   {/* Recent Bookings List */}
                   <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm">
