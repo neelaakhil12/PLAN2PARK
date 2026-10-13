@@ -186,6 +186,10 @@ router.post('/', protect, seekerOnly, upload.single('driverImageFile'), async (r
 
     // Calculate total amount was handled above
 
+    // ── Apply Promotional Code Discount if provided ──
+    const promoDiscountAmount = Math.max(0, Math.min(Number(req.body.promoDiscount) || 0, totalAmount));
+    const priceAfterPromo = Math.max(0, totalAmount - promoDiscountAmount);
+
     // ── Apply Owner-Configured Wallet Discount if Seeker opted in ──
     let walletAmountUsed = 0;
     const maxDiscountAllowed = (space.maxWalletDiscount !== undefined && space.maxWalletDiscount !== null) ? Number(space.maxWalletDiscount) : 10;
@@ -194,11 +198,11 @@ router.post('/', protect, seekerOnly, upload.single('driverImageFile'), async (r
       const seeker = await User.findById(req.user._id);
       const seekerBalance = seeker ? (seeker.walletBalance || 0) : 0;
       if (seekerBalance > 0) {
-        walletAmountUsed = Math.min(seekerBalance, maxDiscountAllowed, totalAmount);
+        walletAmountUsed = Math.min(seekerBalance, maxDiscountAllowed, priceAfterPromo);
       }
     }
 
-    const finalPayableAmount = Math.max(0, totalAmount - walletAmountUsed);
+    const finalPayableAmount = Math.max(0, priceAfterPromo - walletAmountUsed);
     const isFullyPaidByWallet = finalPayableAmount === 0 && walletAmountUsed > 0;
 
     // If 100% paid by wallet, deduct wallet balance now
@@ -230,6 +234,8 @@ router.post('/', protect, seekerOnly, upload.single('driverImageFile'), async (r
       endTime: endTime,
       totalAmount: finalPayableAmount,
       walletAmountUsed,
+      promoCode: req.body.promoCode ? req.body.promoCode.toUpperCase().trim() : null,
+      promoDiscount: promoDiscountAmount,
       driverImage: finalDriverImage,
       status: isFullyPaidByWallet ? 'paid' : 'allotted',
       paymentStatus: isFullyPaidByWallet ? 'paid' : 'unpaid',
@@ -1525,6 +1531,74 @@ const cancelBookingHandler = async (req, res) => {
     }
 
     await booking.save();
+
+    // ── Dispatch Cancellation & Refund Notifications (Seeker & Space Owner) ──
+    try {
+      // 1. Seeker In-App & Push Notification with horn sound
+      const seekerNotifTitle = '🚫 Booking Cancelled & Refunded';
+      const seekerNotifMsg = refundAmount > 0
+        ? `Your booking at ${space ? space.title : 'Parking Space'} was cancelled. ₹${refundAmount} (${policyApplied === 'half' ? '50%' : '100%'} refund) credited to your wallet!`
+        : `Your booking at ${space ? space.title : 'Parking Space'} was cancelled successfully.`;
+
+      await Notification.create({
+        userId: booking.seekerId,
+        targetRole: 'seeker',
+        type: 'cancellation',
+        title: seekerNotifTitle,
+        message: seekerNotifMsg,
+        data: {
+          bookingId: booking._id,
+          spaceId: booking.spaceId,
+          refundAmount,
+          policyApplied,
+        },
+      });
+
+      const seekerUser = await User.findById(booking.seekerId);
+      if (seekerUser && seekerUser.pushToken) {
+        sendPushNotification(
+          seekerUser.pushToken,
+          seekerNotifTitle,
+          seekerNotifMsg,
+          { screen: 'Bookings', bookingId: booking._id, type: 'cancellation' }
+        );
+      }
+
+      // 2. Space Owner In-App & Push Notification with horn sound
+      if (space && space.ownerId) {
+        const ownerUser = await User.findById(space.ownerId);
+        if (ownerUser) {
+          const slotTag = booking.slotId ? `Slot ${booking.slotId}` : 'The parking slot';
+          const ownerNotifTitle = '⚠️ Booking Cancelled by Commuter';
+          const ownerNotifMsg = `Booking #${booking._id.toString().slice(-6)} at ${space.title || 'your spot'} was cancelled. ${slotTag} is now released and available.`;
+
+          await Notification.create({
+            userId: ownerUser._id,
+            targetRole: 'owner',
+            type: 'cancellation',
+            title: ownerNotifTitle,
+            message: ownerNotifMsg,
+            data: {
+              bookingId: booking._id,
+              spaceId: space._id,
+              slotId: booking.slotId,
+              retainedAmount: booking.ownerEarnings || 0,
+            },
+          });
+
+          if (ownerUser.pushToken) {
+            sendPushNotification(
+              ownerUser.pushToken,
+              ownerNotifTitle,
+              ownerNotifMsg,
+              { screen: 'Orders', bookingId: booking._id, type: 'cancellation' }
+            );
+          }
+        }
+      }
+    } catch (notifErr) {
+      console.warn('[Cancel Booking] Error dispatching notifications:', notifErr.message);
+    }
 
     const policyText = policyApplied === 'full' ? '100% Full Refund' : policyApplied === 'half' ? '50% Half Refund' : 'No Refund';
     const message = refundAmount > 0

@@ -348,6 +348,11 @@ export default function BookingsScreen({ navigation }) {
             (estimatedRefund > 0
               ? `Reservation cancelled successfully! ₹${estimatedRefund} has been refunded to your PlanToPark Wallet.`
               : 'Reservation cancelled.');
+          triggerExternalNotification({
+            title: '🚫 Booking Cancelled & Refunded',
+            body: msg,
+            data: { screen: 'Wallet' },
+          });
           Alert.alert('Cancelled', msg);
           fetchMyBookings();
         } else {

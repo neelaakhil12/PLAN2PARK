@@ -111,6 +111,9 @@ const AdminDashboard = () => {
   const [termOrderInput, setTermOrderInput] = useState(1);
   const [termSearchQuery, setTermSearchQuery] = useState('');
   const [showAddTermModal, setShowAddTermModal] = useState(false);
+  const [showBulkEditTermsModal, setShowBulkEditTermsModal] = useState(false);
+  const [bulkTermsList, setBulkTermsList] = useState([]);
+  const [savingBulkTerms, setSavingBulkTerms] = useState(false);
 
   // ── Chatbot FAQs Management States ──
   const [faqs, setFaqs] = useState([]);
@@ -254,6 +257,47 @@ const AdminDashboard = () => {
       }
     } catch (err) {
       alert('Delete term error: ' + err.message);
+    }
+  };
+
+  const openBulkEditTerms = () => {
+    const currentList = terms
+      .filter(t => t.type === termsType)
+      .sort((a, b) => (a.order || 0) - (b.order || 0))
+      .map(t => t.clause);
+    setBulkTermsList(currentList.length > 0 ? currentList : ['']);
+    setShowBulkEditTermsModal(true);
+  };
+
+  const handleSaveBulkTerms = async (e) => {
+    if (e) e.preventDefault();
+    const cleaned = bulkTermsList.map(s => s.trim()).filter(Boolean);
+    if (cleaned.length === 0) {
+      alert('Please provide at least one clause text');
+      return;
+    }
+    setSavingBulkTerms(true);
+    try {
+      const res = await fetch(`${API_URL}/terms/admin/bulk/${termsType}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ clauses: cleaned }),
+      });
+      const data = await res.json();
+      if (res.ok && data.terms) {
+        setTerms(data.terms);
+        setShowBulkEditTermsModal(false);
+        alert(`🎉 All ${cleaned.length} clauses saved successfully in one click!`);
+      } else {
+        alert(data.message || 'Failed to save terms');
+      }
+    } catch (err) {
+      alert('Error updating terms: ' + err.message);
+    } finally {
+      setSavingBulkTerms(false);
     }
   };
 
@@ -935,12 +979,9 @@ const AdminDashboard = () => {
     bookings: 'Platform Bookings',
     revenue: 'Revenue Reports & Ledger',
     payouts: '💸 Owner Withdrawals & Payout Requests',
-    promotions: 'Promotional Offers & Push Broadcasts',
     terms: '📜 Terms & Conditions Management',
     faqs: '💬 Chatbot FAQs (Parking & Bank Repo Yards)',
-    complaints: 'Complaints',
-    reviews: 'Support Reviews',
-    notifications: 'Notifications',
+    settings: '⚙️ Platform Settings & Configurations',
   };
 
   const menuItems = [
@@ -952,12 +993,9 @@ const AdminDashboard = () => {
     { id: 'bookings', path: '/admin/bookings', label: 'Platform Bookings', icon: <ClipboardList className="h-4.5 w-4.5" /> },
     { id: 'revenue', path: '/admin/revenue', label: 'Revenue & Invoices', icon: <DollarSign className="h-4.5 w-4.5 text-emerald-400" /> },
     { id: 'payouts', path: '/admin/payouts', label: '💸 Owner Withdrawals', icon: <DollarSign className="h-4.5 w-4.5 text-amber-400" /> },
-    { id: 'promotions', path: '/admin/promotions', label: '📢 Promotional Offers', icon: <Megaphone className="h-4.5 w-4.5 text-amber-400" /> },
     { id: 'terms', path: '/admin/terms', label: '📜 Terms & Conditions', icon: <FileText className="h-4.5 w-4.5 text-indigo-400" /> },
     { id: 'faqs', path: '/admin/faqs', label: '💬 Chatbot FAQs', icon: <HelpCircle className="h-4.5 w-4.5 text-cyan-400" /> },
-    { id: 'complaints', path: '/admin/complaints', label: 'Complaints', icon: <AlertTriangle className="h-4.5 w-4.5 text-rose-400" /> },
-    { id: 'reviews', path: '/admin/reviews', label: 'Support Reviews', icon: <MessageSquare className="h-4.5 w-4.5 text-purple-400" /> },
-    { id: 'notifications', path: '/admin/notifications', label: 'Notifications', icon: <Bell className="h-4.5 w-4.5" /> },
+    { id: 'settings', path: '/admin/settings', label: '⚙️ Platform Settings', icon: <Settings className="h-4.5 w-4.5 text-indigo-400" /> },
   ];  return (
     <div className="h-screen w-screen bg-slate-50 flex font-sans overflow-hidden">
 
@@ -1013,8 +1051,6 @@ const AdminDashboard = () => {
               ? users.filter(u => u.status === 'pending').length
               : item.id === 'payouts'
               ? payoutRequests.filter(r => r.status === 'pending').length
-              : item.id === 'notifications'
-              ? unreadCount
               : 0;
             return (
               <button
@@ -1159,167 +1195,178 @@ const AdminDashboard = () => {
           ) : (
             <div className="space-y-8">
               
-              {/* ── VIEW: PROMOTIONAL OFFERS & PUSH BROADCASTS ─────────────────── */}
-              {currentView === 'promotions' && (
-                <div className="space-y-8 animate-fadeIn">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              {/* ── VIEW: PLATFORM SETTINGS ────────────────────────────────────── */}
+              {currentView === 'settings' && (
+                <div className="space-y-6 animate-fadeIn">
+                  {/* Header */}
+                  <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div>
                       <h2 className="text-xl font-black text-slate-900 flex items-center gap-2">
-                        <Megaphone className="h-6 w-6 text-amber-500" />
-                        Promotional Offers & Push Broadcasts
+                        <Settings className="h-6 w-6 text-indigo-500" />
+                        ⚙️ Platform Settings & Configurations
                       </h2>
-                      <p className="text-xs text-slate-500 mt-1">Broadcast discounts, coupon codes, and special parking alerts directly to Seeker app users.</p>
+                      <p className="text-xs text-slate-500 mt-1">
+                        Manage platform commission fee, space host minimum payout withdrawal limits, and official contact helplines.
+                      </p>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                    {/* Compose Broadcast Form */}
-                    <div className="lg:col-span-1 bg-white rounded-3xl border border-slate-200 p-6 shadow-sm">
-                      <div className="flex items-center gap-2 mb-4">
-                        <div className="h-8 w-8 bg-amber-50 rounded-xl flex items-center justify-center text-amber-600 font-bold">
-                          <Sparkles className="h-4 w-4" />
-                        </div>
-                        <h3 className="text-sm font-black text-slate-900">Create New Offer Broadcast</h3>
-                      </div>
+                  {/* Financial & Fee Rules */}
+                  <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-6">
+                    <div className="border-b border-slate-100 pb-4">
+                      <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
+                        <DollarSign className="h-5 w-5 text-amber-500" />
+                        Platform Financial & Payout Rules
+                      </h3>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        These rates directly govern space owner earnings and payout withdrawal eligibility across Plan2Park.
+                      </p>
+                    </div>
 
-                      <form onSubmit={handleBroadcastPromo} className="space-y-4">
-                        <div>
-                          <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">Campaign Title *</label>
-                          <input
-                            type="text"
-                            required
-                            placeholder="e.g. 🎉 Weekend 20% OFF Special!"
-                            value={promoTitle}
-                            onChange={(e) => setPromoTitle(e.target.value)}
-                            className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:border-amber-500"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">Message / Notification Text *</label>
-                          <textarea
-                            required
-                            rows={3}
-                            placeholder="e.g. Book your spot today and get an instant 20% discount on all Hyderabad parking spaces!"
-                            value={promoMessage}
-                            onChange={(e) => setPromoMessage(e.target.value)}
-                            className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:border-amber-500 resize-none"
-                          />
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-3">
-                          <div>
-                            <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">Promo Code</label>
-                            <input
-                              type="text"
-                              placeholder="e.g. PARK20"
-                              value={promoCode}
-                              onChange={(e) => setPromoCode(e.target.value)}
-                              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold uppercase focus:outline-none focus:border-amber-500"
-                            />
+                    <form onSubmit={handleSaveCommission} className="space-y-6">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {/* Commission Fee Input */}
+                        <div className="bg-slate-50 rounded-2xl p-5 border border-slate-200/80">
+                          <div className="flex items-center justify-between mb-2">
+                            <label className="text-xs font-black text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                              <Percent className="h-4 w-4 text-indigo-500" />
+                              Platform Commission Fee (%)
+                            </label>
+                            <span className="text-xs font-extrabold px-2.5 py-0.5 rounded-full bg-indigo-100 text-indigo-700">
+                              Active: {commissionRate}%
+                            </span>
                           </div>
-                          <div>
-                            <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">Discount %</label>
+                          <p className="text-xs text-slate-500 mb-4 leading-relaxed">
+                            Percentage retained by Plan2Park from each completed booking. The remaining amount is credited directly to the space owner's wallet.
+                          </p>
+                          <div className="relative">
+                            <input
+                              type="number"
+                              min="0"
+                              max="100"
+                              step="0.5"
+                              value={commissionInput}
+                              onChange={(e) => setCommissionInput(e.target.value)}
+                              className="w-full bg-white border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm font-bold text-slate-800 placeholder-slate-400 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 pr-10"
+                            />
+                            <span className="absolute right-3.5 top-2.5 text-sm text-slate-400 font-bold">%</span>
+                          </div>
+                          <div className="mt-3 text-[11px] text-slate-600 font-medium bg-white/80 p-2.5 rounded-lg border border-slate-200">
+                            💡 Example: On a ₹100 booking, Plan2Park keeps <strong>₹{Number(commissionInput) || 0}</strong> and the space host receives <strong>₹{Math.max(0, 100 - (Number(commissionInput) || 0))}</strong>.
+                          </div>
+                        </div>
+
+                        {/* Minimum Withdrawal Limit Input */}
+                        <div className="bg-slate-50 rounded-2xl p-5 border border-slate-200/80">
+                          <div className="flex items-center justify-between mb-2">
+                            <label className="text-xs font-black text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                              <DollarSign className="h-4 w-4 text-amber-500" />
+                              Minimum Wallet Payout Limit (₹)
+                            </label>
+                            <span className="text-xs font-extrabold px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-700">
+                              Active: ₹{Number(minWithdrawalAmount).toLocaleString('en-IN')}
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-500 mb-4 leading-relaxed">
+                            Minimum balance a space host must accumulate before they can request a wallet withdrawal into their Bank Account or UPI ID.
+                          </p>
+                          <div className="relative">
                             <input
                               type="number"
                               min="1"
-                              max="100"
-                              placeholder="e.g. 20"
-                              value={promoDiscount}
-                              onChange={(e) => setPromoDiscount(e.target.value)}
-                              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:border-amber-500"
+                              step="50"
+                              value={minWithdrawalInput}
+                              onChange={(e) => setMinWithdrawalInput(e.target.value)}
+                              className="w-full bg-white border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm font-bold text-slate-800 placeholder-slate-400 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 pl-8"
                             />
+                            <span className="absolute left-3.5 top-2.5 text-sm text-slate-400 font-bold">₹</span>
+                          </div>
+                          <div className="mt-3 text-[11px] text-slate-600 font-medium bg-white/80 p-2.5 rounded-lg border border-slate-200">
+                            💡 Hosts with wallet balances lower than <strong>₹{Number(minWithdrawalInput) || 0}</strong> cannot submit withdrawal requests until reaching this threshold.
                           </div>
                         </div>
-
-                        <div className="grid grid-cols-2 gap-3">
-                          <div>
-                            <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">Target Audience</label>
-                            <select
-                              value={promoAudience}
-                              onChange={(e) => setPromoAudience(e.target.value)}
-                              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:border-amber-500"
-                            >
-                              <option value="seeker">Seeker App Users</option>
-                              <option value="owner">Space Owners</option>
-                              <option value="all">All Registered Users</option>
-                            </select>
-                          </div>
-                          <div>
-                            <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">Validity Text</label>
-                            <input
-                              type="text"
-                              placeholder="e.g. Valid this Sunday"
-                              value={promoValidUntil}
-                              onChange={(e) => setPromoValidUntil(e.target.value)}
-                              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:border-amber-500"
-                            />
-                          </div>
-                        </div>
-
-                        <button
-                          type="submit"
-                          disabled={broadcastingPromo}
-                          className="w-full bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white font-black py-3 rounded-xl text-xs shadow-lg shadow-amber-500/25 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
-                        >
-                          <Send className="h-4 w-4" />
-                          {broadcastingPromo ? 'Broadcasting Offer...' : '🚀 Broadcast to All Seeker Users'}
-                        </button>
-                      </form>
-                    </div>
-
-                    {/* Sent Broadcasts History */}
-                    <div className="lg:col-span-2 bg-white rounded-3xl border border-slate-200 p-6 shadow-sm flex flex-col">
-                      <div className="flex items-center justify-between mb-4">
-                        <div className="flex items-center gap-2">
-                          <div className="h-8 w-8 bg-emerald-50 rounded-xl flex items-center justify-center text-emerald-600 font-bold">
-                            <Tag className="h-4 w-4" />
-                          </div>
-                          <h3 className="text-sm font-black text-slate-900">Active & Past Broadcast Offers</h3>
-                        </div>
-                        <span className="text-[11px] font-bold text-slate-400">{promoBroadcasts.length} Campaigns</span>
                       </div>
 
-                      {promoBroadcasts.length === 0 ? (
-                        <div className="py-16 text-center">
-                          <Megaphone className="h-10 w-10 text-slate-200 mx-auto mb-3" />
-                          <p className="text-xs text-slate-400 font-bold">No promotional campaigns broadcasted yet.</p>
-                        </div>
-                      ) : (
-                        <div className="space-y-3 overflow-y-auto max-h-[500px] pr-1">
-                          {promoBroadcasts.map((promo) => (
-                            <div key={promo._id} className="p-4 rounded-2xl border border-slate-100 bg-slate-50/50 hover:bg-slate-50 transition-colors relative">
-                              <div className="flex items-start justify-between gap-3">
-                                <div>
-                                  <div className="flex items-center gap-2 mb-1">
-                                    <span className="px-2 py-0.5 bg-amber-100 text-amber-800 rounded-full text-[9px] font-black uppercase">
-                                      {promo.targetRole}
-                                    </span>
-                                    {promo.promoCode && (
-                                      <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-full text-[9px] font-black">
-                                        🎟️ {promo.promoCode} {promo.discountPercent ? `(${promo.discountPercent}% OFF)` : ''}
-                                      </span>
-                                    )}
-                                    <span className="text-[10px] text-slate-400 font-medium">
-                                      {new Date(promo.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                                    </span>
-                                  </div>
-                                  <h4 className="text-xs font-black text-slate-800">{promo.title}</h4>
-                                  <p className="text-[11px] text-slate-600 mt-1 leading-relaxed">{promo.message}</p>
-                                </div>
-                                <button
-                                  onClick={() => handleDeletePromo(promo._id)}
-                                  className="text-slate-400 hover:text-rose-500 p-1.5 rounded-lg hover:bg-rose-50 transition-colors"
-                                  title="Delete campaign"
-                                >
-                                  <X className="h-4 w-4" />
-                                </button>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
+                      <div className="flex justify-end">
+                        <button
+                          type="submit"
+                          disabled={savingCommission}
+                          className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-extrabold px-6 py-3 rounded-xl text-xs flex items-center gap-2 shadow-lg shadow-indigo-600/25 transition-all cursor-pointer"
+                        >
+                          {savingCommission ? 'Saving Financial Settings...' : '💾 Save Financial Settings'}
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+
+                  {/* 24/7 Platform Helpline & Concierge Contacts */}
+                  <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+                      <div>
+                        <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
+                          <span className="text-lg">📞</span> 24/7 Platform Helpline & Concierge Contacts
+                        </h3>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          Configure official helpline and support contacts displayed across the Mobile Apps and Web Portal.
+                        </p>
+                      </div>
+                      {supportSettingsSuccess && (
+                        <span className="px-3 py-1 rounded-full text-xs font-black bg-emerald-50 text-emerald-700 border border-emerald-200">
+                          ✓ Support Contacts Saved!
+                        </span>
                       )}
                     </div>
+
+                    <form onSubmit={handleSaveSupportSettings} className="space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div>
+                          <label className="block text-[11px] font-bold text-slate-600 mb-1">📞 General Support Phone</label>
+                          <input
+                            type="text"
+                            value={supportSettings.supportPhone || ''}
+                            onChange={(e) => setSupportSettings({ ...supportSettings, supportPhone: e.target.value })}
+                            className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:border-indigo-400"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[11px] font-bold text-slate-600 mb-1">✉️ General Support Email</label>
+                          <input
+                            type="email"
+                            value={supportSettings.supportEmail || ''}
+                            onChange={(e) => setSupportSettings({ ...supportSettings, supportEmail: e.target.value })}
+                            className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:border-indigo-400"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[11px] font-bold text-slate-600 mb-1">💬 WhatsApp Helpline</label>
+                          <input
+                            type="text"
+                            value={supportSettings.supportWhatsapp || ''}
+                            onChange={(e) => setSupportSettings({ ...supportSettings, supportWhatsapp: e.target.value })}
+                            className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:border-indigo-400"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[11px] font-bold text-slate-600 mb-1">⏱️ Support Operating Hours</label>
+                          <input
+                            type="text"
+                            value={supportSettings.supportHours || ''}
+                            onChange={(e) => setSupportSettings({ ...supportSettings, supportHours: e.target.value })}
+                            className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:border-indigo-400"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex justify-end">
+                        <button
+                          type="submit"
+                          disabled={savingSupportSettings}
+                          className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold px-5 py-2.5 rounded-xl text-xs flex items-center gap-2 shadow-md shadow-emerald-600/20 transition-all cursor-pointer"
+                        >
+                          {savingSupportSettings ? 'Saving Support Settings...' : '💾 Save Support Helpline Settings'}
+                        </button>
+                      </div>
+                    </form>
                   </div>
                 </div>
               )}
@@ -1866,16 +1913,10 @@ const AdminDashboard = () => {
                       </div>
 
                       <button
-                        onClick={() => {
-                          setEditingTerm(null);
-                          setTermClauseInput('');
-                          const maxOrd = Math.max(0, ...terms.filter(t => t.type === termsType).map(t => t.order || 0));
-                          setTermOrderInput(maxOrd + 1);
-                          setShowAddTermModal(true);
-                        }}
-                        className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-4 py-2.5 rounded-xl text-xs flex items-center gap-2 shadow-md shadow-indigo-600/20 transition-all shrink-0"
+                        onClick={openBulkEditTerms}
+                        className="bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold px-5 py-2.5 rounded-xl text-xs flex items-center gap-2 shadow-lg shadow-indigo-600/25 transition-all shrink-0 cursor-pointer"
                       >
-                        <Plus className="h-4 w-4" /> Add New Clause
+                        <Edit2 className="h-4 w-4" /> ✏️ Edit All Terms (One-Click)
                       </button>
                     </div>
 
@@ -1890,22 +1931,9 @@ const AdminDashboard = () => {
                               : 'text-slate-600 hover:text-slate-900'
                           }`}
                         >
-                          <span>🏢 Space Owner (30 Pts)</span>
-                          <span className="px-2 py-0.5 rounded-full text-[10px] bg-indigo-50 text-indigo-600">
-                            {terms.filter(t => t.type === 'owner').length}
-                          </span>
-                        </button>
-                        <button
-                          onClick={() => setTermsType('storage_owner')}
-                          className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
-                            termsType === 'storage_owner'
-                              ? 'bg-white text-amber-700 shadow-sm font-black'
-                              : 'text-slate-600 hover:text-slate-900'
-                          }`}
-                        >
-                          <span>🚜 Storage Yard Owner (30 Pts)</span>
-                          <span className="px-2 py-0.5 rounded-full text-[10px] bg-amber-50 text-amber-600">
-                            {terms.filter(t => t.type === 'storage_owner').length}
+                          <span>🏢 Space Owner</span>
+                          <span className="px-2 py-0.5 rounded-full text-[10px] bg-indigo-50 text-indigo-600 font-bold">
+                            {terms.filter(t => t.type === 'owner').length} Clauses
                           </span>
                         </button>
                         <button
@@ -1916,22 +1944,9 @@ const AdminDashboard = () => {
                               : 'text-slate-600 hover:text-slate-900'
                           }`}
                         >
-                          <span>🚗 Parking Seeker (30 Pts)</span>
-                          <span className="px-2 py-0.5 rounded-full text-[10px] bg-blue-50 text-blue-600">
-                            {terms.filter(t => t.type === 'seeker').length}
-                          </span>
-                        </button>
-                        <button
-                          onClick={() => setTermsType('bank_finance')}
-                          className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
-                            termsType === 'bank_finance'
-                              ? 'bg-white text-cyan-700 shadow-sm font-black'
-                              : 'text-slate-600 hover:text-slate-900'
-                          }`}
-                        >
-                          <span>🏦 Bank & Auto Finance (30 Pts)</span>
-                          <span className="px-2 py-0.5 rounded-full text-[10px] bg-cyan-50 text-cyan-600">
-                            {terms.filter(t => t.type === 'bank_finance').length}
+                          <span>🚗 Parking Seeker</span>
+                          <span className="px-2 py-0.5 rounded-full text-[10px] bg-blue-50 text-blue-600 font-bold">
+                            {terms.filter(t => t.type === 'seeker').length} Clauses
                           </span>
                         </button>
                       </div>
@@ -2148,18 +2163,6 @@ const AdminDashboard = () => {
                                   <td className="px-6 py-4 text-right">
                                     <div className="flex items-center justify-end gap-1.5">
                                       <button
-                                        onClick={() => {
-                                          setEditingTerm(t);
-                                          setTermClauseInput(t.clause);
-                                          setTermOrderInput(t.order || idx + 1);
-                                          setShowAddTermModal(true);
-                                        }}
-                                        className="h-8 w-8 rounded-lg bg-slate-50 border border-slate-200 text-slate-600 hover:text-indigo-600 hover:border-indigo-300 flex items-center justify-center transition-colors"
-                                        title="Edit Clause"
-                                      >
-                                        <Edit2 className="h-3.5 w-3.5" />
-                                      </button>
-                                      <button
                                         onClick={() => handleDeleteTerm(t._id)}
                                         className="h-8 w-8 rounded-lg bg-slate-50 border border-slate-200 text-slate-600 hover:text-rose-600 hover:border-rose-300 flex items-center justify-center transition-colors"
                                         title="Delete Clause"
@@ -2176,78 +2179,93 @@ const AdminDashboard = () => {
                       </div>
                     </div>
 
-                    {/* Add / Edit Modal */}
-                    {showAddTermModal && (
-                      <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-                        <div className="bg-white rounded-3xl border border-slate-200 max-w-lg w-full p-6 shadow-2xl animate-scaleUp">
-                          <div className="flex items-center justify-between pb-4 border-b border-slate-100 mb-4">
-                            <h3 className="font-black text-slate-900 text-base flex items-center gap-2">
-                              <FileText className="h-5 w-5 text-indigo-500" />
-                              {editingTerm ? 'Edit Term Clause' : 'Add New Term Clause'}
-                            </h3>
+                    {/* ── BULK TERMS LIVE EDITOR MODAL (EDIT ALL AT ONCE IN 1-CLICK) ── */}
+                    {showBulkEditTermsModal && (
+                      <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+                        <div className="bg-white rounded-3xl border border-slate-200 max-w-3xl w-full max-h-[90vh] flex flex-col shadow-2xl animate-scaleUp overflow-hidden">
+                          {/* Modal Header */}
+                          <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/80 shrink-0">
+                            <div>
+                              <h3 className="font-black text-slate-900 text-base flex items-center gap-2">
+                                <FileText className="h-5 w-5 text-indigo-600" />
+                                Edit All Terms (1-Click) — {termsType === 'owner' ? '🏢 Space Owner' : '🚗 Parking Seeker'}
+                              </h3>
+                              <p className="text-[11px] text-slate-500 mt-0.5">
+                                Modify clauses below, add new clauses, or delete clauses. Click "Save All Terms" once to apply live to all users!
+                              </p>
+                            </div>
                             <button
-                              onClick={() => setShowAddTermModal(false)}
-                              className="h-8 w-8 rounded-xl bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200 transition-colors"
+                              onClick={() => setShowBulkEditTermsModal(false)}
+                              className="h-8 w-8 rounded-full hover:bg-slate-200 flex items-center justify-center text-slate-400 hover:text-slate-700 transition-colors"
                             >
                               <X className="h-4 w-4" />
                             </button>
                           </div>
 
-                          <form onSubmit={handleSaveTerm} className="space-y-4">
-                            <div>
-                              <label className="block text-xs font-bold text-slate-600 mb-1">Target Application</label>
-                              <select
-                                value={termsType}
-                                onChange={(e) => setTermsType(e.target.value)}
-                                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:border-indigo-400"
-                              >
-                                <option value="owner">🏢 Space Owner Terms (30 Clauses)</option>
-                                <option value="storage_owner">🚜 Storage Yard Owner Terms (30 Clauses)</option>
-                                <option value="seeker">🚗 Parking Seeker Terms (30 Clauses)</option>
-                                <option value="bank_finance">🏦 Bank & Auto Finance Terms (30 Clauses)</option>
-                              </select>
-                            </div>
+                          {/* Clauses Scrollable List */}
+                          <div className="p-6 overflow-y-auto space-y-4 flex-1">
+                            {bulkTermsList.map((clauseText, idx) => (
+                              <div key={idx} className="flex items-start gap-3 bg-slate-50 border border-slate-200 rounded-2xl p-3.5 focus-within:border-indigo-400 focus-within:ring-2 focus-within:ring-indigo-100 transition-all">
+                                <div className="h-7 w-7 rounded-lg bg-indigo-100 text-indigo-700 font-black text-xs flex items-center justify-center shrink-0 mt-0.5">
+                                  {idx + 1}
+                                </div>
+                                <textarea
+                                  rows={2}
+                                  value={clauseText}
+                                  onChange={(e) => {
+                                    const updated = [...bulkTermsList];
+                                    updated[idx] = e.target.value;
+                                    setBulkTermsList(updated);
+                                  }}
+                                  placeholder={`Enter clause #${idx + 1}...`}
+                                  className="flex-1 bg-white border border-slate-200 rounded-xl p-2.5 text-xs text-slate-800 font-medium placeholder-slate-400 focus:outline-none focus:border-indigo-500 resize-y"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const updated = bulkTermsList.filter((_, i) => i !== idx);
+                                    setBulkTermsList(updated.length > 0 ? updated : ['']);
+                                  }}
+                                  title="Remove this clause"
+                                  className="h-8 w-8 rounded-lg bg-white border border-slate-200 text-slate-400 hover:text-rose-600 hover:border-rose-200 flex items-center justify-center transition-colors shrink-0 mt-0.5"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                              </div>
+                            ))}
 
-                            <div>
-                              <label className="block text-xs font-bold text-slate-600 mb-1">Clause Number (Order)</label>
-                              <input
-                                type="number"
-                                min="1"
-                                value={termOrderInput}
-                                onChange={(e) => setTermOrderInput(Number(e.target.value))}
-                                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:border-indigo-400"
-                              />
-                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setBulkTermsList([...bulkTermsList, ''])}
+                              className="w-full py-3 border-2 border-dashed border-indigo-200 hover:border-indigo-400 rounded-2xl text-xs font-bold text-indigo-600 hover:bg-indigo-50/50 flex items-center justify-center gap-2 transition-all cursor-pointer"
+                            >
+                              <Plus className="h-4 w-4" /> + Add Another Point / Clause
+                            </button>
+                          </div>
 
-                            <div>
-                              <label className="block text-xs font-bold text-slate-600 mb-1">Clause Content</label>
-                              <textarea
-                                rows="5"
-                                required
-                                placeholder="Enter clause description..."
-                                value={termClauseInput}
-                                onChange={(e) => setTermClauseInput(e.target.value)}
-                                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
-                              />
-                            </div>
-
-                            <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
+                          {/* Modal Footer */}
+                          <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-between bg-slate-50/80 shrink-0">
+                            <span className="text-xs text-slate-500 font-semibold">
+                              Total Active Clauses: {bulkTermsList.filter(s => s.trim()).length}
+                            </span>
+                            <div className="flex items-center gap-3">
                               <button
                                 type="button"
-                                onClick={() => setShowAddTermModal(false)}
-                                className="px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors"
+                                onClick={() => setShowBulkEditTermsModal(false)}
+                                className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-200 transition-colors cursor-pointer"
                               >
                                 Cancel
                               </button>
                               <button
-                                type="submit"
-                                disabled={termLoading}
-                                className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl text-xs font-bold shadow-md shadow-indigo-600/20 transition-all flex items-center gap-2"
+                                type="button"
+                                onClick={handleSaveBulkTerms}
+                                disabled={savingBulkTerms}
+                                className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-extrabold px-5 py-2.5 rounded-xl text-xs flex items-center gap-2 shadow-lg shadow-indigo-600/25 transition-all cursor-pointer"
                               >
-                                {termLoading ? 'Saving...' : editingTerm ? 'Update Clause' : 'Create Clause'}
+                                {savingBulkTerms ? '💾 Saving All Terms...' : '💾 Save All Terms (1-Click)'}
                               </button>
                             </div>
-                          </form>
+                          </div>
                         </div>
                       </div>
                     )}
@@ -4420,65 +4438,6 @@ const AdminDashboard = () => {
                 </div>
               )}
 
-              {/* ── VIEW: COMPLAINTS ───────────────────────────────────────── */}
-              {currentView === 'complaints' && (
-                <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm animate-fadeIn">
-                  <div className="px-6 py-5 border-b border-slate-100">
-                    <h3 className="font-extrabold text-slate-800 text-lg">Complaints &amp; Support Tickets</h3>
-                    <p className="text-xs text-slate-400 mt-0.5">Read, review, reply, and resolve customer complaints raised on the platform.</p>
-                  </div>
-                  <div className="p-6 space-y-4">
-                    {complaints.length === 0 ? (
-                      <p className="text-slate-400 text-center py-10 font-bold">No active support ticket logs.</p>
-                    ) : complaints.map(c => (
-                      <div key={c._id} className="border border-slate-200 rounded-2xl p-5 bg-slate-50/50 flex flex-col justify-between">
-                        <div>
-                          <div className="flex justify-between items-start mb-2">
-                            <div>
-                              <h4 className="font-bold text-slate-800 text-base">{c.subject}</h4>
-                              <p className="text-xs text-slate-400">Raised by: <strong className="text-slate-600">{c.userName}</strong> ({c.userRole})</p>
-                            </div>
-                            <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold border capitalize ${
-                              c.status === 'resolved' ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                              : c.status === 'in_progress' ? 'bg-blue-50 text-blue-700 border-blue-200'
-                              : 'bg-amber-50 text-amber-700 border-amber-200'
-                            }`}>{c.status}</span>
-                          </div>
-                          <p className="text-slate-600 text-sm mt-3 bg-white border border-slate-200 rounded-xl p-3">{c.description}</p>
-                          {c.reply && (
-                            <div className="mt-3 bg-emerald-50/30 border border-emerald-100 rounded-xl p-3">
-                              <p className="text-[10px] text-emerald-600 font-bold uppercase tracking-wider">Admin Resolution Reply</p>
-                              <p className="text-slate-700 text-sm mt-1">{c.reply}</p>
-                            </div>
-                          )}
-                        </div>
-
-                        {c.status !== 'resolved' && (
-                          <div className="mt-4 border-t border-slate-200/50 pt-4">
-                            {resolvingId === c._id ? (
-                              <div className="space-y-3">
-                                <textarea
-                                  placeholder="Type response resolution message..."
-                                  value={replyText}
-                                  onChange={e => setReplyText(e.target.value)}
-                                  className="w-full bg-white border border-slate-200 rounded-xl text-sm p-3 focus:outline-none focus:border-emerald-500 h-20"
-                                />
-                                <div className="flex gap-2">
-                                  <button onClick={() => handleResolveComplaint(c._id)} className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold px-4 py-2 rounded-xl text-xs">Resolve Ticket</button>
-                                  <button onClick={() => setResolvingId(null)} className="text-slate-500 text-xs hover:underline">Cancel</button>
-                                </div>
-                              </div>
-                            ) : (
-                              <button onClick={() => setResolvingId(c._id)} className="bg-slate-800 hover:bg-slate-900 text-white font-bold px-4 py-2 rounded-xl text-xs">Reply &amp; Resolve</button>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
               {/* ── VIEW: OWNER WITHDRAWALS & PAYOUTS ─────────────────── */}
               {currentView === 'payouts' && (
                 <div className="space-y-6 animate-fadeIn">
@@ -4516,7 +4475,7 @@ const AdminDashboard = () => {
                       </div>
                     </div>
 
-                    {/* Platform Commission & Minimum Withdrawal Config Box */}
+                    {/* Financial Rules Card with link to Settings */}
                     <div className="bg-gradient-to-br from-indigo-900 via-slate-900 to-slate-950 text-white rounded-3xl p-6 shadow-md border border-slate-800 flex flex-col justify-between">
                       <div>
                         <div className="flex items-center justify-between">
@@ -4527,50 +4486,19 @@ const AdminDashboard = () => {
                             Fee: {commissionRate}% | Min: ₹{Number(minWithdrawalAmount).toLocaleString('en-IN')}
                           </span>
                         </div>
-                        <p className="text-xs text-slate-300 mt-1.5 leading-relaxed">
+                        <p className="text-xs text-slate-300 mt-2 leading-relaxed">
                           Commission is debited from each seeker booking. Minimum withdrawal determines host payout eligibility.
                         </p>
                       </div>
-                      <form onSubmit={handleSaveCommission} className="space-y-3 mt-4">
-                        <div className="grid grid-cols-2 gap-2">
-                          <div>
-                            <label className="block text-[10px] font-bold uppercase text-slate-300 mb-1">Fee (%)</label>
-                            <div className="relative">
-                              <input
-                                type="number"
-                                min="0"
-                                max="100"
-                                step="0.5"
-                                value={commissionInput}
-                                onChange={(e) => setCommissionInput(e.target.value)}
-                                className="w-full bg-white/10 border border-white/20 rounded-xl px-2.5 py-1.5 text-xs text-white font-bold placeholder-slate-400 focus:outline-none focus:border-indigo-400 pr-6"
-                              />
-                              <span className="absolute right-2 top-1.5 text-xs text-slate-400 font-bold">%</span>
-                            </div>
-                          </div>
-                          <div>
-                            <label className="block text-[10px] font-bold uppercase text-slate-300 mb-1">Min Payout (₹)</label>
-                            <div className="relative">
-                              <input
-                                type="number"
-                                min="1"
-                                step="100"
-                                value={minWithdrawalInput}
-                                onChange={(e) => setMinWithdrawalInput(e.target.value)}
-                                className="w-full bg-white/10 border border-white/20 rounded-xl px-2.5 py-1.5 text-xs text-white font-bold placeholder-slate-400 focus:outline-none focus:border-indigo-400 pl-6"
-                              />
-                              <span className="absolute left-2 top-1.5 text-xs text-slate-400 font-bold">₹</span>
-                            </div>
-                          </div>
-                        </div>
+                      <div className="mt-4 pt-3 border-t border-slate-800">
                         <button
-                          type="submit"
-                          disabled={savingCommission}
-                          className="w-full py-2 bg-indigo-500 hover:bg-indigo-600 active:scale-95 disabled:opacity-50 text-white text-xs font-black rounded-xl transition shadow flex items-center justify-center gap-1"
+                          type="button"
+                          onClick={() => navigate('/admin/settings')}
+                          className="w-full py-2 bg-indigo-500 hover:bg-indigo-600 text-white text-xs font-black rounded-xl transition shadow flex items-center justify-center gap-1.5 cursor-pointer"
                         >
-                          {savingCommission ? 'Saving...' : 'Save Financial Rules'}
+                          <Settings className="h-3.5 w-3.5" /> Manage in Platform Settings →
                         </button>
-                      </form>
+                      </div>
                     </div>
                   </div>
 
@@ -4815,111 +4743,6 @@ const AdminDashboard = () => {
                   </div>
                 </div>
               )}
-
-              {/* ── VIEW: SUPPORT REVIEWS ──────────────────────────────────── */}
-              {currentView === 'reviews' && (
-                <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm animate-fadeIn">
-                  <div className="px-6 py-5 border-b border-slate-100">
-                    <h3 className="font-extrabold text-slate-800 text-lg">Customer Reviews Log</h3>
-                    <p className="text-xs text-slate-400 mt-0.5">Logs of star ratings and text reviews submitted by commuters for parking services.</p>
-                  </div>
-                  <div className="p-6 space-y-4">
-                    {reviews.length === 0 ? (
-                      <p className="text-slate-400 text-center py-10 font-bold">No customer reviews submitted yet.</p>
-                    ) : reviews.map(r => (
-                      <div key={r._id} className="border border-slate-200 rounded-2xl p-5 bg-slate-50/50 flex flex-col justify-between">
-                        <div>
-                          <div className="flex justify-between items-start mb-2">
-                            <div>
-                              <h4 className="font-bold text-slate-800 text-sm">{r.spaceId?.address || 'Parking Space'}</h4>
-                              <p className="text-[10px] text-slate-400">Reviewed by: <strong className="text-slate-600">{r.seekerName}</strong></p>
-                            </div>
-                            <div className="flex items-center gap-0.5 text-amber-500">
-                              {Array.from({ length: r.rating }).map((_, idx) => (
-                                <Star key={idx} className="h-4 w-4 fill-amber-500 text-amber-500" />
-                              ))}
-                            </div>
-                          </div>
-                          <p className="text-slate-600 text-sm italic mt-2 bg-white border border-slate-100 rounded-xl p-3">"{r.comment}"</p>
-                          <p className="text-[9px] text-slate-400 text-right mt-1">{new Date(r.createdAt).toLocaleString()}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* ── VIEW: NOTIFICATIONS ────────────────────────────────────── */}
-              {currentView === 'notifications' && (() => {
-                const getNotifMeta = (id) => {
-                  if (id.startsWith('u-'))       return { label: 'User Approval',    color: 'bg-blue-50 text-blue-600 border-blue-200',    dot: 'bg-blue-500' };
-                  if (id.startsWith('s-'))       return { label: 'Space Approval',   color: 'bg-indigo-50 text-indigo-600 border-indigo-200', dot: 'bg-indigo-500' };
-                  if (id.startsWith('b-paid-'))  return { label: 'Payment Confirmed', color: 'bg-emerald-50 text-emerald-600 border-emerald-200', dot: 'bg-emerald-500' };
-                  if (id.startsWith('b-pend-'))  return { label: 'Awaiting Allotment', color: 'bg-amber-50 text-amber-600 border-amber-200', dot: 'bg-amber-500' };
-                  return                           { label: 'System',                color: 'bg-slate-50 text-slate-500 border-slate-200',   dot: 'bg-slate-400' };
-                };
-                return (
-                  <div className="space-y-4 animate-fadeIn">
-                    <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm">
-                      <div className="px-6 py-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                        <div>
-                          <h3 className="font-extrabold text-slate-800 text-lg">Live Notification Centre</h3>
-                          <p className="text-xs text-slate-400 mt-0.5">Real-time alerts from user registrations, space listings, and booking payments.</p>
-                        </div>
-                        <div className="flex items-center gap-3 shrink-0">
-                          <span className="text-xs font-bold text-slate-400">{notifications.filter(n => !n.read).length} unread</span>
-                          {notifications.some(n => !n.read) && (
-                            <button
-                              onClick={() => setNotifications(prev => prev.map(n => ({ ...n, read: true })))}
-                              className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold rounded-xl transition-colors"
-                            >
-                              Mark All Read
-                            </button>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Type Filter Pills */}
-                      <div className="px-6 py-3 border-b border-slate-100 bg-slate-50 flex gap-2 flex-wrap">
-                        {['All', 'User Approval', 'Space Approval', 'Payment Confirmed', 'Awaiting Allotment'].map(tag => (
-                          <span key={tag} className="px-3 py-1 bg-white border border-slate-200 rounded-full text-[10px] font-bold text-slate-500 cursor-default">{tag}</span>
-                        ))}
-                      </div>
-
-                      <div className="divide-y divide-slate-100">
-                        {notifications.length === 0 ? (
-                          <div className="py-16 text-center">
-                            <Bell className="h-10 w-10 text-slate-200 mx-auto mb-3" />
-                            <p className="text-slate-400 font-bold">All clear — no notifications right now.</p>
-                          </div>
-                        ) : notifications.map(n => {
-                          const meta = getNotifMeta(n.id);
-                          return (
-                            <div
-                              key={n.id}
-                              onClick={() => setNotifications(prev => prev.map(item => item.id === n.id ? { ...item, read: true } : item))}
-                              className={`px-6 py-4 flex items-start gap-4 cursor-pointer transition-colors ${!n.read ? 'bg-amber-50/30 hover:bg-amber-50' : 'hover:bg-slate-50'}`}
-                            >
-                              {/* Type dot indicator */}
-                              <span className={`mt-1 h-2.5 w-2.5 rounded-full shrink-0 ${meta.dot}`} />
-
-                              {/* Text */}
-                              <div className="flex-1 min-w-0">
-                                <div className="flex flex-wrap items-center gap-2 mb-1">
-                                  <span className={`px-2 py-0.5 rounded-full text-[9px] font-black border ${meta.color}`}>{meta.label}</span>
-                                  {!n.read && <span className="text-[9px] font-black text-red-500 uppercase tracking-wider">● New</span>}
-                                </div>
-                                <p className={`text-sm leading-snug ${n.read ? 'text-slate-500' : 'text-slate-800 font-semibold'}`}>{n.text}</p>
-                                <span className="text-[10px] text-slate-400 font-medium mt-1 inline-block">{n.time}</span>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })()}
 
             </div>
           )}

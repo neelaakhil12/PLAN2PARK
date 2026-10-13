@@ -7,29 +7,11 @@ const { sendPushNotification } = require('../utils/pushNotifier');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'secret123';
 
-// Auth middleware helper
-const authMiddleware = (req, res, next) => {
-  const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ message: 'Authentication required' });
-  }
-  const token = authHeader.split(' ')[1];
-  try {
-    const decoded = jwt.verify(token, JWT_SECRET);
-    req.user = decoded;
-    next();
-  } catch (err) {
-    return res.status(401).json({ message: 'Invalid or expired token' });
-  }
-};
+const { protect, adminOnly } = require('../middleware/auth');
 
-// Admin auth middleware
-const adminMiddleware = async (req, res, next) => {
-  if (req.user.role !== 'admin') {
-    return res.status(403).json({ message: 'Admin access required' });
-  }
-  next();
-};
+// Legacy alias for compatibility
+const authMiddleware = protect;
+const adminMiddleware = adminOnly;
 
 // 1. GET /api/notifications - Get notifications for logged-in user (personal + relevant broadcasts)
 router.get('/', authMiddleware, async (req, res) => {
@@ -244,6 +226,38 @@ router.delete('/admin/:id', authMiddleware, adminMiddleware, async (req, res) =>
   } catch (err) {
     console.error('Error deleting broadcast:', err);
     res.status(500).json({ message: 'Failed to delete notification', error: err.message });
+  }
+});
+
+// 7. POST /api/notifications/promo/verify - Verify a promotional discount code at checkout
+router.post('/promo/verify', protect, async (req, res) => {
+  try {
+    const { promoCode } = req.body;
+    if (!promoCode || !promoCode.trim()) {
+      return res.status(400).json({ valid: false, message: 'Please enter a promo code' });
+    }
+    const cleanCode = promoCode.trim().toUpperCase();
+    const promo = await Notification.findOne({
+      userId: null,
+      promoCode: cleanCode,
+      targetRole: { $in: ['all', 'seeker'] },
+    }).sort({ createdAt: -1 });
+
+    if (!promo) {
+      return res.status(404).json({ valid: false, message: `Promo code "${cleanCode}" is invalid or expired` });
+    }
+
+    const discountPercent = promo.discountPercent || 10;
+    return res.json({
+      valid: true,
+      promoCode: cleanCode,
+      discountPercent,
+      title: promo.title,
+      message: promo.message,
+    });
+  } catch (err) {
+    console.error('Error verifying promo code:', err);
+    res.status(500).json({ valid: false, message: 'Failed to verify promo code' });
   }
 });
 

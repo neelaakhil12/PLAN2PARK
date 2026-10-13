@@ -140,4 +140,47 @@ router.delete('/admin/:id', protect, adminOnly, async (req, res) => {
   }
 });
 
+// @desc    Admin bulk update all term clauses for a role in one click
+// @route   PUT /api/terms/admin/bulk/:type
+// @access  Private (Admin)
+router.put('/admin/bulk/:type', protect, adminOnly, async (req, res) => {
+  const type = normalizeType(req.params.type);
+  const { clauses } = req.body;
+
+  if (!Array.isArray(clauses)) {
+    return res.status(400).json({ message: 'Clauses must be an array' });
+  }
+
+  try {
+    await Term.deleteMany({ type });
+
+    const docs = clauses
+      .map((item, idx) => {
+        const clauseText = typeof item === 'string' ? item.trim() : (item.clause || '').trim();
+        if (!clauseText) return null;
+        return {
+          type,
+          clause: clauseText,
+          order: idx + 1,
+          isActive: typeof item === 'object' && item.isActive !== undefined ? item.isActive : true,
+        };
+      })
+      .filter(Boolean);
+
+    if (docs.length > 0) {
+      await Term.insertMany(docs);
+    }
+
+    const updatedTerms = await Term.find().sort({ type: 1, order: 1 });
+    res.json({
+      success: true,
+      message: `Successfully saved ${docs.length} clauses for ${type}`,
+      terms: updatedTerms,
+    });
+  } catch (err) {
+    console.error('Error in bulk terms update:', err);
+    res.status(500).json({ message: err.message });
+  }
+});
+
 module.exports = router;

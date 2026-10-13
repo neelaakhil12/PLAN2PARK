@@ -60,6 +60,14 @@ const bookingSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    promoCode: {
+      type: String,
+      default: null,
+    },
+    promoDiscount: {
+      type: Number,
+      default: 0,
+    },
     ownerEarnings: {
       type: Number,
       default: 0,
