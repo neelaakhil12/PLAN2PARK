@@ -2422,12 +2422,25 @@ const AdminDashboard = () => {
                         </p>
                       </div>
 
-                      <button
-                        onClick={openBulkEditTerms}
-                        className="bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold px-5 py-2.5 rounded-xl text-xs flex items-center gap-2 shadow-lg shadow-indigo-600/25 transition-all shrink-0 cursor-pointer"
-                      >
-                        <Edit2 className="h-4 w-4" /> ✏️ Edit All Terms (One-Click)
-                      </button>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          onClick={() => {
+                            setEditingTerm(null);
+                            setTermClauseInput('');
+                            setTermOrderInput((filteredTerms.length || 0) + 1);
+                            setShowAddTermModal(true);
+                          }}
+                          className="bg-slate-900 hover:bg-slate-800 text-white font-bold px-4 py-2.5 rounded-xl text-xs flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
+                        >
+                          <Plus className="h-4 w-4" /> Add Clause
+                        </button>
+                        <button
+                          onClick={openBulkEditTerms}
+                          className="bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold px-5 py-2.5 rounded-xl text-xs flex items-center gap-2 shadow-lg shadow-indigo-600/25 transition-all cursor-pointer"
+                        >
+                          <Edit2 className="h-4 w-4" /> ✏️ Edit All Terms (One-Click)
+                        </button>
+                      </div>
                     </div>
 
                     {/* Navigation Filter Tabs & Search */}
@@ -2637,12 +2650,13 @@ const AdminDashboard = () => {
                               <th className="px-6 py-3 w-16">#</th>
                               <th className="px-6 py-3">Clause Description</th>
                               <th className="px-6 py-3 w-28 text-center">Status</th>
+                              <th className="px-6 py-3 w-28 text-center">Actions</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-100 font-medium">
                             {filteredTerms.length === 0 ? (
                               <tr>
-                                <td colSpan="3" className="text-center py-12 text-slate-400">
+                                <td colSpan="4" className="text-center py-12 text-slate-400">
                                   No clauses found matching your search.
                                 </td>
                               </tr>
@@ -2668,6 +2682,29 @@ const AdminDashboard = () => {
                                     >
                                       {t.isActive ? '✓ Active' : 'Inactive'}
                                     </button>
+                                  </td>
+                                  <td className="px-6 py-4 text-center">
+                                    <div className="flex items-center justify-center gap-1.5">
+                                      <button
+                                        onClick={() => {
+                                          setEditingTerm(t);
+                                          setTermClauseInput(t.clause);
+                                          setTermOrderInput(t.order || idx + 1);
+                                          setShowAddTermModal(true);
+                                        }}
+                                        className="p-1.5 rounded-lg text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 transition-colors cursor-pointer"
+                                        title="Edit Clause"
+                                      >
+                                        <Edit2 className="h-4 w-4" />
+                                      </button>
+                                      <button
+                                        onClick={() => handleDeleteTerm(t._id)}
+                                        className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                                        title="Delete Clause"
+                                      >
+                                        <Trash2 className="h-4 w-4" />
+                                      </button>
+                                    </div>
                                   </td>
                                 </tr>
                               ))
@@ -2743,6 +2780,67 @@ const AdminDashboard = () => {
                         </div>
                       </div>
                     )}
+
+                    {/* Add / Edit Single Term Modal */}
+                    {showAddTermModal && (
+                      <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+                        <div className="bg-white rounded-3xl border border-slate-200 max-w-lg w-full p-6 shadow-2xl animate-scaleUp">
+                          <div className="flex items-center justify-between pb-4 border-b border-slate-100 mb-4">
+                            <h3 className="font-black text-slate-900 text-base flex items-center gap-2">
+                              <FileText className="h-5 w-5 text-indigo-600" />
+                              {editingTerm ? 'Edit Clause' : 'Add New Clause'}
+                            </h3>
+                            <button
+                              onClick={() => setShowAddTermModal(false)}
+                              className="h-8 w-8 rounded-xl bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200 transition-colors cursor-pointer"
+                            >
+                              <X className="h-4 w-4" />
+                            </button>
+                          </div>
+
+                          <form onSubmit={handleSaveTerm} className="space-y-4">
+                            <div>
+                              <label className="block text-xs font-bold text-slate-600 mb-1">Clause Order / Position</label>
+                              <input
+                                type="number"
+                                value={termOrderInput}
+                                onChange={(e) => setTermOrderInput(Number(e.target.value))}
+                                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:border-indigo-500 font-semibold"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-xs font-bold text-slate-600 mb-1">Clause Text *</label>
+                              <textarea
+                                rows={6}
+                                required
+                                placeholder="Enter clause content..."
+                                value={termClauseInput}
+                                onChange={(e) => setTermClauseInput(e.target.value)}
+                                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-indigo-500 leading-relaxed resize-y"
+                              />
+                            </div>
+
+                            <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
+                              <button
+                                type="button"
+                                onClick={() => setShowAddTermModal(false)}
+                                className="px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors cursor-pointer"
+                              >
+                                Cancel
+                              </button>
+                              <button
+                                type="submit"
+                                disabled={termLoading}
+                                className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-extrabold px-5 py-2.5 rounded-xl text-xs shadow-md transition-all cursor-pointer"
+                              >
+                                {termLoading ? 'Saving...' : editingTerm ? 'Update Clause' : 'Create Clause'}
+                              </button>
+                            </div>
+                          </form>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 );
               })()}
@@ -2781,12 +2879,28 @@ const AdminDashboard = () => {
                         </p>
                       </div>
 
-                      <button
-                        onClick={openBulkEditFaqs}
-                        className="bg-cyan-600 hover:bg-cyan-700 text-white font-extrabold px-5 py-2.5 rounded-xl text-xs flex items-center gap-2 shadow-lg shadow-cyan-600/25 transition-all shrink-0 cursor-pointer"
-                      >
-                        <Edit2 className="h-4 w-4" /> ✏️ Edit All FAQs (One-Click)
-                      </button>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          onClick={() => {
+                            setEditingFaq(null);
+                            setFaqCategoryInput('');
+                            setFaqQuestionInput('');
+                            setFaqAnswerInput('');
+                            setFaqOrderInput((audienceFaqs.length || 0) + 1);
+                            setFaqAudienceInput(faqsAudience);
+                            setShowAddFaqModal(true);
+                          }}
+                          className="bg-slate-900 hover:bg-slate-800 text-white font-bold px-4 py-2.5 rounded-xl text-xs flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
+                        >
+                          <Plus className="h-4 w-4" /> Add FAQ
+                        </button>
+                        <button
+                          onClick={openBulkEditFaqs}
+                          className="bg-cyan-600 hover:bg-cyan-700 text-white font-extrabold px-5 py-2.5 rounded-xl text-xs flex items-center gap-2 shadow-lg shadow-cyan-600/25 transition-all cursor-pointer"
+                        >
+                          <Edit2 className="h-4 w-4" /> ✏️ Edit All FAQs (One-Click)
+                        </button>
+                      </div>
                     </div>
 
                     {/* Audience Filter Tabs & Search & Category Filter */}
@@ -2882,12 +2996,13 @@ const AdminDashboard = () => {
                               <th className="px-5 py-3 w-44">Category</th>
                               <th className="px-5 py-3">Question & Answer</th>
                               <th className="px-5 py-3 w-28 text-center">Status</th>
+                              <th className="px-5 py-3 w-28 text-center">Actions</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-100 font-medium">
                             {filteredFaqs.length === 0 ? (
                               <tr>
-                                <td colSpan="4" className="text-center py-12 text-slate-400">
+                                <td colSpan="5" className="text-center py-12 text-slate-400">
                                   No FAQs found matching your query.
                                 </td>
                               </tr>
@@ -2925,6 +3040,32 @@ const AdminDashboard = () => {
                                     >
                                       {faq.isActive !== false ? '✓ Active' : 'Inactive'}
                                     </button>
+                                  </td>
+                                  <td className="px-5 py-4 align-top text-center">
+                                    <div className="flex items-center justify-center gap-1.5">
+                                      <button
+                                        onClick={() => {
+                                          setEditingFaq(faq);
+                                          setFaqCategoryInput(faq.category || '');
+                                          setFaqQuestionInput(faq.question || '');
+                                          setFaqAnswerInput(faq.answer || '');
+                                          setFaqOrderInput(faq.order || idx + 1);
+                                          setFaqAudienceInput(faq.audience || faqsAudience);
+                                          setShowAddFaqModal(true);
+                                        }}
+                                        className="p-1.5 rounded-lg text-slate-500 hover:text-cyan-600 hover:bg-cyan-50 transition-colors cursor-pointer"
+                                        title="Edit FAQ"
+                                      >
+                                        <Edit2 className="h-4 w-4" />
+                                      </button>
+                                      <button
+                                        onClick={() => handleDeleteFaq(faq._id || faq.id)}
+                                        className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                                        title="Delete FAQ"
+                                      >
+                                        <Trash2 className="h-4 w-4" />
+                                      </button>
+                                    </div>
                                   </td>
                                 </tr>
                               ))
