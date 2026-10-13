@@ -81,6 +81,11 @@ const AdminDashboard = () => {
   const [viewingReceiptUrl, setViewingReceiptUrl] = useState(null);
   const [payoutsFilter, setPayoutsFilter] = useState('all');
 
+  // ── Global Owner Earnings Breakdown Modal States ──
+  const [showOwnerEarningsModal, setShowOwnerEarningsModal] = useState(false);
+  const [ownerEarningsSearch, setOwnerEarningsSearch] = useState('');
+  const [ownerEarningsSort, setOwnerEarningsSort] = useState('earnings'); // 'earnings' | 'bookings' | 'name'
+
   const unreadCount = notifications.filter(n => !n.read).length;
 
   // Close bell dropdown on outside click
@@ -487,11 +492,12 @@ const AdminDashboard = () => {
       if (rFaqs && rFaqs.ok) setFaqs(await rFaqs.json());
       fetchSupportSettings();
 
-      // Fetch wallet payouts & commission
+      // Fetch wallet payouts, commission & owner revenue summary
       try {
-        const [rPayouts, rComm] = await Promise.all([
+        const [rPayouts, rComm, rOwnerRev] = await Promise.all([
           fetch(`${API_URL}/wallet/admin/requests`, { headers }),
           fetch(`${API_URL}/wallet/admin/commission`, { headers }),
+          fetch(`${API_URL}/bookings/owner-revenue-summary`, { headers }),
         ]);
         if (rPayouts.ok) {
           const pData = await rPayouts.json();
@@ -505,6 +511,9 @@ const AdminDashboard = () => {
           setCommissionInput(String(comm));
           setMinWithdrawalAmount(minW);
           setMinWithdrawalInput(String(minW));
+        }
+        if (rOwnerRev && rOwnerRev.ok) {
+          setOwnerSummaries(await rOwnerRev.json());
         }
       } catch (e) {}
 
@@ -1375,24 +1384,380 @@ const AdminDashboard = () => {
               {currentView === 'overview' && analytics && (
                 <div className="space-y-8 animate-fadeIn">
                   
-                  {/* Top Stats Row */}
-                  <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
+                  {/* ── 4 CORE HERO FINANCIAL & OWNER KPI METRICS ── */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    {/* 1. Total Platform Earnings (Gross Volume) */}
+                    <div 
+                      onClick={() => navigate('/admin/revenue')}
+                      className="bg-gradient-to-br from-emerald-500/10 via-white to-white border-2 border-emerald-500/20 hover:border-emerald-500/50 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all cursor-pointer group relative overflow-hidden"
+                    >
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-[10px] font-black uppercase tracking-wider text-emerald-800 bg-emerald-100/80 px-2.5 py-1 rounded-full">
+                          Platform Gross Turnover
+                        </span>
+                        <div className="h-9 w-9 rounded-xl bg-emerald-500 text-white flex items-center justify-center shadow-md shadow-emerald-500/20 group-hover:scale-110 transition-transform">
+                          <DollarSign className="h-5 w-5" />
+                        </div>
+                      </div>
+                      <p className="text-xs font-bold text-slate-500">Total Platform Earnings</p>
+                      <p className="text-2xl lg:text-3xl font-black text-slate-900 mt-1 tracking-tight">
+                        ₹{Number(analytics.finances?.totalRevenue || 0).toLocaleString('en-IN')}
+                      </p>
+                      <div className="mt-3 pt-2.5 border-t border-emerald-100 flex items-center justify-between text-[11px]">
+                        <span className="text-slate-500 font-medium">Completed bookings</span>
+                        <span className="text-emerald-700 font-bold group-hover:translate-x-0.5 transition-transform flex items-center gap-0.5">
+                          View Invoices →
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* 2. Admin Commission Received */}
+                    <div 
+                      onClick={() => navigate('/admin/settings')}
+                      className="bg-gradient-to-br from-indigo-500/10 via-white to-white border-2 border-indigo-500/20 hover:border-indigo-500/50 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all cursor-pointer group relative overflow-hidden"
+                    >
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-[10px] font-black uppercase tracking-wider text-indigo-800 bg-indigo-100/80 px-2.5 py-1 rounded-full">
+                          Admin Cut ({commissionRate}%)
+                        </span>
+                        <div className="h-9 w-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-md shadow-indigo-600/20 group-hover:scale-110 transition-transform">
+                          <Percent className="h-5 w-5" />
+                        </div>
+                      </div>
+                      <p className="text-xs font-bold text-slate-500">Admin Commission Earned</p>
+                      <p className="text-2xl lg:text-3xl font-black text-indigo-900 mt-1 tracking-tight">
+                        ₹{Number(analytics.finances?.totalCommission || 0).toLocaleString('en-IN')}
+                      </p>
+                      <div className="mt-3 pt-2.5 border-t border-indigo-100 flex items-center justify-between text-[11px]">
+                        <span className="text-slate-500 font-medium">Retained from owners</span>
+                        <span className="text-indigo-700 font-bold group-hover:translate-x-0.5 transition-transform flex items-center gap-0.5">
+                          Fee Settings →
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* 3. Space Owners Net Earnings (Click to open Global Owner Earnings Breakdown) */}
+                    <div 
+                      onClick={() => setShowOwnerEarningsModal(true)}
+                      className="bg-gradient-to-br from-amber-500/15 via-white to-amber-50/20 border-2 border-amber-500/30 hover:border-amber-500 hover:ring-4 hover:ring-amber-500/10 rounded-2xl p-5 shadow-sm hover:shadow-lg transition-all cursor-pointer group relative overflow-hidden ring-1 ring-amber-400/40"
+                    >
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-[10px] font-black uppercase tracking-wider text-amber-800 bg-amber-100/90 px-2.5 py-1 rounded-full flex items-center gap-1">
+                          <Sparkles className="h-3 w-3 text-amber-600" />
+                          Net After Commission
+                        </span>
+                        <div className="h-9 w-9 rounded-xl bg-amber-500 text-white flex items-center justify-center shadow-md shadow-amber-500/25 group-hover:scale-110 transition-transform">
+                          <TrendingUp className="h-5 w-5" />
+                        </div>
+                      </div>
+                      <p className="text-xs font-bold text-slate-500">Owners Net Earnings</p>
+                      <p className="text-2xl lg:text-3xl font-black text-amber-900 mt-1 tracking-tight">
+                        ₹{Number(analytics.finances?.totalOwnerPayout || 0).toLocaleString('en-IN')}
+                      </p>
+                      <div className="mt-3 pt-2.5 border-t border-amber-100 flex items-center justify-between text-[11px]">
+                        <span className="text-amber-800 font-bold flex items-center gap-1">
+                          <span>👆</span> Click to view breakdown
+                        </span>
+                        <span className="bg-amber-500 text-white font-extrabold px-2 py-0.5 rounded-full text-[10px] group-hover:bg-amber-600 transition-colors">
+                          View All Owners ↗
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* 4. Total Space Owners Count (Click to navigate to Owners directory) */}
+                    <div 
+                      onClick={() => navigate('/admin/owners')}
+                      className="bg-gradient-to-br from-purple-500/10 via-white to-purple-50/20 border-2 border-purple-500/20 hover:border-purple-500 hover:ring-4 hover:ring-purple-500/10 rounded-2xl p-5 shadow-sm hover:shadow-lg transition-all cursor-pointer group relative overflow-hidden"
+                    >
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-[10px] font-black uppercase tracking-wider text-purple-800 bg-purple-100/80 px-2.5 py-1 rounded-full">
+                          Registered Hosts
+                        </span>
+                        <div className="h-9 w-9 rounded-xl bg-purple-600 text-white flex items-center justify-center shadow-md shadow-purple-600/20 group-hover:scale-110 transition-transform">
+                          <UserCheck className="h-5 w-5" />
+                        </div>
+                      </div>
+                      <p className="text-xs font-bold text-slate-500">Total Space Owners</p>
+                      <p className="text-2xl lg:text-3xl font-black text-purple-900 mt-1 tracking-tight">
+                        {users.filter(u => u.role === 'owner').length || analytics.users?.owners || 0}
+                        <span className="text-xs font-extrabold text-slate-400 ml-1.5 uppercase">Hosts</span>
+                      </p>
+                      <div className="mt-3 pt-2.5 border-t border-purple-100 flex items-center justify-between text-[11px]">
+                        <span className="text-purple-800 font-bold flex items-center gap-1">
+                          <span>👉</span> Click to view directory
+                        </span>
+                        <span className="bg-purple-600 text-white font-extrabold px-2 py-0.5 rounded-full text-[10px] group-hover:bg-purple-700 transition-colors">
+                          Open Hosts ↗
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Secondary Platform Volume Bar */}
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                     {[
-                      { title: 'Total Users', value: analytics.users?.total || 0, pct: '+12.5% vs last month', icon: <Users className="h-5 w-5 text-emerald-500" />, color: 'bg-emerald-50' },
-                      { title: 'Vehicle Owners', value: analytics.users?.seekers || 0, pct: '+10.3% vs last month', icon: <Car className="h-5 w-5 text-blue-500" />, color: 'bg-blue-50' },
-                      { title: 'Place Owners', value: analytics.users?.owners || 0, pct: '+8.7% vs last month', icon: <Layers className="h-5 w-5 text-amber-500" />, color: 'bg-amber-50' },
-                      { title: 'Total Parkings', value: analytics.spaces?.total || 0, pct: '+11.2% vs last month', icon: <MapPin className="h-5 w-5 text-indigo-500" />, color: 'bg-indigo-50' },
-                      { title: 'Total Bookings', value: analytics.bookings?.total || 0, pct: '+13.6% vs last month', icon: <ClipboardList className="h-5 w-5 text-teal-500" />, color: 'bg-teal-50' },
-                      { title: 'Total Revenue', value: `₹${analytics.finances?.totalRevenue || 0}`, pct: '+15.4% vs last month', icon: <DollarSign className="h-5 w-5 text-rose-500" />, color: 'bg-rose-50', highlight: true },
-                    ].map((stat, i) => (
-                      <div key={i} className={`bg-white rounded-2xl border border-slate-200 p-5 shadow-sm hover:shadow-md transition-shadow relative ${stat.highlight ? 'ring-1 ring-rose-200 bg-gradient-to-tr from-white to-rose-50/10' : ''}`}>
-                        <div className={`h-9 w-9 rounded-xl ${stat.color} flex items-center justify-center mb-3`}>{stat.icon}</div>
-                        <p className="text-sm font-bold text-slate-400 leading-tight uppercase tracking-wider text-[10px]">{stat.title}</p>
-                        <p className="text-xl font-black text-slate-900 mt-1">{stat.value}</p>
-                        <p className="text-[9px] text-emerald-600 font-bold mt-1.5 flex items-center gap-0.5">{stat.pct}</p>
+                      { title: 'Total Registered Users', value: analytics.users?.total || 0, icon: <Users className="h-4 w-4 text-emerald-600" />, path: '/admin/users' },
+                      { title: 'Parking Seekers (Drivers)', value: analytics.users?.seekers || 0, icon: <Car className="h-4 w-4 text-blue-600" />, path: '/admin/seekers' },
+                      { title: 'Total Parking Spaces', value: analytics.spaces?.total || 0, icon: <MapPin className="h-4 w-4 text-indigo-600" />, path: '/admin/spaces' },
+                      { title: 'Total Bookings Processed', value: analytics.bookings?.total || 0, icon: <ClipboardList className="h-4 w-4 text-teal-600" />, path: '/admin/bookings' },
+                    ].map((sec, sIdx) => (
+                      <div 
+                        key={sIdx} 
+                        onClick={() => navigate(sec.path)}
+                        className="bg-white rounded-xl border border-slate-200/80 p-3.5 shadow-xs hover:border-slate-300 hover:shadow-sm transition-all cursor-pointer flex items-center justify-between"
+                      >
+                        <div className="min-w-0">
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider truncate">{sec.title}</p>
+                          <p className="text-lg font-black text-slate-800 mt-0.5">{sec.value}</p>
+                        </div>
+                        <div className="h-8 w-8 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center shrink-0">
+                          {sec.icon}
+                        </div>
                       </div>
                     ))}
                   </div>
+
+                  {/* ── MODAL: GLOBAL OWNER EARNINGS & COMMISSION BREAKDOWN ── */}
+                  {showOwnerEarningsModal && (() => {
+                    const rawList = (ownerSummaries && ownerSummaries.length > 0)
+                      ? ownerSummaries
+                      : users.filter(u => u.role === 'owner').map(o => {
+                          const ownerSpaces = spaces.filter(s => (s.ownerId?._id || s.ownerId)?.toString() === o._id.toString());
+                          const ownerBookings = bookings.filter(b => (b.spaceId?.ownerId?._id || b.spaceId?.ownerId || b.ownerId)?.toString() === o._id.toString() && b.paymentStatus === 'paid');
+                          const gross = ownerBookings.reduce((sum, b) => sum + (b.totalAmount || 0), 0);
+                          const comm = ownerBookings.reduce((sum, b) => sum + (b.adminCommission || (b.totalAmount * (commissionRate / 100)) || 0), 0);
+                          const net = Math.max(0, gross - comm);
+                          return {
+                            ownerId: o._id,
+                            name: o.name,
+                            email: o.email,
+                            contact: o.contact,
+                            status: o.status,
+                            createdAt: o.createdAt,
+                            walletBalance: o.walletBalance || 0,
+                            spacesCount: ownerSpaces.length,
+                            bookingsCount: ownerBookings.length,
+                            grossRevenue: Number(gross.toFixed(2)),
+                            adminCommission: Number(comm.toFixed(2)),
+                            totalEarnings: Number(net.toFixed(2)),
+                            paidAmount: Number((o.ownerPaidRevenue || 0).toFixed(2)),
+                            owedAmount: Number(Math.max(0, net - (o.ownerPaidRevenue || 0)).toFixed(2)),
+                          };
+                        });
+
+                    const filtered = rawList.filter(o => {
+                      if (!ownerEarningsSearch) return true;
+                      const q = ownerEarningsSearch.toLowerCase();
+                      return (
+                        (o.name && o.name.toLowerCase().includes(q)) ||
+                        (o.email && o.email.toLowerCase().includes(q)) ||
+                        (o.contact && o.contact.toLowerCase().includes(q))
+                      );
+                    });
+
+                    filtered.sort((a, b) => {
+                      if (ownerEarningsSort === 'earnings') return (b.totalEarnings || 0) - (a.totalEarnings || 0);
+                      if (ownerEarningsSort === 'bookings') return (b.bookingsCount || 0) - (a.bookingsCount || 0);
+                      if (ownerEarningsSort === 'name') return (a.name || '').localeCompare(b.name || '');
+                      return 0;
+                    });
+
+                    const totalGrossSum = filtered.reduce((sum, o) => sum + (o.grossRevenue || 0), 0);
+                    const totalCommSum = filtered.reduce((sum, o) => sum + (o.adminCommission || 0), 0);
+                    const totalNetSum = filtered.reduce((sum, o) => sum + (o.totalEarnings || 0), 0);
+
+                    return (
+                      <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/70 backdrop-blur-sm animate-fadeIn">
+                        <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl w-full max-w-5xl max-h-[92vh] flex flex-col overflow-hidden">
+                          {/* Modal Header */}
+                          <div className="px-6 py-5 bg-gradient-to-r from-slate-900 to-slate-800 text-white flex items-center justify-between shrink-0">
+                            <div>
+                              <h3 className="text-lg font-black flex items-center gap-2">
+                                <TrendingUp className="h-5 w-5 text-amber-400" />
+                                Global Space Owner Earnings &amp; Commission Breakdown
+                              </h3>
+                              <p className="text-xs text-slate-300 mt-0.5">
+                                Transparency report detailing individual host gross volume, platform commission, and net earnings.
+                              </p>
+                            </div>
+                            <button
+                              onClick={() => setShowOwnerEarningsModal(false)}
+                              className="h-8 w-8 rounded-xl bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors cursor-pointer"
+                            >
+                              <X className="h-5 w-5" />
+                            </button>
+                          </div>
+
+                          {/* Quick Summary Strip */}
+                          <div className="px-6 py-3.5 bg-slate-50 border-b border-slate-200 grid grid-cols-2 sm:grid-cols-4 gap-3 shrink-0">
+                            <div className="bg-white p-3 rounded-xl border border-slate-200">
+                              <p className="text-[10px] font-bold text-slate-400 uppercase">Space Hosts Shown</p>
+                              <p className="text-base font-black text-slate-800 mt-0.5">{filtered.length} Hosts</p>
+                            </div>
+                            <div className="bg-white p-3 rounded-xl border border-slate-200">
+                              <p className="text-[10px] font-bold text-slate-400 uppercase">Gross Booking Volume</p>
+                              <p className="text-base font-black text-slate-900 mt-0.5">₹{totalGrossSum.toLocaleString('en-IN')}</p>
+                            </div>
+                            <div className="bg-white p-3 rounded-xl border border-slate-200">
+                              <p className="text-[10px] font-bold text-slate-400 uppercase">Admin Commission Cut</p>
+                              <p className="text-base font-black text-indigo-600 mt-0.5">₹{totalCommSum.toLocaleString('en-IN')}</p>
+                            </div>
+                            <div className="bg-amber-50 p-3 rounded-xl border border-amber-200">
+                              <p className="text-[10px] font-bold text-amber-800 uppercase">Total Net to Owners</p>
+                              <p className="text-base font-black text-amber-900 mt-0.5">₹{totalNetSum.toLocaleString('en-IN')}</p>
+                            </div>
+                          </div>
+
+                          {/* Search & Sort Controls */}
+                          <div className="px-6 py-3 border-b border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0">
+                            <div className="relative w-full sm:w-72">
+                              <Search className="h-4 w-4 absolute left-3 top-2.5 text-slate-400" />
+                              <input
+                                type="text"
+                                placeholder="Search owner by name, email, phone..."
+                                value={ownerEarningsSearch}
+                                onChange={(e) => setOwnerEarningsSearch(e.target.value)}
+                                className="w-full pl-9 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:border-amber-500"
+                              />
+                            </div>
+
+                            <div className="flex items-center gap-1.5 w-full sm:w-auto">
+                              <span className="text-[11px] font-bold text-slate-500">Sort By:</span>
+                              <button
+                                onClick={() => setOwnerEarningsSort('earnings')}
+                                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-colors ${
+                                  ownerEarningsSort === 'earnings' ? 'bg-amber-500 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                }`}
+                              >
+                                💰 Net Earnings
+                              </button>
+                              <button
+                                onClick={() => setOwnerEarningsSort('bookings')}
+                                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-colors ${
+                                  ownerEarningsSort === 'bookings' ? 'bg-amber-500 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                }`}
+                              >
+                                📋 Bookings
+                              </button>
+                              <button
+                                onClick={() => setOwnerEarningsSort('name')}
+                                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-colors ${
+                                  ownerEarningsSort === 'name' ? 'bg-amber-500 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                }`}
+                              >
+                                🔤 Name
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Owners Table */}
+                          <div className="flex-1 overflow-y-auto">
+                            <table className="w-full text-left text-xs">
+                              <thead className="bg-slate-50 text-slate-400 text-[10px] font-bold uppercase tracking-wider sticky top-0 z-10 border-b border-slate-200">
+                                <tr>
+                                  <th className="px-6 py-3">Space Owner</th>
+                                  <th className="px-4 py-3 text-center">Spots</th>
+                                  <th className="px-4 py-3 text-center">Bookings</th>
+                                  <th className="px-4 py-3 text-right">Gross Generated</th>
+                                  <th className="px-4 py-3 text-right">Admin Fee</th>
+                                  <th className="px-6 py-3 text-right">Net Earned (After Comm.)</th>
+                                  <th className="px-4 py-3 text-right">Wallet Balance</th>
+                                  <th className="px-6 py-3 text-right">Action</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-100">
+                                {filtered.length === 0 ? (
+                                  <tr>
+                                    <td colSpan="8" className="text-center py-12 text-slate-400 font-medium">
+                                      No space owners found matching "{ownerEarningsSearch}".
+                                    </td>
+                                  </tr>
+                                ) : (
+                                  filtered.map((own) => (
+                                    <tr key={own.ownerId} className="hover:bg-amber-50/30 transition-colors">
+                                      <td className="px-6 py-3.5">
+                                        <div className="flex items-center gap-3">
+                                          <div className="h-8 w-8 rounded-full bg-gradient-to-tr from-amber-400 to-amber-600 text-white font-black text-xs flex items-center justify-center shrink-0">
+                                            {(own.name || 'O').charAt(0).toUpperCase()}
+                                          </div>
+                                          <div>
+                                            <p className="font-extrabold text-slate-900 leading-snug">{own.name || 'Owner'}</p>
+                                            <p className="text-[11px] text-slate-400">{own.contact || own.email || '-'}</p>
+                                          </div>
+                                        </div>
+                                      </td>
+                                      <td className="px-4 py-3.5 text-center font-bold text-slate-700">
+                                        <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 font-extrabold">
+                                          {own.spacesCount || 0}
+                                        </span>
+                                      </td>
+                                      <td className="px-4 py-3.5 text-center font-bold text-slate-700">
+                                        <span className="px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 font-extrabold">
+                                          {own.bookingsCount || 0}
+                                        </span>
+                                      </td>
+                                      <td className="px-4 py-3.5 text-right font-bold text-slate-800">
+                                        ₹{(own.grossRevenue || 0).toLocaleString('en-IN')}
+                                      </td>
+                                      <td className="px-4 py-3.5 text-right font-bold text-indigo-600">
+                                        -₹{(own.adminCommission || 0).toLocaleString('en-IN')}
+                                      </td>
+                                      <td className="px-6 py-3.5 text-right">
+                                        <span className="text-sm font-black text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
+                                          ₹{(own.totalEarnings || 0).toLocaleString('en-IN')}
+                                        </span>
+                                      </td>
+                                      <td className="px-4 py-3.5 text-right font-extrabold text-slate-700">
+                                        ₹{(own.walletBalance || 0).toLocaleString('en-IN')}
+                                      </td>
+                                      <td className="px-6 py-3.5 text-right">
+                                        <button
+                                          onClick={() => {
+                                            setShowOwnerEarningsModal(false);
+                                            const fullUser = users.find(u => u._id === own.ownerId);
+                                            if (fullUser) setSelectedOwnerForDetail(fullUser);
+                                            navigate('/admin/owners');
+                                          }}
+                                          className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold transition-colors inline-flex items-center gap-1 cursor-pointer"
+                                        >
+                                          <span>View Spaces</span>
+                                          <ExternalLink className="h-3 w-3" />
+                                        </button>
+                                      </td>
+                                    </tr>
+                                  ))
+                                )}
+                              </tbody>
+                            </table>
+                          </div>
+
+                          {/* Modal Footer */}
+                          <div className="px-6 py-3.5 bg-slate-50 border-t border-slate-200 flex items-center justify-between shrink-0">
+                            <span className="text-xs text-slate-500 font-medium">
+                              💡 Need to process host payouts? Manage them in Owner Withdrawals.
+                            </span>
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => {
+                                  setShowOwnerEarningsModal(false);
+                                  navigate('/admin/payouts');
+                                }}
+                                className="px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+                              >
+                                Manage Withdrawals →
+                              </button>
+                              <button
+                                onClick={() => setShowOwnerEarningsModal(false)}
+                                className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer"
+                              >
+                                Close
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
 
                   {/* Graphs Panel */}
                   <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">

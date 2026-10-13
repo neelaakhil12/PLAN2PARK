@@ -980,18 +980,27 @@ router.get('/revenue-report', protect, adminOnly, async (req, res) => {
 router.get('/owner-revenue-summary', protect, adminOnly, async (req, res) => {
   try {
     // 1. Get all owners/hosts
-    const owners = await User.find({ role: 'owner' }).select('name email contact ownerPaidRevenue bankAccountDetails');
+    const owners = await User.find({ role: 'owner' }).select('name email contact ownerPaidRevenue bankAccountDetails walletBalance status createdAt');
 
     // 2. Fetch all paid bookings populate spaceId
     const paidBookings = await Booking.find({ paymentStatus: 'paid' }).populate('spaceId');
 
-    // 3. Aggregate owner earnings
+    // 3. Fetch all parking spaces
+    const spaces = await ParkingSpace.find({}).select('ownerId title address');
+
+    // 4. Aggregate owner earnings
     const summaries = owners.map((owner) => {
       // Find all bookings matching this owner's spaceId
       const ownerBookings = paidBookings.filter(
         (b) => b.spaceId && b.spaceId.ownerId && b.spaceId.ownerId.toString() === owner._id.toString()
       );
 
+      const ownerSpaces = spaces.filter(
+        (s) => s.ownerId && s.ownerId.toString() === owner._id.toString()
+      );
+
+      const grossRevenue = ownerBookings.reduce((sum, b) => sum + (b.totalAmount || 0), 0);
+      const totalAdminCommission = ownerBookings.reduce((sum, b) => sum + (b.adminCommission || 0), 0);
       const totalEarnings = ownerBookings.reduce((sum, b) => sum + (b.ownerEarnings || 0), 0);
       const paid = owner.ownerPaidRevenue || 0;
       const owed = Math.max(0, totalEarnings - paid);
@@ -1001,10 +1010,17 @@ router.get('/owner-revenue-summary', protect, adminOnly, async (req, res) => {
         name: owner.name,
         email: owner.email,
         contact: owner.contact,
-        bankAccountDetails: owner.bankAccountDetails,
+        status: owner.status,
+        createdAt: owner.createdAt,
+        walletBalance: owner.walletBalance || 0,
+        spacesCount: ownerSpaces.length,
+        bookingsCount: ownerBookings.length,
+        grossRevenue: Number(grossRevenue.toFixed(2)),
+        adminCommission: Number(totalAdminCommission.toFixed(2)),
         totalEarnings: Number(totalEarnings.toFixed(2)),
         paidAmount: Number(paid.toFixed(2)),
         owedAmount: Number(owed.toFixed(2)),
+        bankAccountDetails: owner.bankAccountDetails,
       };
     });
 
