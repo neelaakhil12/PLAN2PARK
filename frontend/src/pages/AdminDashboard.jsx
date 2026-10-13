@@ -124,6 +124,25 @@ const AdminDashboard = () => {
   const [savingBulkFaqs, setSavingBulkFaqs] = useState(false);
   const [savingBulkTerms, setSavingBulkTerms] = useState(false);
 
+  // ── On-page View Modes & Direct Inline Editing States (Zero Black Overlays) ──
+  const [termsViewMode, setTermsViewMode] = useState('table'); // 'table' | 'editor'
+  const [inlineEditingTermId, setInlineEditingTermId] = useState(null);
+  const [inlineTermText, setInlineTermText] = useState('');
+  const [showInlineAddTerm, setShowInlineAddTerm] = useState(false);
+  const [newTermClause, setNewTermClause] = useState('');
+  const [newTermOrder, setNewTermOrder] = useState(1);
+
+  const [faqsViewMode, setFaqsViewMode] = useState('table'); // 'table' | 'editor'
+  const [inlineEditingFaqId, setInlineEditingFaqId] = useState(null);
+  const [inlineFaqCategory, setInlineFaqCategory] = useState('');
+  const [inlineFaqQuestion, setInlineFaqQuestion] = useState('');
+  const [inlineFaqAnswer, setInlineFaqAnswer] = useState('');
+  const [showInlineAddFaq, setShowInlineAddFaq] = useState(false);
+  const [newFaqCategory, setNewFaqCategory] = useState('');
+  const [newFaqQuestion, setNewFaqQuestion] = useState('');
+  const [newFaqAnswer, setNewFaqAnswer] = useState('');
+  const [newFaqOrder, setNewFaqOrder] = useState(1);
+
   // ── Chatbot FAQs Management States ──
   const [faqs, setFaqs] = useState([]);
   const [faqsAudience, setFaqsAudience] = useState('parking_seeker'); // 'parking_seeker' | 'bank_finance'
@@ -281,7 +300,83 @@ const AdminDashboard = () => {
       text = `TERMS AND CONDITIONS\n\nLast Updated: October 2026\n\nWelcome to Plan To Park. These Terms and Conditions ("Terms") govern your access to and use of the platform.\n\n1. About the Platform\nPlan To Park connects vehicle owners with available parking and storage spaces.\n\n2. User Responsibilities\nAll users agree to adhere to parking safety guidelines, timely check-outs, and lawful use of spots.`;
     }
     setBulkTermsText(text);
-    setShowBulkEditTermsModal(true);
+    setTermsViewMode('editor');
+  };
+
+  const handleSelectTermsType = (type) => {
+    setTermsType(type);
+    setInlineEditingTermId(null);
+    setShowInlineAddTerm(false);
+    if (termsViewMode === 'editor') {
+      const currentList = terms
+        .filter(t => t.type === type)
+        .sort((a, b) => (a.order || 0) - (b.order || 0))
+        .map(t => t.clause);
+      setBulkTermsText(currentList.length > 0 ? currentList.join('\n\n') : '');
+    }
+  };
+
+  const handleSaveInlineTerm = async (id) => {
+    if (!inlineTermText.trim()) return;
+    setTermLoading(true);
+    try {
+      const res = await fetch(`${API_URL}/terms/admin/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          clause: inlineTermText.trim(),
+        })
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        setTerms(prev => prev.map(t => t._id === updated._id ? updated : t));
+        setInlineEditingTermId(null);
+        setInlineTermText('');
+      } else {
+        const err = await res.json();
+        alert(err.message || 'Failed to update clause');
+      }
+    } catch (err) {
+      alert('Error saving clause: ' + err.message);
+    } finally {
+      setTermLoading(false);
+    }
+  };
+
+  const handleCreateInlineTerm = async (e) => {
+    if (e) e.preventDefault();
+    if (!newTermClause.trim()) return;
+    setTermLoading(true);
+    try {
+      const res = await fetch(`${API_URL}/terms/admin`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          clause: newTermClause.trim(),
+          order: newTermOrder,
+          type: termsType,
+        })
+      });
+      if (res.ok) {
+        const created = await res.json();
+        setTerms(prev => [...prev, created]);
+        setNewTermClause('');
+        setShowInlineAddTerm(false);
+      } else {
+        const err = await res.json();
+        alert(err.message || 'Failed to create clause');
+      }
+    } catch (err) {
+      alert('Error creating clause: ' + err.message);
+    } finally {
+      setTermLoading(false);
+    }
   };
 
   const handleSaveBulkTerms = async (e) => {
@@ -315,7 +410,7 @@ const AdminDashboard = () => {
       const data = await res.json();
       if (res.ok && data.terms) {
         setTerms(data.terms);
-        setShowBulkEditTermsModal(false);
+        setTermsViewMode('table');
         alert(`🎉 Terms & Conditions saved and published live to app and web! (${cleaned.length} clauses saved)`);
       } else {
         alert(data.message || 'Failed to save terms');
@@ -437,7 +532,81 @@ const AdminDashboard = () => {
       .filter(f => (f.audience || 'parking_seeker') === faqsAudience)
       .sort((a, b) => (a.order || 0) - (b.order || 0));
     setBulkFaqsText(serializeFaqsToText(list));
-    setShowBulkEditFaqsModal(true);
+    setFaqsViewMode('editor');
+  };
+
+  const handleSaveInlineFaq = async (id) => {
+    if (!inlineFaqQuestion.trim() || !inlineFaqAnswer.trim()) {
+      alert('Please fill out both the question and answer.');
+      return;
+    }
+    setFaqLoading(true);
+    try {
+      const res = await fetch(`${API_URL}/faqs/admin/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          category: (inlineFaqCategory || 'General').trim(),
+          question: inlineFaqQuestion.trim(),
+          answer: inlineFaqAnswer.trim(),
+        })
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        setFaqs(prev => prev.map(f => (f._id === updated._id || f.id === updated._id) ? updated : f));
+        setInlineEditingFaqId(null);
+      } else {
+        const err = await res.json();
+        alert(err.message || 'Failed to update FAQ');
+      }
+    } catch (err) {
+      alert('Error updating FAQ: ' + err.message);
+    } finally {
+      setFaqLoading(false);
+    }
+  };
+
+  const handleCreateInlineFaq = async (e) => {
+    if (e) e.preventDefault();
+    if (!newFaqQuestion.trim() || !newFaqAnswer.trim()) {
+      alert('Please fill out both question and answer.');
+      return;
+    }
+    setFaqLoading(true);
+    try {
+      const res = await fetch(`${API_URL}/faqs/admin`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          audience: 'parking_seeker',
+          category: (newFaqCategory || 'General').trim(),
+          question: newFaqQuestion.trim(),
+          answer: newFaqAnswer.trim(),
+          order: newFaqOrder,
+        })
+      });
+      if (res.ok) {
+        const created = await res.json();
+        setFaqs(prev => [...prev, created]);
+        setNewFaqQuestion('');
+        setNewFaqAnswer('');
+        setNewFaqCategory('');
+        setShowInlineAddFaq(false);
+      } else {
+        const err = await res.json();
+        alert(err.message || 'Failed to create FAQ');
+      }
+    } catch (err) {
+      alert('Error creating FAQ: ' + err.message);
+    } finally {
+      setFaqLoading(false);
+    }
   };
 
   const handleSaveBulkFaqs = async () => {
@@ -459,7 +628,7 @@ const AdminDashboard = () => {
       const data = await res.json();
       if (res.ok && data.faqs) {
         setFaqs(data.faqs);
-        setShowBulkEditFaqsModal(false);
+        setFaqsViewMode('table');
         alert(`🎉 All ${cleaned.length} FAQs saved and published live to chatbot & web!`);
       } else {
         alert(data.message || 'Failed to save FAQs');
@@ -2419,28 +2588,79 @@ const AdminDashboard = () => {
                           Terms & Conditions Live Editor
                         </h2>
                         <p className="text-xs text-slate-500 mt-1">
-                          Manage, edit, add, or delete legal clauses for Space Owners and Parking Seekers. Updates reflect instantly in the mobile apps.
+                          Manage, edit, add, or delete legal clauses for Space Owners and Parking Seekers. Updates reflect instantly in the mobile apps and web.
                         </p>
                       </div>
 
-                      <div className="flex items-center gap-2 shrink-0">
-                        <button
-                          onClick={() => {
-                            setEditingTerm(null);
-                            setTermClauseInput('');
-                            setTermOrderInput((filteredTerms.length || 0) + 1);
-                            setShowAddTermModal(true);
-                          }}
-                          className="bg-slate-900 hover:bg-slate-800 text-white font-bold px-4 py-2.5 rounded-xl text-xs flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
-                        >
-                          <Plus className="h-4 w-4" /> Add Clause
-                        </button>
-                        <button
-                          onClick={openBulkEditTerms}
-                          className="bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold px-5 py-2.5 rounded-xl text-xs flex items-center gap-2 shadow-lg shadow-indigo-600/25 transition-all cursor-pointer"
-                        >
-                          <Edit2 className="h-4 w-4" /> ✏️ Edit All Terms (One-Click)
-                        </button>
+                      <div className="flex flex-wrap items-center gap-2 shrink-0">
+                        {/* View Switcher: Table vs Document Editor */}
+                        <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200">
+                          <button
+                            type="button"
+                            onClick={() => setTermsViewMode('table')}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                              termsViewMode === 'table'
+                                ? 'bg-white text-indigo-700 shadow-xs'
+                                : 'text-slate-600 hover:text-slate-900'
+                            }`}
+                          >
+                            📋 Table View
+                          </button>
+                          <button
+                            type="button"
+                            onClick={openBulkEditTerms}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                              termsViewMode === 'editor'
+                                ? 'bg-indigo-600 text-white shadow-xs'
+                                : 'text-slate-600 hover:text-slate-900'
+                            }`}
+                          >
+                            ✏️ Document Editor
+                          </button>
+                        </div>
+
+                        {termsViewMode === 'table' ? (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setInlineEditingTermId(null);
+                                setNewTermClause('');
+                                setNewTermOrder((filteredTerms.length || 0) + 1);
+                                setShowInlineAddTerm(prev => !prev);
+                              }}
+                              className="bg-slate-900 hover:bg-slate-800 text-white font-bold px-4 py-2.5 rounded-xl text-xs flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
+                            >
+                              <Plus className="h-4 w-4" /> {showInlineAddTerm ? 'Close Add Form' : 'Add Clause'}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={openBulkEditTerms}
+                              className="bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold px-5 py-2.5 rounded-xl text-xs flex items-center gap-2 shadow-lg shadow-indigo-600/25 transition-all cursor-pointer"
+                            >
+                              <Edit2 className="h-4 w-4" /> ✏️ Edit All Terms (One-Click)
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => setTermsViewMode('table')}
+                              className="px-4 py-2.5 rounded-xl text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 transition-all cursor-pointer"
+                            >
+                              📋 Back to Table
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handleSaveBulkTerms}
+                              disabled={savingBulkTerms}
+                              className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-black px-5 py-2.5 rounded-xl text-xs flex items-center gap-2 shadow-lg shadow-emerald-600/25 transition-all cursor-pointer"
+                            >
+                              <Save className="h-4 w-4" />
+                              {savingBulkTerms ? 'Publishing...' : '💾 Save & Publish to App & Web'}
+                            </button>
+                          </>
+                        )}
                       </div>
                     </div>
 
@@ -2448,8 +2668,9 @@ const AdminDashboard = () => {
                     <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4">
                       <div className="flex flex-wrap items-center gap-2 bg-slate-200/60 p-1.5 rounded-2xl">
                         <button
-                          onClick={() => setTermsType('owner')}
-                          className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                          type="button"
+                          onClick={() => handleSelectTermsType('owner')}
+                          className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
                             termsType === 'owner'
                               ? 'bg-white text-indigo-700 shadow-sm font-black'
                               : 'text-slate-600 hover:text-slate-900'
@@ -2461,8 +2682,9 @@ const AdminDashboard = () => {
                           </span>
                         </button>
                         <button
-                          onClick={() => setTermsType('seeker')}
-                          className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                          type="button"
+                          onClick={() => handleSelectTermsType('seeker')}
+                          className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
                             termsType === 'seeker'
                               ? 'bg-white text-blue-700 shadow-sm font-black'
                               : 'text-slate-600 hover:text-slate-900'
@@ -2475,16 +2697,18 @@ const AdminDashboard = () => {
                         </button>
                       </div>
 
-                      <div className="relative w-full sm:w-72">
-                        <Search className="absolute left-3.5 top-3 h-4 w-4 text-slate-400" />
-                        <input
-                          type="text"
-                          placeholder="Search clauses..."
-                          value={termSearchQuery}
-                          onChange={(e) => setTermSearchQuery(e.target.value)}
-                          className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 transition-all"
-                        />
-                      </div>
+                      {termsViewMode === 'table' && (
+                        <div className="relative w-full sm:w-72">
+                          <Search className="absolute left-3.5 top-3 h-4 w-4 text-slate-400" />
+                          <input
+                            type="text"
+                            placeholder="Search clauses..."
+                            value={termSearchQuery}
+                            onChange={(e) => setTermSearchQuery(e.target.value)}
+                            className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 transition-all"
+                          />
+                        </div>
+                      )}
                     </div>
 
                     {/* ── 24/7 SUPPORT HELPLINE & CONCIERGE SETTINGS ── */}
@@ -2627,218 +2851,258 @@ const AdminDashboard = () => {
                       </form>
                     </div>
 
-                    {/* Clauses List Table */}
-                    <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm">
-                      <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-                        <div>
-                          <h3 className="font-extrabold text-slate-800 text-sm">
-                            {termsType === 'storage_owner'
-                              ? '🚜 Storage Yard Owner (1+ Acre Facility Agreement) Clauses'
-                              : termsType === 'owner'
-                              ? '🏢 Parking Space Owner (Host Agreement) Clauses'
-                              : termsType === 'bank_finance'
-                              ? '🏦 Bank & Auto Finance Repossession Staging Clauses'
-                              : '🚗 Parking Seeker (Driver & Commuter) Clauses'}
-                          </h3>
-                          <p className="text-[11px] text-slate-400">Total {filteredTerms.length} active clauses loaded</p>
-                        </div>
-                      </div>
-
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-sm text-left">
-                          <thead className="bg-slate-50 text-slate-400 text-xs uppercase">
-                            <tr>
-                              <th className="px-6 py-3 w-16">#</th>
-                              <th className="px-6 py-3">Clause Description</th>
-                              <th className="px-6 py-3 w-28 text-center">Status</th>
-                              <th className="px-6 py-3 w-28 text-center">Actions</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-slate-100 font-medium">
-                            {filteredTerms.length === 0 ? (
-                              <tr>
-                                <td colSpan="4" className="text-center py-12 text-slate-400">
-                                  No clauses found matching your search.
-                                </td>
-                              </tr>
-                            ) : (
-                              filteredTerms.map((t, idx) => (
-                                <tr key={t._id} className="hover:bg-slate-50/70 transition-colors">
-                                  <td className="px-6 py-4">
-                                    <span className="h-7 w-7 rounded-lg bg-indigo-50 border border-indigo-200 text-indigo-700 font-black text-xs flex items-center justify-center font-mono">
-                                      {t.order || idx + 1}
-                                    </span>
-                                  </td>
-                                  <td className="px-6 py-4 text-slate-800 font-medium text-xs leading-relaxed max-w-xl">
-                                    {t.clause}
-                                  </td>
-                                  <td className="px-6 py-4 text-center">
-                                    <button
-                                      onClick={() => handleToggleTermActive(t)}
-                                      className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase transition-all ${
-                                        t.isActive
-                                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100'
-                                          : 'bg-slate-100 text-slate-500 border border-slate-200 hover:bg-slate-200'
-                                      }`}
-                                    >
-                                      {t.isActive ? '✓ Active' : 'Inactive'}
-                                    </button>
-                                  </td>
-                                  <td className="px-6 py-4 text-center">
-                                    <div className="flex items-center justify-center gap-1.5">
-                                      <button
-                                        onClick={() => {
-                                          setEditingTerm(t);
-                                          setTermClauseInput(t.clause);
-                                          setTermOrderInput(t.order || idx + 1);
-                                          setShowAddTermModal(true);
-                                        }}
-                                        className="p-1.5 rounded-lg text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 transition-colors cursor-pointer"
-                                        title="Edit Clause"
-                                      >
-                                        <Edit2 className="h-4 w-4" />
-                                      </button>
-                                      <button
-                                        onClick={() => handleDeleteTerm(t._id)}
-                                        className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
-                                        title="Delete Clause"
-                                      >
-                                        <Trash2 className="h-4 w-4" />
-                                      </button>
-                                    </div>
-                                  </td>
-                                </tr>
-                              ))
-                            )}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-
-                    {/* ── BULK TERMS LIVE EDITOR MODAL (MATCHING SCREENSHOT) ── */}
-                    {showBulkEditTermsModal && (
-                      <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-                        <div className="bg-white rounded-3xl border border-slate-200 max-w-4xl w-full max-h-[92vh] flex flex-col shadow-2xl animate-scaleUp overflow-hidden">
-                          {/* Modal Header */}
-                          <div className="px-8 pt-6 pb-4 flex items-center justify-between shrink-0 border-b border-slate-100">
-                            <div>
-                              <h3 className="font-extrabold text-slate-900 text-lg">
-                                {termsType === 'owner'
-                                  ? 'Space Owner Terms & Conditions'
-                                  : termsType === 'storage_owner'
-                                  ? 'Storage Yard Owner Terms & Conditions'
-                                  : termsType === 'bank_finance'
-                                  ? 'Bank & Finance Terms & Conditions'
-                                  : 'User / Student Terms & Conditions'}
-                              </h3>
-                            </div>
-                            <div className="text-right">
-                              <p className="text-xs text-slate-500 font-medium">
-                                Displayed during {termsType === 'owner'
-                                  ? 'Space Owner'
-                                  : termsType === 'storage_owner'
-                                  ? 'Storage Yard Owner'
-                                  : termsType === 'bank_finance'
-                                  ? 'Bank & Finance'
-                                  : 'Student & Learner'} Login / Sign Up
-                              </p>
-                            </div>
+                    {/* ── ON-PAGE DIRECT DOCUMENT LIVE EDITOR (ZERO OVERLAY / ZERO POPUP) ── */}
+                    {termsViewMode === 'editor' ? (
+                      <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-4 animate-fadeIn">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
+                          <div>
+                            <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
+                              <FileText className="h-5 w-5 text-indigo-600" />
+                              {termsType === 'owner'
+                                ? '🏢 Space Owner Agreement — Direct On-Page Document Editor'
+                                : '🚗 Parking Seeker Agreement — Direct On-Page Document Editor'}
+                            </h3>
+                            <p className="text-xs text-slate-500 mt-1">
+                              Edit all clauses directly below without any modal popup. Separate each clause or paragraph with an empty line. Updates publish live to mobile apps and website.
+                            </p>
                           </div>
 
-                          {/* Editor Body */}
-                          <div className="px-8 py-5 flex-1 flex flex-col min-h-0 bg-slate-50/40">
-                            <textarea
-                              value={bulkTermsText}
-                              onChange={(e) => setBulkTermsText(e.target.value)}
-                              placeholder={`TERMS AND CONDITIONS\n\nLast Updated: October 2026\n\nWelcome to Plan To Park. These Terms and Conditions ("Terms") govern your access to and use of the platform.\n\n1. About the Platform\n...`}
-                              className="w-full flex-1 min-h-[440px] bg-white border border-slate-200/90 rounded-2xl p-6 text-slate-800 text-[13px] leading-relaxed font-sans placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all resize-y shadow-xs"
-                            />
-                            <div className="flex items-center justify-between pt-2.5 text-[11px] text-slate-400 font-medium px-1">
-                              <span>Separate paragraphs or numbered clauses with an empty line.</span>
-                              <span>{bulkTermsText.trim() ? `${bulkTermsText.split(/\n\s*\n+/).filter(Boolean).length} clauses / sections loaded` : '0 clauses'}</span>
-                            </div>
-                          </div>
-
-                          {/* Modal Footer */}
-                          <div className="px-8 py-4 border-t border-slate-100 flex items-center justify-end gap-3 shrink-0 bg-white">
+                          <div className="flex items-center gap-2 shrink-0">
                             <button
                               type="button"
-                              onClick={() => setShowBulkEditTermsModal(false)}
-                              className="px-6 py-2.5 rounded-xl text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 transition-all cursor-pointer"
+                              onClick={() => setTermsViewMode('table')}
+                              className="px-4 py-2.5 rounded-xl text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 transition-all cursor-pointer"
                             >
-                              Cancel
+                              📋 Back to Table
                             </button>
                             <button
                               type="button"
                               onClick={handleSaveBulkTerms}
                               disabled={savingBulkTerms}
-                              className="bg-[#0a5c36] hover:bg-[#074729] disabled:opacity-50 text-white font-extrabold px-6 py-2.5 rounded-xl text-xs flex items-center gap-2 shadow-md hover:shadow-lg transition-all cursor-pointer"
+                              className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-black px-5 py-2.5 rounded-xl text-xs flex items-center gap-2 shadow-md shadow-emerald-600/20 transition-all cursor-pointer"
                             >
                               <Save className="h-4 w-4" />
-                              {savingBulkTerms ? 'Publishing...' : 'Save & Publish to App and Web'}
+                              {savingBulkTerms ? 'Publishing...' : '💾 Save & Publish to App and Web'}
                             </button>
                           </div>
                         </div>
-                      </div>
-                    )}
 
-                    {/* Add / Edit Single Term Modal */}
-                    {showAddTermModal && (
-                      <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-                        <div className="bg-white rounded-3xl border border-slate-200 max-w-lg w-full p-6 shadow-2xl animate-scaleUp">
-                          <div className="flex items-center justify-between pb-4 border-b border-slate-100 mb-4">
-                            <h3 className="font-black text-slate-900 text-base flex items-center gap-2">
-                              <FileText className="h-5 w-5 text-indigo-600" />
-                              {editingTerm ? 'Edit Clause' : 'Add New Clause'}
-                            </h3>
-                            <button
-                              onClick={() => setShowAddTermModal(false)}
-                              className="h-8 w-8 rounded-xl bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200 transition-colors cursor-pointer"
-                            >
-                              <X className="h-4 w-4" />
-                            </button>
+                        <div>
+                          <textarea
+                            value={bulkTermsText}
+                            onChange={(e) => setBulkTermsText(e.target.value)}
+                            rows={22}
+                            placeholder={`TERMS AND CONDITIONS\n\nLast Updated: October 2026\n\nWelcome to Plan To Park. These Terms and Conditions govern your access to and use of the platform.\n\n1. About the Platform\n...`}
+                            className="w-full min-h-[460px] bg-slate-50/50 border border-slate-200 rounded-2xl p-5 text-slate-800 text-[13px] leading-relaxed font-sans placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all resize-y shadow-inner"
+                          />
+                          <div className="flex items-center justify-between pt-3 text-xs text-slate-500 font-medium px-1">
+                            <span>💡 Tip: Separate paragraphs or numbered clauses with an empty line.</span>
+                            <span className="font-bold text-indigo-700 bg-indigo-50 px-3 py-1 rounded-full border border-indigo-100">
+                              {bulkTermsText.trim() ? `${bulkTermsText.split(/\n\s*\n+/).filter(Boolean).length} clauses loaded` : '0 clauses'}
+                            </span>
                           </div>
+                        </div>
 
-                          <form onSubmit={handleSaveTerm} className="space-y-4">
-                            <div>
-                              <label className="block text-xs font-bold text-slate-600 mb-1">Clause Order / Position</label>
-                              <input
-                                type="number"
-                                value={termOrderInput}
-                                onChange={(e) => setTermOrderInput(Number(e.target.value))}
-                                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:border-indigo-500 font-semibold"
-                              />
-                            </div>
-
-                            <div>
-                              <label className="block text-xs font-bold text-slate-600 mb-1">Clause Text *</label>
-                              <textarea
-                                rows={6}
-                                required
-                                placeholder="Enter clause content..."
-                                value={termClauseInput}
-                                onChange={(e) => setTermClauseInput(e.target.value)}
-                                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-indigo-500 leading-relaxed resize-y"
-                              />
-                            </div>
-
-                            <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
+                        <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
+                          <button
+                            type="button"
+                            onClick={() => setTermsViewMode('table')}
+                            className="px-5 py-2.5 rounded-xl text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 transition-all cursor-pointer"
+                          >
+                            Cancel / Back to Table
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleSaveBulkTerms}
+                            disabled={savingBulkTerms}
+                            className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-black px-6 py-2.5 rounded-xl text-xs flex items-center gap-2 shadow-md shadow-emerald-600/20 transition-all cursor-pointer"
+                          >
+                            <Save className="h-4 w-4" />
+                            {savingBulkTerms ? 'Publishing...' : '💾 Save & Publish to App and Web'}
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      /* ── CLAUSES TABLE & INLINE EDITING (ZERO OVERLAY) ── */
+                      <div className="space-y-4">
+                        {/* Inline Add Clause Box */}
+                        {showInlineAddTerm && (
+                          <div className="bg-indigo-50/50 border-2 border-dashed border-indigo-200 rounded-3xl p-5 shadow-xs animate-fadeIn space-y-3">
+                            <div className="flex items-center justify-between">
+                              <h4 className="text-xs font-black uppercase text-indigo-900 tracking-wider flex items-center gap-2">
+                                <Plus className="h-4 w-4 text-indigo-600" />
+                                Add New Clause to {termsType === 'owner' ? 'Space Owner' : 'Parking Seeker'} Agreement
+                              </h4>
                               <button
                                 type="button"
-                                onClick={() => setShowAddTermModal(false)}
-                                className="px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors cursor-pointer"
+                                onClick={() => { setShowInlineAddTerm(false); setNewTermClause(''); }}
+                                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-white cursor-pointer"
+                              >
+                                <X className="h-4 w-4" />
+                              </button>
+                            </div>
+
+                            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+                              <div className="w-full sm:w-28 shrink-0">
+                                <label className="block text-[10px] font-bold text-slate-500 mb-1">Clause Order</label>
+                                <input
+                                  type="number"
+                                  value={newTermOrder}
+                                  onChange={(e) => setNewTermOrder(Number(e.target.value))}
+                                  className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:border-indigo-500"
+                                />
+                              </div>
+                              <div className="w-full flex-1">
+                                <label className="block text-[10px] font-bold text-slate-500 mb-1">Clause Text *</label>
+                                <textarea
+                                  rows={2}
+                                  value={newTermClause}
+                                  onChange={(e) => setNewTermClause(e.target.value)}
+                                  placeholder="Enter the full text of the new clause..."
+                                  className="w-full px-3.5 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:border-indigo-500 resize-y"
+                                />
+                              </div>
+                            </div>
+
+                            <div className="flex justify-end gap-2 pt-1">
+                              <button
+                                type="button"
+                                onClick={() => { setShowInlineAddTerm(false); setNewTermClause(''); }}
+                                className="px-3 py-1.5 rounded-xl text-xs font-bold text-slate-600 hover:bg-white cursor-pointer"
                               >
                                 Cancel
                               </button>
                               <button
-                                type="submit"
-                                disabled={termLoading}
-                                className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-extrabold px-5 py-2.5 rounded-xl text-xs shadow-md transition-all cursor-pointer"
+                                type="button"
+                                onClick={handleCreateInlineTerm}
+                                disabled={termLoading || !newTermClause.trim()}
+                                className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-bold px-4 py-1.5 rounded-xl text-xs flex items-center gap-1.5 shadow-sm cursor-pointer"
                               >
-                                {termLoading ? 'Saving...' : editingTerm ? 'Update Clause' : 'Create Clause'}
+                                <Check className="h-4 w-4" />
+                                {termLoading ? 'Adding...' : 'Create Clause'}
                               </button>
                             </div>
-                          </form>
+                          </div>
+                        )}
+
+                        <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm">
+                          <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+                            <div>
+                              <h3 className="font-extrabold text-slate-800 text-sm">
+                                {termsType === 'owner'
+                                  ? '🏢 Parking Space Owner (Host Agreement) Clauses'
+                                  : '🚗 Parking Seeker (Driver & Commuter) Clauses'}
+                              </h3>
+                              <p className="text-[11px] text-slate-400">Total {filteredTerms.length} active clauses loaded • Click ✏️ to edit inline directly</p>
+                            </div>
+                          </div>
+
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-sm text-left">
+                              <thead className="bg-slate-50 text-slate-400 text-xs uppercase">
+                                <tr>
+                                  <th className="px-6 py-3 w-16">#</th>
+                                  <th className="px-6 py-3">Clause Description</th>
+                                  <th className="px-6 py-3 w-28 text-center">Status</th>
+                                  <th className="px-6 py-3 w-28 text-center">Actions</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-100 font-medium">
+                                {filteredTerms.length === 0 ? (
+                                  <tr>
+                                    <td colSpan="4" className="text-center py-12 text-slate-400">
+                                      No clauses found matching your search.
+                                    </td>
+                                  </tr>
+                                ) : (
+                                  filteredTerms.map((t, idx) => {
+                                    const isInlineEditing = inlineEditingTermId === t._id;
+                                    return (
+                                      <tr key={t._id} className={isInlineEditing ? "bg-indigo-50/30" : "hover:bg-slate-50/70 transition-colors"}>
+                                        <td className="px-6 py-4 align-top">
+                                          <span className="h-7 w-7 rounded-lg bg-indigo-50 border border-indigo-200 text-indigo-700 font-black text-xs flex items-center justify-center font-mono">
+                                            {t.order || idx + 1}
+                                          </span>
+                                        </td>
+                                        <td className="px-6 py-4 text-slate-800 font-medium text-xs leading-relaxed max-w-xl">
+                                          {isInlineEditing ? (
+                                            <div className="space-y-2">
+                                              <textarea
+                                                rows={4}
+                                                value={inlineTermText}
+                                                onChange={(e) => setInlineTermText(e.target.value)}
+                                                className="w-full p-3 bg-white border border-indigo-300 rounded-xl text-xs font-normal text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 resize-y shadow-xs"
+                                                autoFocus
+                                              />
+                                              <div className="flex items-center gap-2">
+                                                <button
+                                                  type="button"
+                                                  onClick={() => handleSaveInlineTerm(t._id)}
+                                                  disabled={termLoading || !inlineTermText.trim()}
+                                                  className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold px-3 py-1.5 rounded-lg text-xs flex items-center gap-1 shadow-xs cursor-pointer"
+                                                >
+                                                  <Check className="h-3.5 w-3.5" />
+                                                  {termLoading ? 'Saving...' : 'Save Clause'}
+                                                </button>
+                                                <button
+                                                  type="button"
+                                                  onClick={() => { setInlineEditingTermId(null); setInlineTermText(''); }}
+                                                  className="bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold px-3 py-1.5 rounded-lg text-xs flex items-center gap-1 cursor-pointer"
+                                                >
+                                                  <X className="h-3.5 w-3.5" /> Cancel
+                                                </button>
+                                              </div>
+                                            </div>
+                                          ) : (
+                                            <span>{t.clause}</span>
+                                          )}
+                                        </td>
+                                        <td className="px-6 py-4 text-center align-top">
+                                          <button
+                                            type="button"
+                                            onClick={() => handleToggleTermActive(t)}
+                                            className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase transition-all cursor-pointer ${
+                                              t.isActive
+                                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100'
+                                                : 'bg-slate-100 text-slate-500 border border-slate-200 hover:bg-slate-200'
+                                            }`}
+                                          >
+                                            {t.isActive ? '✓ Active' : 'Inactive'}
+                                          </button>
+                                        </td>
+                                        <td className="px-6 py-4 text-center align-top">
+                                          {!isInlineEditing && (
+                                            <div className="flex items-center justify-center gap-1.5">
+                                              <button
+                                                type="button"
+                                                onClick={() => {
+                                                  setInlineEditingTermId(t._id);
+                                                  setInlineTermText(t.clause);
+                                                  setShowInlineAddTerm(false);
+                                                }}
+                                                className="p-1.5 rounded-lg text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 transition-colors cursor-pointer"
+                                                title="Edit Clause Directly"
+                                              >
+                                                <Edit2 className="h-4 w-4" />
+                                              </button>
+                                              <button
+                                                type="button"
+                                                onClick={() => handleDeleteTerm(t._id)}
+                                                className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                                                title="Delete Clause"
+                                              >
+                                                <Trash2 className="h-4 w-4" />
+                                              </button>
+                                            </div>
+                                          )}
+                                        </td>
+                                      </tr>
+                                    );
+                                  })
+                                )}
+                              </tbody>
+                            </table>
+                          </div>
                         </div>
                       </div>
                     )}
@@ -2880,316 +3144,435 @@ const AdminDashboard = () => {
                         </p>
                       </div>
 
-                      <div className="flex items-center gap-2 shrink-0">
-                        <button
-                          onClick={() => {
-                            setEditingFaq(null);
-                            setFaqCategoryInput('');
-                            setFaqQuestionInput('');
-                            setFaqAnswerInput('');
-                            setFaqOrderInput((audienceFaqs.length || 0) + 1);
-                            setFaqAudienceInput('parking_seeker');
-                            setShowAddFaqModal(true);
-                          }}
-                          className="bg-slate-900 hover:bg-slate-800 text-white font-bold px-4 py-2.5 rounded-xl text-xs flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
-                        >
-                          <Plus className="h-4 w-4" /> Add FAQ
-                        </button>
-                        <button
-                          onClick={openBulkEditFaqs}
-                          className="bg-cyan-600 hover:bg-cyan-700 text-white font-extrabold px-5 py-2.5 rounded-xl text-xs flex items-center gap-2 shadow-lg shadow-cyan-600/25 transition-all cursor-pointer"
-                        >
-                          <Edit2 className="h-4 w-4" /> ✏️ Edit All FAQs (One-Click)
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Filter Tabs & Search & Category Filter */}
-                    <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4">
-                      <div className="flex items-center gap-2 bg-slate-200/60 p-1.5 rounded-2xl">
-                        <div className="px-4 py-2 rounded-xl text-xs font-black bg-white text-blue-700 shadow-sm flex items-center gap-2">
-                          <span>🚗 Parking Seeker FAQs</span>
-                          <span className="px-2 py-0.5 rounded-full text-[10px] bg-blue-50 text-blue-600 font-bold">
-                            {audienceFaqs.length}
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-                        {/* Category Filter */}
-                        <div className="relative">
-                          <select
-                            value={faqCategoryFilter}
-                            onChange={(e) => setFaqCategoryFilter(e.target.value)}
-                            className="w-full sm:w-52 px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-700 font-semibold focus:outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 cursor-pointer"
+                      <div className="flex flex-wrap items-center gap-2 shrink-0">
+                        {/* View Switcher: Table vs Document Editor */}
+                        <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200">
+                          <button
+                            type="button"
+                            onClick={() => setFaqsViewMode('table')}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                              faqsViewMode === 'table'
+                                ? 'bg-white text-cyan-700 shadow-xs'
+                                : 'text-slate-600 hover:text-slate-900'
+                            }`}
                           >
-                            <option value="all">All Categories ({audienceFaqs.length})</option>
-                            {uniqueCategories.filter(c => c !== 'all').map(cat => (
-                              <option key={cat} value={cat}>
-                                {cat} ({audienceFaqs.filter(f => f.category === cat).length})
-                              </option>
-                            ))}
-                          </select>
+                            📋 Table View
+                          </button>
+                          <button
+                            type="button"
+                            onClick={openBulkEditFaqs}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                              faqsViewMode === 'editor'
+                                ? 'bg-cyan-600 text-white shadow-xs'
+                                : 'text-slate-600 hover:text-slate-900'
+                            }`}
+                          >
+                            ✏️ Document Editor
+                          </button>
                         </div>
 
-                        {/* Search Input */}
-                        <div className="relative w-full sm:w-64">
-                          <Search className="absolute left-3.5 top-2.5 h-4 w-4 text-slate-400" />
-                          <input
-                            type="text"
-                            placeholder="Search questions & answers..."
-                            value={faqSearchQuery}
-                            onChange={(e) => setFaqSearchQuery(e.target.value)}
-                            className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 transition-all"
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* FAQs List Table */}
-                    <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm">
-                      <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-                        <div>
-                          <h3 className="font-extrabold text-slate-800 text-sm flex items-center gap-2">
-                            <span>🚗 Parking Seeker Chatbot FAQs</span>
-                            <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 font-bold">
-                              {filteredFaqs.length} of {audienceFaqs.length} questions
-                            </span>
-                          </h3>
-                          <p className="text-[11px] text-slate-400 mt-0.5">
-                            Use "Edit All FAQs (One-Click)" to edit, add or delete every question and answer at once.
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-sm text-left">
-                          <thead className="bg-slate-50 text-slate-400 text-xs uppercase">
-                            <tr>
-                              <th className="px-5 py-3 w-16">#</th>
-                              <th className="px-5 py-3 w-44">Category</th>
-                              <th className="px-5 py-3">Question & Answer</th>
-                              <th className="px-5 py-3 w-28 text-center">Status</th>
-                              <th className="px-5 py-3 w-28 text-center">Actions</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-slate-100 font-medium">
-                            {filteredFaqs.length === 0 ? (
-                              <tr>
-                                <td colSpan="5" className="text-center py-12 text-slate-400">
-                                  No FAQs found matching your query.
-                                </td>
-                              </tr>
-                            ) : (
-                              filteredFaqs.map((faq, idx) => (
-                                <tr key={faq._id || faq.id || idx} className="hover:bg-slate-50/70 transition-colors">
-                                  <td className="px-5 py-4 align-top">
-                                    <span className="h-7 w-7 rounded-lg bg-cyan-50 border border-cyan-200 text-cyan-700 font-black text-xs flex items-center justify-center font-mono">
-                                      {faq.order || idx + 1}
-                                    </span>
-                                  </td>
-                                  <td className="px-5 py-4 align-top">
-                                    <span className="inline-block px-2.5 py-1 rounded-lg text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
-                                      {faq.category || 'General'}
-                                    </span>
-                                  </td>
-                                  <td className="px-5 py-4 align-top">
-                                    <div className="space-y-1.5 max-w-2xl">
-                                      <p className="font-bold text-slate-900 text-xs leading-snug">
-                                        {faq.question}
-                                      </p>
-                                      <p className="text-slate-600 text-xs leading-relaxed">
-                                        {faq.answer}
-                                      </p>
-                                    </div>
-                                  </td>
-                                  <td className="px-5 py-4 align-top text-center">
-                                    <button
-                                      onClick={() => handleToggleFaqActive(faq)}
-                                      className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase transition-all cursor-pointer ${
-                                        faq.isActive !== false
-                                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100'
-                                          : 'bg-slate-100 text-slate-500 border border-slate-200 hover:bg-slate-200'
-                                      }`}
-                                    >
-                                      {faq.isActive !== false ? '✓ Active' : 'Inactive'}
-                                    </button>
-                                  </td>
-                                  <td className="px-5 py-4 align-top text-center">
-                                    <div className="flex items-center justify-center gap-1.5">
-                                      <button
-                                        onClick={() => {
-                                          setEditingFaq(faq);
-                                          setFaqCategoryInput(faq.category || '');
-                                          setFaqQuestionInput(faq.question || '');
-                                          setFaqAnswerInput(faq.answer || '');
-                                          setFaqOrderInput(faq.order || idx + 1);
-                                          setFaqAudienceInput(faq.audience || faqsAudience);
-                                          setShowAddFaqModal(true);
-                                        }}
-                                        className="p-1.5 rounded-lg text-slate-500 hover:text-cyan-600 hover:bg-cyan-50 transition-colors cursor-pointer"
-                                        title="Edit FAQ"
-                                      >
-                                        <Edit2 className="h-4 w-4" />
-                                      </button>
-                                      <button
-                                        onClick={() => handleDeleteFaq(faq._id || faq.id)}
-                                        className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
-                                        title="Delete FAQ"
-                                      >
-                                        <Trash2 className="h-4 w-4" />
-                                      </button>
-                                    </div>
-                                  </td>
-                                </tr>
-                              ))
-                            )}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-
-                    {/* ── BULK FAQ LIVE EDITOR MODAL (MATCHING SCREENSHOT) ── */}
-                    {showBulkEditFaqsModal && (
-                      <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-                        <div className="bg-white rounded-3xl border border-slate-200 max-w-4xl w-full max-h-[92vh] flex flex-col shadow-2xl animate-scaleUp overflow-hidden">
-                          {/* Modal Header */}
-                          <div className="px-8 pt-6 pb-4 flex items-center justify-between shrink-0 border-b border-slate-100">
-                            <div>
-                              <h3 className="font-extrabold text-slate-900 text-lg">
-                                🚗 Parking Seeker Chatbot FAQs
-                              </h3>
-                            </div>
-                            <div className="text-right">
-                              <p className="text-xs text-slate-500 font-medium">
-                                Displayed in Seeker AI Chatbot &amp; FAQ Center
-                              </p>
-                            </div>
-                          </div>
-
-                          {/* Editor Body */}
-                          <div className="px-8 py-5 flex-1 flex flex-col min-h-0 bg-slate-50/40">
-                            <textarea
-                              value={bulkFaqsText}
-                              onChange={(e) => setBulkFaqsText(e.target.value)}
-                              placeholder={`[Category: Booking & Reservations]\n\nQ: How do I book a parking spot?\nA: Search for your destination, choose a slot, and confirm payment.\n\n[Category: Payments & Refunds]\n\nQ: What payment methods are supported?\nA: UPI, credit/debit cards, net banking, and wallets are accepted.`}
-                              className="w-full flex-1 min-h-[440px] bg-white border border-slate-200/90 rounded-2xl p-6 text-slate-800 text-[13px] leading-relaxed font-sans placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all resize-y shadow-xs"
-                            />
-                            <div className="flex items-center justify-between pt-2.5 text-[11px] text-slate-400 font-medium px-1">
-                              <span>Format: [Category: Name] followed by Q: Question and A: Answer.</span>
-                              <span className="font-bold text-emerald-700">
-                                {`${parseFaqsFromText(bulkFaqsText).length} Questions & Answers ready to publish`}
-                              </span>
-                            </div>
-                          </div>
-
-                          {/* Modal Footer */}
-                          <div className="px-8 py-4 border-t border-slate-100 flex items-center justify-end gap-3 shrink-0 bg-white">
+                        {faqsViewMode === 'table' ? (
+                          <>
                             <button
                               type="button"
-                              onClick={() => setShowBulkEditFaqsModal(false)}
-                              className="px-6 py-2.5 rounded-xl text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 transition-all cursor-pointer"
+                              onClick={() => {
+                                setInlineEditingFaqId(null);
+                                setNewFaqQuestion('');
+                                setNewFaqAnswer('');
+                                setNewFaqCategory('General');
+                                setNewFaqOrder((audienceFaqs.length || 0) + 1);
+                                setShowInlineAddFaq(prev => !prev);
+                              }}
+                              className="bg-slate-900 hover:bg-slate-800 text-white font-bold px-4 py-2.5 rounded-xl text-xs flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
                             >
-                              Cancel
+                              <Plus className="h-4 w-4" /> {showInlineAddFaq ? 'Close Add Form' : 'Add FAQ'}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={openBulkEditFaqs}
+                              className="bg-cyan-600 hover:bg-cyan-700 text-white font-extrabold px-5 py-2.5 rounded-xl text-xs flex items-center gap-2 shadow-lg shadow-cyan-600/25 transition-all cursor-pointer"
+                            >
+                              <Edit2 className="h-4 w-4" /> ✏️ Edit All FAQs (One-Click)
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => setFaqsViewMode('table')}
+                              className="px-4 py-2.5 rounded-xl text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 transition-all cursor-pointer"
+                            >
+                              📋 Back to Table
                             </button>
                             <button
                               type="button"
                               onClick={handleSaveBulkFaqs}
                               disabled={savingBulkFaqs}
-                              className="bg-[#0a5c36] hover:bg-[#074729] disabled:opacity-50 text-white font-extrabold px-6 py-2.5 rounded-xl text-xs flex items-center gap-2 shadow-md hover:shadow-lg transition-all cursor-pointer"
+                              className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-black px-5 py-2.5 rounded-xl text-xs flex items-center gap-2 shadow-lg shadow-emerald-600/25 transition-all cursor-pointer"
                             >
                               <Save className="h-4 w-4" />
-                              {savingBulkFaqs ? 'Publishing...' : 'Save & Publish to App and Web'}
+                              {savingBulkFaqs ? 'Publishing...' : '💾 Save & Publish to Chatbot & Web'}
                             </button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Filter Tabs & Search & Category Filter (Visible in Table View) */}
+                    {faqsViewMode === 'table' && (
+                      <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4">
+                        <div className="flex items-center gap-2 bg-slate-200/60 p-1.5 rounded-2xl">
+                          <div className="px-4 py-2 rounded-xl text-xs font-black bg-white text-blue-700 shadow-sm flex items-center gap-2">
+                            <span>🚗 Parking Seeker FAQs</span>
+                            <span className="px-2 py-0.5 rounded-full text-[10px] bg-blue-50 text-blue-600 font-bold">
+                              {audienceFaqs.length}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                          {/* Category Filter */}
+                          <div className="relative">
+                            <select
+                              value={faqCategoryFilter}
+                              onChange={(e) => setFaqCategoryFilter(e.target.value)}
+                              className="w-full sm:w-52 px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-700 font-semibold focus:outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 cursor-pointer"
+                            >
+                              <option value="all">All Categories ({audienceFaqs.length})</option>
+                              {uniqueCategories.filter(c => c !== 'all').map(cat => (
+                                <option key={cat} value={cat}>
+                                  {cat} ({audienceFaqs.filter(f => f.category === cat).length})
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+
+                          {/* Search Input */}
+                          <div className="relative w-full sm:w-64">
+                            <Search className="absolute left-3.5 top-2.5 h-4 w-4 text-slate-400" />
+                            <input
+                              type="text"
+                              placeholder="Search questions & answers..."
+                              value={faqSearchQuery}
+                              onChange={(e) => setFaqSearchQuery(e.target.value)}
+                              className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 transition-all"
+                            />
                           </div>
                         </div>
                       </div>
                     )}
 
-                    {/* Add / Edit FAQ Modal */}
-                    {showAddFaqModal && (
-                      <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-                        <div className="bg-white rounded-3xl border border-slate-200 max-w-lg w-full p-6 shadow-2xl animate-scaleUp">
-                          <div className="flex items-center justify-between pb-4 border-b border-slate-100 mb-4">
-                            <h3 className="font-black text-slate-900 text-base flex items-center gap-2">
+                    {/* ── ON-PAGE DIRECT FAQ DOCUMENT LIVE EDITOR (ZERO OVERLAY / ZERO POPUP) ── */}
+                    {faqsViewMode === 'editor' ? (
+                      <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-4 animate-fadeIn">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
+                          <div>
+                            <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
                               <HelpCircle className="h-5 w-5 text-cyan-500" />
-                              {editingFaq ? 'Edit Chatbot FAQ' : 'Add New Chatbot FAQ'}
+                              🚗 Parking Seeker Chatbot FAQs — Direct On-Page Document Editor
                             </h3>
-                            <button
-                              onClick={() => setShowAddFaqModal(false)}
-                              className="h-8 w-8 rounded-xl bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200 transition-colors cursor-pointer"
-                            >
-                              <X className="h-4 w-4" />
-                            </button>
+                            <p className="text-xs text-slate-500 mt-1">
+                              Edit, add, or delete all questions and answers directly below without any modal popup. Format: [Category: Category Name] followed by Q: Question and A: Answer.
+                            </p>
                           </div>
 
-                          <form onSubmit={handleSaveFaq} className="space-y-4">
+                          <div className="flex items-center gap-2 shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => setFaqsViewMode('table')}
+                              className="px-4 py-2.5 rounded-xl text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 transition-all cursor-pointer"
+                            >
+                              📋 Back to Table
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handleSaveBulkFaqs}
+                              disabled={savingBulkFaqs}
+                              className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-black px-5 py-2.5 rounded-xl text-xs flex items-center gap-2 shadow-md shadow-emerald-600/20 transition-all cursor-pointer"
+                            >
+                              <Save className="h-4 w-4" />
+                              {savingBulkFaqs ? 'Publishing...' : '💾 Save & Publish to Chatbot & Web'}
+                            </button>
+                          </div>
+                        </div>
 
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                              <div>
-                                <label className="block text-xs font-bold text-slate-600 mb-1">Topic / Category *</label>
-                                <input
-                                  type="text"
-                                  required
-                                  placeholder="e.g. About & Eligibility"
-                                  value={faqCategoryInput}
-                                  onChange={(e) => setFaqCategoryInput(e.target.value)}
-                                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-cyan-400"
-                                />
-                              </div>
+                        <div>
+                          <textarea
+                            value={bulkFaqsText}
+                            onChange={(e) => setBulkFaqsText(e.target.value)}
+                            rows={22}
+                            placeholder={`[Category: Booking & Reservations]\n\nQ: How do I book a parking spot?\nA: Search for your destination, choose a slot, and confirm payment.\n\n[Category: Payments & Refunds]\n\nQ: What payment methods are supported?\nA: UPI, credit/debit cards, net banking, and wallets are accepted.`}
+                            className="w-full min-h-[460px] bg-slate-50/50 border border-slate-200 rounded-2xl p-5 text-slate-800 text-[13px] leading-relaxed font-sans placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 transition-all resize-y shadow-inner"
+                          />
+                          <div className="flex items-center justify-between pt-3 text-xs text-slate-500 font-medium px-1">
+                            <span>💡 Format: <code>[Category: Name]</code> followed by <code>Q: Question</code> and <code>A: Answer</code>.</span>
+                            <span className="font-bold text-cyan-800 bg-cyan-50 px-3 py-1 rounded-full border border-cyan-100">
+                              {`${parseFaqsFromText(bulkFaqsText).length} Questions & Answers ready to publish`}
+                            </span>
+                          </div>
+                        </div>
 
-                              <div>
-                                <label className="block text-xs font-bold text-slate-600 mb-1">Display Order</label>
-                                <input
-                                  type="number"
-                                  value={faqOrderInput}
-                                  onChange={(e) => setFaqOrderInput(Number(e.target.value))}
-                                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:border-cyan-400"
-                                />
-                              </div>
-                            </div>
-
-                            <div>
-                              <label className="block text-xs font-bold text-slate-600 mb-1">Question Text *</label>
-                              <input
-                                type="text"
-                                required
-                                placeholder="e.g. What is Plant2Park?"
-                                value={faqQuestionInput}
-                                onChange={(e) => setFaqQuestionInput(e.target.value)}
-                                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-cyan-400"
-                              />
-                            </div>
-
-                            <div>
-                              <label className="block text-xs font-bold text-slate-600 mb-1">Answer Text *</label>
-                              <textarea
-                                rows={4}
-                                required
-                                placeholder="Enter the detailed resolution or answer provided to users..."
-                                value={faqAnswerInput}
-                                onChange={(e) => setFaqAnswerInput(e.target.value)}
-                                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-cyan-400 leading-relaxed"
-                              />
-                            </div>
-
-                            <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
+                        <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
+                          <button
+                            type="button"
+                            onClick={() => setFaqsViewMode('table')}
+                            className="px-5 py-2.5 rounded-xl text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 transition-all cursor-pointer"
+                          >
+                            Cancel / Back to Table
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleSaveBulkFaqs}
+                            disabled={savingBulkFaqs}
+                            className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-black px-6 py-2.5 rounded-xl text-xs flex items-center gap-2 shadow-md shadow-emerald-600/20 transition-all cursor-pointer"
+                          >
+                            <Save className="h-4 w-4" />
+                            {savingBulkFaqs ? 'Publishing...' : '💾 Save & Publish to Chatbot & Web'}
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      /* ── FAQS TABLE & INLINE EDITING (ZERO OVERLAY) ── */
+                      <div className="space-y-4">
+                        {/* Inline Add FAQ Box */}
+                        {showInlineAddFaq && (
+                          <div className="bg-cyan-50/50 border-2 border-dashed border-cyan-200 rounded-3xl p-5 shadow-xs animate-fadeIn space-y-3">
+                            <div className="flex items-center justify-between">
+                              <h4 className="text-xs font-black uppercase text-cyan-900 tracking-wider flex items-center gap-2">
+                                <Plus className="h-4 w-4 text-cyan-600" />
+                                Add New Chatbot Question & Answer
+                              </h4>
                               <button
                                 type="button"
-                                onClick={() => setShowAddFaqModal(false)}
-                                className="px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors cursor-pointer"
+                                onClick={() => { setShowInlineAddFaq(false); setNewFaqQuestion(''); setNewFaqAnswer(''); }}
+                                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-white cursor-pointer"
+                              >
+                                <X className="h-4 w-4" />
+                              </button>
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                              <div>
+                                <label className="block text-[10px] font-bold text-slate-500 mb-1">Topic / Category *</label>
+                                <input
+                                  type="text"
+                                  value={newFaqCategory}
+                                  onChange={(e) => setNewFaqCategory(e.target.value)}
+                                  placeholder="e.g. Booking & Cancellations"
+                                  className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:border-cyan-500"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-[10px] font-bold text-slate-500 mb-1">Display Order</label>
+                                <input
+                                  type="number"
+                                  value={newFaqOrder}
+                                  onChange={(e) => setNewFaqOrder(Number(e.target.value))}
+                                  className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:border-cyan-500"
+                                />
+                              </div>
+                              <div className="sm:col-span-3">
+                                <label className="block text-[10px] font-bold text-slate-500 mb-1">Question Text *</label>
+                                <input
+                                  type="text"
+                                  value={newFaqQuestion}
+                                  onChange={(e) => setNewFaqQuestion(e.target.value)}
+                                  placeholder="e.g. How do I extend my active parking time?"
+                                  className="w-full px-3.5 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:border-cyan-500 font-medium"
+                                />
+                              </div>
+                              <div className="sm:col-span-3">
+                                <label className="block text-[10px] font-bold text-slate-500 mb-1">Answer Text *</label>
+                                <textarea
+                                  rows={3}
+                                  value={newFaqAnswer}
+                                  onChange={(e) => setNewFaqAnswer(e.target.value)}
+                                  placeholder="Enter the complete response or resolution provided to users..."
+                                  className="w-full px-3.5 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:border-cyan-500 resize-y"
+                                />
+                              </div>
+                            </div>
+
+                            <div className="flex justify-end gap-2 pt-1">
+                              <button
+                                type="button"
+                                onClick={() => { setShowInlineAddFaq(false); setNewFaqQuestion(''); setNewFaqAnswer(''); }}
+                                className="px-3 py-1.5 rounded-xl text-xs font-bold text-slate-600 hover:bg-white cursor-pointer"
                               >
                                 Cancel
                               </button>
                               <button
-                                type="submit"
-                                disabled={faqLoading}
-                                className="bg-cyan-600 hover:bg-cyan-700 text-white px-5 py-2.5 rounded-xl text-xs font-bold shadow-md shadow-cyan-600/20 transition-all flex items-center gap-2 cursor-pointer"
+                                type="button"
+                                onClick={handleCreateInlineFaq}
+                                disabled={faqLoading || !newFaqQuestion.trim() || !newFaqAnswer.trim()}
+                                className="bg-cyan-600 hover:bg-cyan-700 disabled:opacity-50 text-white font-bold px-4 py-1.5 rounded-xl text-xs flex items-center gap-1.5 shadow-sm cursor-pointer"
                               >
-                                {faqLoading ? 'Saving...' : editingFaq ? 'Update FAQ' : 'Create FAQ'}
+                                <Check className="h-4 w-4" />
+                                {faqLoading ? 'Adding...' : 'Create FAQ'}
                               </button>
                             </div>
-                          </form>
+                          </div>
+                        )}
+
+                        <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm">
+                          <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+                            <div>
+                              <h3 className="font-extrabold text-slate-800 text-sm flex items-center gap-2">
+                                <span>🚗 Parking Seeker Chatbot FAQs</span>
+                                <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 font-bold">
+                                  {filteredFaqs.length} of {audienceFaqs.length} questions
+                                </span>
+                              </h3>
+                              <p className="text-[11px] text-slate-400 mt-0.5">
+                                Click ✏️ on any question to edit inline directly, or click "Edit All FAQs (One-Click)" to edit everything at once.
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-sm text-left">
+                              <thead className="bg-slate-50 text-slate-400 text-xs uppercase">
+                                <tr>
+                                  <th className="px-5 py-3 w-16">#</th>
+                                  <th className="px-5 py-3 w-44">Category</th>
+                                  <th className="px-5 py-3">Question & Answer</th>
+                                  <th className="px-5 py-3 w-28 text-center">Status</th>
+                                  <th className="px-5 py-3 w-28 text-center">Actions</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-100 font-medium">
+                                {filteredFaqs.length === 0 ? (
+                                  <tr>
+                                    <td colSpan="5" className="text-center py-12 text-slate-400">
+                                      No FAQs found matching your query.
+                                    </td>
+                                  </tr>
+                                ) : (
+                                  filteredFaqs.map((faq, idx) => {
+                                    const faqId = faq._id || faq.id || idx;
+                                    const isInlineEditing = inlineEditingFaqId === faqId;
+                                    return (
+                                      <tr key={faqId} className={isInlineEditing ? "bg-cyan-50/30" : "hover:bg-slate-50/70 transition-colors"}>
+                                        <td className="px-5 py-4 align-top">
+                                          <span className="h-7 w-7 rounded-lg bg-cyan-50 border border-cyan-200 text-cyan-700 font-black text-xs flex items-center justify-center font-mono">
+                                            {faq.order || idx + 1}
+                                          </span>
+                                        </td>
+                                        <td className="px-5 py-4 align-top">
+                                          {isInlineEditing ? (
+                                            <input
+                                              type="text"
+                                              value={inlineFaqCategory}
+                                              onChange={(e) => setInlineFaqCategory(e.target.value)}
+                                              placeholder="Category"
+                                              className="w-full px-2.5 py-1.5 bg-white border border-cyan-300 rounded-lg text-xs font-semibold text-slate-800 focus:outline-none focus:ring-1 focus:ring-cyan-500"
+                                            />
+                                          ) : (
+                                            <span className="inline-block px-2.5 py-1 rounded-lg text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                                              {faq.category || 'General'}
+                                            </span>
+                                          )}
+                                        </td>
+                                        <td className="px-5 py-4 align-top">
+                                          {isInlineEditing ? (
+                                            <div className="space-y-2">
+                                              <div>
+                                                <label className="block text-[10px] font-bold text-slate-500 mb-0.5">Question</label>
+                                                <input
+                                                  type="text"
+                                                  value={inlineFaqQuestion}
+                                                  onChange={(e) => setInlineFaqQuestion(e.target.value)}
+                                                  className="w-full p-2.5 bg-white border border-cyan-300 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                                                  autoFocus
+                                                />
+                                              </div>
+                                              <div>
+                                                <label className="block text-[10px] font-bold text-slate-500 mb-0.5">Answer</label>
+                                                <textarea
+                                                  rows={4}
+                                                  value={inlineFaqAnswer}
+                                                  onChange={(e) => setInlineFaqAnswer(e.target.value)}
+                                                  className="w-full p-2.5 bg-white border border-cyan-300 rounded-xl text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-cyan-500 resize-y shadow-xs"
+                                                />
+                                              </div>
+                                              <div className="flex items-center gap-2 pt-1">
+                                                <button
+                                                  type="button"
+                                                  onClick={() => handleSaveInlineFaq(faqId)}
+                                                  disabled={faqLoading || !inlineFaqQuestion.trim() || !inlineFaqAnswer.trim()}
+                                                  className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold px-3 py-1.5 rounded-lg text-xs flex items-center gap-1 shadow-xs cursor-pointer"
+                                                >
+                                                  <Check className="h-3.5 w-3.5" />
+                                                  {faqLoading ? 'Saving...' : 'Save FAQ'}
+                                                </button>
+                                                <button
+                                                  type="button"
+                                                  onClick={() => setInlineEditingFaqId(null)}
+                                                  className="bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold px-3 py-1.5 rounded-lg text-xs flex items-center gap-1 cursor-pointer"
+                                                >
+                                                  <X className="h-3.5 w-3.5" /> Cancel
+                                                </button>
+                                              </div>
+                                            </div>
+                                          ) : (
+                                            <div className="space-y-1.5 max-w-2xl">
+                                              <p className="font-bold text-slate-900 text-xs leading-snug">
+                                                {faq.question}
+                                              </p>
+                                              <p className="text-slate-600 text-xs leading-relaxed">
+                                                {faq.answer}
+                                              </p>
+                                            </div>
+                                          )}
+                                        </td>
+                                        <td className="px-5 py-4 align-top text-center">
+                                          <button
+                                            type="button"
+                                            onClick={() => handleToggleFaqActive(faq)}
+                                            className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase transition-all cursor-pointer ${
+                                              faq.isActive !== false
+                                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100'
+                                                : 'bg-slate-100 text-slate-500 border border-slate-200 hover:bg-slate-200'
+                                            }`}
+                                          >
+                                            {faq.isActive !== false ? '✓ Active' : 'Inactive'}
+                                          </button>
+                                        </td>
+                                        <td className="px-5 py-4 align-top text-center">
+                                          {!isInlineEditing && (
+                                            <div className="flex items-center justify-center gap-1.5">
+                                              <button
+                                                type="button"
+                                                onClick={() => {
+                                                  setInlineEditingFaqId(faqId);
+                                                  setInlineFaqCategory(faq.category || 'General');
+                                                  setInlineFaqQuestion(faq.question || '');
+                                                  setInlineFaqAnswer(faq.answer || '');
+                                                  setShowInlineAddFaq(false);
+                                                }}
+                                                className="p-1.5 rounded-lg text-slate-500 hover:text-cyan-600 hover:bg-cyan-50 transition-colors cursor-pointer"
+                                                title="Edit FAQ Directly"
+                                              >
+                                                <Edit2 className="h-4 w-4" />
+                                              </button>
+                                              <button
+                                                type="button"
+                                                onClick={() => handleDeleteFaq(faqId)}
+                                                className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                                                title="Delete FAQ"
+                                              >
+                                                <Trash2 className="h-4 w-4" />
+                                              </button>
+                                            </div>
+                                          )}
+                                        </td>
+                                      </tr>
+                                    );
+                                  })
+                                )}
+                              </tbody>
+                            </table>
+                          </div>
                         </div>
                       </div>
                     )}
