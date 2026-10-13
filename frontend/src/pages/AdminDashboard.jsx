@@ -2492,13 +2492,12 @@ const AdminDashboard = () => {
                               <th className="px-6 py-3 w-16">#</th>
                               <th className="px-6 py-3">Clause Description</th>
                               <th className="px-6 py-3 w-28 text-center">Status</th>
-                              <th className="px-6 py-3 w-32 text-right">Actions</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-100 font-medium">
                             {filteredTerms.length === 0 ? (
                               <tr>
-                                <td colSpan="4" className="text-center py-12 text-slate-400">
+                                <td colSpan="3" className="text-center py-12 text-slate-400">
                                   No clauses found matching your search.
                                 </td>
                               </tr>
@@ -2524,17 +2523,6 @@ const AdminDashboard = () => {
                                     >
                                       {t.isActive ? '✓ Active' : 'Inactive'}
                                     </button>
-                                  </td>
-                                  <td className="px-6 py-4 text-right">
-                                    <div className="flex items-center justify-end gap-1.5">
-                                      <button
-                                        onClick={() => handleDeleteTerm(t._id)}
-                                        className="h-8 w-8 rounded-lg bg-slate-50 border border-slate-200 text-slate-600 hover:text-rose-600 hover:border-rose-300 flex items-center justify-center transition-colors"
-                                        title="Delete Clause"
-                                      >
-                                        <Trash2 className="h-3.5 w-3.5" />
-                                      </button>
-                                    </div>
                                   </td>
                                 </tr>
                               ))
