@@ -1244,8 +1244,11 @@ router.post('/:id/extend-verify', protect, seekerOnly, async (req, res) => {
     const currentEndTime = new Date(booking.endTime || new Date(booking.startTime.getTime() + booking.hours * 60 * 60 * 1000));
     const extensionEndTime = new Date(currentEndTime.getTime() + Number(extendHours) * 60 * 60 * 1000);
     const additionalAmount = Number(extendHours) * space.pricePerHour;
-    const additionalOwnerEarning = Number((additionalAmount * 0.9).toFixed(2));
-    const additionalCommission = Number((additionalAmount * 0.1).toFixed(2));
+    
+    // Dynamic commission calculation based on active platform rate
+    const commissionRate = await getCommissionRate();
+    const additionalCommission = Math.round(additionalAmount * (commissionRate / 100) * 100) / 100;
+    const additionalOwnerEarning = Math.max(0, Math.round((additionalAmount - additionalCommission) * 100) / 100);
 
     // Update booking duration and financials
     booking.totalAmount += additionalAmount;
@@ -1257,7 +1260,7 @@ router.post('/:id/extend-verify', protect, seekerOnly, async (req, res) => {
 
     await booking.save();
 
-    // Credit additional earnings to space owner's wallet
+    // Credit additional net earnings to space owner's wallet
     const owner = await User.findById(space.ownerId);
     if (owner) {
       owner.walletBalance = Number(((owner.walletBalance || 0) + additionalOwnerEarning).toFixed(2));
@@ -1265,7 +1268,7 @@ router.post('/:id/extend-verify', protect, seekerOnly, async (req, res) => {
       owner.walletTransactions.push({
         type: 'credit',
         amount: additionalOwnerEarning,
-        description: `Pass extension payout for Slot ${booking.slotId || 'Slot-1'} at ${space.title} (+${extendHours} hrs)`,
+        description: `Pass extension payout for Slot ${booking.slotId || 'Slot-1'} at ${space.title} (+${extendHours} hrs) (Gross: ₹${additionalAmount} - ${commissionRate}% Platform Fee: ₹${additionalCommission})`,
         date: new Date(),
         bookingId: booking._id,
       });
@@ -1351,8 +1354,9 @@ router.post('/:id/extend', protect, seekerOnly, async (req, res) => {
     const extensionEndTime = new Date(currentEndTime.getTime() + Number(extendHours) * 60 * 60 * 1000);
     const additionalAmount = Number(extendHours) * space.pricePerHour;
 
-    const additionalOwnerEarning = Number((additionalAmount * 0.9).toFixed(2));
-    const additionalCommission = Number((additionalAmount * 0.1).toFixed(2));
+    const commissionRate = await getCommissionRate();
+    const additionalCommission = Math.round(additionalAmount * (commissionRate / 100) * 100) / 100;
+    const additionalOwnerEarning = Math.max(0, Math.round((additionalAmount - additionalCommission) * 100) / 100);
 
     booking.totalAmount += additionalAmount;
     booking.hours += Number(extendHours);
@@ -1361,7 +1365,7 @@ router.post('/:id/extend', protect, seekerOnly, async (req, res) => {
     booking.adminCommission = Number(((booking.adminCommission || 0) + additionalCommission).toFixed(2));
     await booking.save();
 
-    // Credit additional earnings to space owner's wallet
+    // Credit additional net earnings to space owner's wallet
     const owner = await User.findById(space.ownerId);
     if (owner) {
       owner.walletBalance = Number(((owner.walletBalance || 0) + additionalOwnerEarning).toFixed(2));
@@ -1369,7 +1373,7 @@ router.post('/:id/extend', protect, seekerOnly, async (req, res) => {
       owner.walletTransactions.push({
         type: 'credit',
         amount: additionalOwnerEarning,
-        description: `Pass extension payout for Slot ${booking.slotId || 'Slot-1'} at ${space.title} (+${extendHours} hrs)`,
+        description: `Pass extension payout for Slot ${booking.slotId || 'Slot-1'} at ${space.title} (+${extendHours} hrs) (Gross: ₹${additionalAmount} - ${commissionRate}% Platform Fee: ₹${additionalCommission})`,
         date: new Date(),
         bookingId: booking._id,
       });

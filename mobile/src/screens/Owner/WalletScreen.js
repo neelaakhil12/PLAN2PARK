@@ -41,7 +41,8 @@ export default function WalletScreen({ navigation }) {
     payoutRequests: [],
   });
 
-  const [activeTab, setActiveTab] = useState('payouts'); // 'payouts' | 'ledger'
+  const [activeTab, setActiveTab] = useState('ledger'); // default to 'ledger' to show full transaction details
+  const [ledgerFilter, setLedgerFilter] = useState('all'); // 'all' | 'credit' | 'debit'
   const [withdrawModalVisible, setWithdrawModalVisible] = useState(false);
   const [submittingWithdraw, setSubmittingWithdraw] = useState(false);
 
@@ -404,40 +405,143 @@ export default function WalletScreen({ navigation }) {
         ) : (
           /* TAB 2: Wallet Transaction Ledger */
           <View style={styles.tabContent}>
-            {(!walletData.transactions || walletData.transactions.length === 0) ? (
-              <View style={styles.emptyBox}>
-                <Text style={styles.emptyIcon}>📜</Text>
-                <Text style={styles.emptyTitle}>No Transaction History</Text>
-                <Text style={styles.emptySubtitle}>
-                  Credits from bookings (net 85% after platform fee) and withdrawals will appear here in chronological order.
-                </Text>
-              </View>
-            ) : (
-              walletData.transactions.map((tx, idx) => {
-                const isCredit = tx.type === 'credit';
-                return (
-                  <View key={idx} style={styles.txCard}>
-                    <View style={styles.txIconBox}>
-                      <Text style={styles.txIcon}>{isCredit ? '⬇️' : '⬆️'}</Text>
+            {(() => {
+              const allTxs = walletData.transactions || [];
+              const totalCredits = allTxs
+                .filter((t) => t.type === 'credit')
+                .reduce((sum, t) => sum + (t.amount || 0), 0);
+              const totalDebits = allTxs
+                .filter((t) => t.type === 'debit')
+                .reduce((sum, t) => sum + (t.amount || 0), 0);
+
+              const filteredTxs = allTxs.filter((t) => {
+                if (ledgerFilter === 'credit') return t.type === 'credit';
+                if (ledgerFilter === 'debit') return t.type === 'debit';
+                return true;
+              });
+
+              return (
+                <>
+                  {/* Ledger Quick Summary Metrics */}
+                  <View style={styles.ledgerSummaryRow}>
+                    <View style={[styles.ledgerSummaryBox, { borderColor: '#10b98140' }]}>
+                      <Text style={[styles.ledgerSummaryLabel, { color: '#34d399' }]}>🟢 Total Credited</Text>
+                      <Text style={[styles.ledgerSummaryVal, { color: '#10b981' }]}>
+                        +₹{totalCredits.toFixed(2)}
+                      </Text>
+                      <Text style={styles.ledgerSummarySub}>Booking & Extension Earnings</Text>
                     </View>
-                    <View style={styles.txInfo}>
-                      <Text style={styles.txDescription}>{tx.description || (isCredit ? 'Booking Credit (Net 85%)' : 'Withdrawal')}</Text>
-                      <Text style={styles.txDate}>
-                        {new Date(tx.date || Date.now()).toLocaleDateString('en-IN', {
-                          month: 'short',
-                          day: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
+                    <View style={[styles.ledgerSummaryBox, { borderColor: '#ef444440' }]}>
+                      <Text style={[styles.ledgerSummaryLabel, { color: '#f87171' }]}>🔴 Total Debited</Text>
+                      <Text style={[styles.ledgerSummaryVal, { color: '#ef4444' }]}>
+                        -₹{totalDebits.toFixed(2)}
+                      </Text>
+                      <Text style={styles.ledgerSummarySub}>Reversals & Withdrawals</Text>
+                    </View>
+                  </View>
+
+                  {/* Filter Pills for Ledger */}
+                  <View style={styles.ledgerFilterRow}>
+                    <TouchableOpacity
+                      style={[styles.ledgerPill, ledgerFilter === 'all' && styles.ledgerPillActive]}
+                      onPress={() => setLedgerFilter('all')}
+                    >
+                      <Text style={[styles.ledgerPillTxt, ledgerFilter === 'all' && styles.ledgerPillTxtActive]}>
+                        All ({allTxs.length})
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.ledgerPill, ledgerFilter === 'credit' && styles.ledgerPillActive]}
+                      onPress={() => setLedgerFilter('credit')}
+                    >
+                      <Text style={[styles.ledgerPillTxt, ledgerFilter === 'credit' && styles.ledgerPillTxtActive]}>
+                        🟢 Credits ({allTxs.filter((t) => t.type === 'credit').length})
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.ledgerPill, ledgerFilter === 'debit' && styles.ledgerPillActive]}
+                      onPress={() => setLedgerFilter('debit')}
+                    >
+                      <Text style={[styles.ledgerPillTxt, ledgerFilter === 'debit' && styles.ledgerPillTxtActive]}>
+                        🔴 Debits & Reversals ({allTxs.filter((t) => t.type === 'debit').length})
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {filteredTxs.length === 0 ? (
+                    <View style={styles.emptyBox}>
+                      <Text style={styles.emptyIcon}>📜</Text>
+                      <Text style={styles.emptyTitle}>No Transactions Found</Text>
+                      <Text style={styles.emptySubtitle}>
+                        {ledgerFilter === 'all'
+                          ? 'Credits from bookings, extensions, and withdrawals will appear here in chronological order.'
+                          : `No ${ledgerFilter} records match this filter.`}
                       </Text>
                     </View>
-                    <Text style={[styles.txAmount, isCredit ? styles.txAmountCredit : styles.txAmountDebit]}>
-                      {isCredit ? '+' : '-'}₹{Number(tx.amount || 0).toFixed(2)}
-                    </Text>
-                  </View>
-                );
-              })
-            )}
+                  ) : (
+                    filteredTxs.map((tx, idx) => {
+                      const isCredit = tx.type === 'credit';
+                      const desc = (tx.description || '').toLowerCase();
+                      const isCancellation = desc.includes('cancel') || desc.includes('reversed') || desc.includes('refund');
+                      const isExtension = desc.includes('extension');
+                      const isWithdrawal = desc.includes('withdraw') || desc.includes('payout');
+
+                      let badgeText = 'BOOKING PAYOUT';
+                      let badgeBg = '#10b98120';
+                      let badgeBorder = '#10b98150';
+                      let badgeColor = '#34d399';
+                      let icon = '💰';
+
+                      if (isCancellation) {
+                        badgeText = '🚫 CANCELLATION REVERSED';
+                        badgeBg = '#ef444420';
+                        badgeBorder = '#ef444450';
+                        badgeColor = '#f87171';
+                        icon = '🚫';
+                      } else if (isExtension) {
+                        badgeText = '⏳ EXTENSION PAYOUT';
+                        badgeBg = '#3b82f620';
+                        badgeBorder = '#3b82f650';
+                        badgeColor = '#60a5fa';
+                        icon = '⏳';
+                      } else if (!isCredit || isWithdrawal) {
+                        badgeText = '💸 WITHDRAWAL DEBIT';
+                        badgeBg = '#f59e0b20';
+                        badgeBorder = '#f59e0b50';
+                        badgeColor = '#fbbf24';
+                        icon = '🏦';
+                      }
+
+                      return (
+                        <View key={tx._id || idx} style={styles.txCard}>
+                          <View style={[styles.txIconBox, isCancellation && { backgroundColor: '#ef444415' }]}>
+                            <Text style={styles.txIcon}>{icon}</Text>
+                          </View>
+                          <View style={styles.txInfo}>
+                            <View style={[styles.txBadge, { backgroundColor: badgeBg, borderColor: badgeBorder }]}>
+                              <Text style={[styles.txBadgeTxt, { color: badgeColor }]}>{badgeText}</Text>
+                            </View>
+                            <Text style={styles.txDescription}>{tx.description || (isCredit ? 'Booking Credit' : 'Debit')}</Text>
+                            <Text style={styles.txDate}>
+                              {new Date(tx.date || Date.now()).toLocaleDateString('en-IN', {
+                                month: 'short',
+                                day: 'numeric',
+                                year: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })}
+                            </Text>
+                          </View>
+                          <Text style={[styles.txAmount, isCredit ? styles.txAmountCredit : styles.txAmountDebit]}>
+                            {isCredit ? '+' : '-'}₹{Number(tx.amount || 0).toFixed(2)}
+                          </Text>
+                        </View>
+                      );
+                    })
+                  )}
+                </>
+              );
+            })()}
           </View>
         )}
       </ScrollView>
@@ -1027,6 +1131,75 @@ const styles = StyleSheet.create({
   },
   txAmountDebit: {
     color: '#ef4444',
+  },
+  ledgerSummaryRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 14,
+  },
+  ledgerSummaryBox: {
+    flex: 1,
+    backgroundColor: '#131b2e',
+    borderRadius: 14,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#1e293b',
+  },
+  ledgerSummaryLabel: {
+    fontSize: 10,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  ledgerSummaryVal: {
+    fontSize: 18,
+    fontWeight: '900',
+    marginTop: 4,
+  },
+  ledgerSummarySub: {
+    fontSize: 10,
+    color: '#64748b',
+    marginTop: 2,
+    fontWeight: '500',
+  },
+  ledgerFilterRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 14,
+  },
+  ledgerPill: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 20,
+    backgroundColor: '#131b2e',
+    borderWidth: 1,
+    borderColor: '#1e293b',
+  },
+  ledgerPillActive: {
+    backgroundColor: '#1e293b',
+    borderColor: '#38bdf8',
+  },
+  ledgerPillTxt: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#94a3b8',
+  },
+  ledgerPillTxtActive: {
+    color: '#38bdf8',
+  },
+  txBadge: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 1,
+    marginBottom: 6,
+  },
+  txBadgeTxt: {
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.5,
   },
   modalOverlay: {
     flex: 1,

@@ -7,32 +7,35 @@ dotenv.config({ path: path.join(__dirname, '.env') });
 const User = require('./models/User');
 const Booking = require('./models/Booking');
 
-async function checkDetails() {
+async function verifyAnalytics() {
   try {
-    const mongoUri = process.env.MONGODB_URI;
-    await mongoose.connect(mongoUri);
+    await mongoose.connect(process.env.MONGODB_URI);
 
-    const owners = await User.find({ role: 'owner' });
-    console.log('--- OWNERS ---');
-    owners.forEach(o => {
-      console.log({
-        id: o._id,
-        name: o.name,
-        walletBalance: o.walletBalance,
-        transactions: o.walletTransactions
-      });
+    const bookingsData = await Booking.find({
+      paymentStatus: 'paid',
+      status: { $nin: ['cancelled'] },
+    });
+    const totalRevenue = bookingsData.reduce((sum, b) => sum + (b.totalAmount || 0), 0);
+    const totalCommission = bookingsData.reduce((sum, b) => sum + (b.adminCommission || 0), 0);
+    const totalOwnerPayout = bookingsData.reduce((sum, b) => sum + (b.ownerEarnings || 0), 0);
+
+    console.log('=== VERIFIED ANALYTICS TOTALS ===');
+    console.log({
+      realizedGrossTurnover: `₹${totalRevenue.toFixed(2)}`,
+      adminCommissionCut: `₹${totalCommission.toFixed(2)}`,
+      ownersNetEarnings: `₹${totalOwnerPayout.toFixed(2)}`,
+      validBookingsCount: bookingsData.length
     });
 
-    const seekers = await User.find({ role: 'seeker' });
-    console.log('--- SEEKERS ---');
-    seekers.forEach(s => {
+    const ramya = await User.findOne({ name: /Ramya/i });
+    if (ramya) {
+      console.log('=== RAMYA OWNER WALLET ===');
       console.log({
-        id: s._id,
-        name: s.name,
-        walletBalance: s.walletBalance,
-        transactions: s.walletTransactions
+        name: ramya.name,
+        walletBalance: `₹${ramya.walletBalance}`,
+        recentTransactions: ramya.walletTransactions.slice(-3)
       });
-    });
+    }
 
     await mongoose.disconnect();
     process.exit(0);
@@ -42,4 +45,4 @@ async function checkDetails() {
   }
 }
 
-checkDetails();
+verifyAnalytics();

@@ -331,12 +331,6 @@ export default function NotificationsScreen({ navigation }) {
             <Text style={[styles.pillTxt, activeFilter === 'all' && styles.pillTxtActive]}>All ({notifications.length})</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.pill, activeFilter === 'offers' && styles.pillActive]}
-            onPress={() => setActiveFilter('offers')}
-          >
-            <Text style={[styles.pillTxt, activeFilter === 'offers' && styles.pillTxtActive]}>🎁 Offers</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
             style={[styles.pill, activeFilter === 'bookings' && styles.pillActive]}
             onPress={() => setActiveFilter('bookings')}
           >
@@ -362,7 +356,7 @@ export default function NotificationsScreen({ navigation }) {
       {loading ? (
         <View style={styles.centerContainer}>
           <ActivityIndicator size="large" color={COLORS.primary} />
-          <Text style={styles.loadingTxt}>Loading alerts & offers...</Text>
+          <Text style={styles.loadingTxt}>Loading alerts...</Text>
         </View>
       ) : (
         <FlatList
@@ -387,7 +381,7 @@ export default function NotificationsScreen({ navigation }) {
               <Text style={styles.emptyTitle}>Zero Notifications</Text>
               <Text style={styles.emptySub}>
                 {activeFilter === 'all'
-                  ? 'Your notification inbox is clean. When you book a parking spot or when promotions launch, they will appear here.'
+                  ? 'Your notification inbox is clean. When you book a parking spot or receive updates, they will appear here.'
                   : `No ${activeFilter} notifications available at the moment.`}
               </Text>
             </View>
