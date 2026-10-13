@@ -22,7 +22,7 @@ const AdminDashboard = () => {
   // Default to 'overview' when on /admin/dashboard or /admin/dashboard/overview
   const currentView = (lastSegment === 'dashboard' || lastSegment === 'overview' || !lastSegment)
     ? 'overview'
-    : lastSegment;
+    : (lastSegment === 'storage-owners' ? 'owners' : lastSegment);
 
   const [analytics, setAnalytics] = useState(null);
   const [revenueStartDate, setRevenueStartDate] = useState('');
@@ -930,7 +930,6 @@ const AdminDashboard = () => {
     overview: 'Dashboard Overview',
     spaces: 'Parking Spaces Directory & Approvals',
     owners: '🏢 Space Owners & Listings',
-    'storage-owners': '🚜 Vehicle Storage Land Owners & Yards',
     seekers: '🚗 Parking Seekers (Drivers & Commuters)',
     users: 'All Registered Platform Users',
     bookings: 'Platform Bookings',
@@ -948,7 +947,6 @@ const AdminDashboard = () => {
     { id: 'overview', path: '/admin/dashboard', label: 'Dashboard Overview', icon: <Layers className="h-4.5 w-4.5" /> },
     { id: 'spaces', path: '/admin/spaces', label: '🅿️ Parking Spaces', icon: <MapPin className="h-4.5 w-4.5 text-indigo-400" /> },
     { id: 'owners', path: '/admin/owners', label: '🏢 Space Owners', icon: <UserCheck className="h-4.5 w-4.5 text-amber-400" /> },
-    { id: 'storage-owners', path: '/admin/storage-owners', label: '🚜 Vehicle Storage Land Owners', icon: <MapPin className="h-4.5 w-4.5 text-emerald-400" /> },
     { id: 'seekers', path: '/admin/seekers', label: '🚗 Parking Seekers', icon: <Car className="h-4.5 w-4.5 text-blue-400" /> },
     { id: 'users', path: '/admin/users', label: '👥 Users Management', icon: <Users className="h-4.5 w-4.5 text-emerald-400" /> },
     { id: 'bookings', path: '/admin/bookings', label: 'Platform Bookings', icon: <ClipboardList className="h-4.5 w-4.5" /> },
@@ -2774,7 +2772,7 @@ const AdminDashboard = () => {
 
               {/* ── VIEW: SPACE OWNERS (HOSTS) DIRECTORY & DETAILS ────────────────────── */}
               {currentView === 'owners' && (() => {
-                const ownerUsers = users.filter(u => u.role === 'owner' && u.accountCategory !== 'vehicle_storage_owner');
+                const ownerUsers = users.filter(u => u.role === 'owner');
                 const filteredOwners = ownerUsers.filter(o => {
                   if (!usersSearch) return true;
                   const q = usersSearch.toLowerCase();
@@ -3169,8 +3167,8 @@ const AdminDashboard = () => {
                 );
               })()}
 
-              {/* ── VIEW: VEHICLE STORAGE LAND OWNERS DIRECTORY & DETAILS ───────── */}
-              {currentView === 'storage-owners' && (() => {
+              {/* ── VIEW: VEHICLE STORAGE LAND OWNERS DIRECTORY & DETAILS (REMOVED) ───────── */}
+              {false && currentView === 'storage-owners' && (() => {
                 const storageOwners = users.filter(u => u.role === 'owner' && (u.accountCategory === 'vehicle_storage_owner' || (u.landAcres && u.landAcres > 0)));
                 const filteredStorageOwners = storageOwners.filter(o => {
                   if (!usersSearch) return true;
