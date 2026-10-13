@@ -1,11 +1,45 @@
 const mongoose = require('mongoose');
+const dotenv = require('dotenv');
+const path = require('path');
 
-async function check() {
-  await mongoose.connect('mongodb://localhost:27017/plantopark');
-  const all = await mongoose.connection.db.collection('bookings').find({}).toArray();
-  console.log('Total bookings:', all.length);
-  console.log(JSON.stringify(all.map(b => ({ id: b._id, seeker: b.seekerName, status: b.status, slotId: b.slotId, spaceId: b.spaceId, createdAt: b.createdAt })), null, 2));
-  process.exit(0);
+dotenv.config({ path: path.join(__dirname, '.env') });
+
+const User = require('./models/User');
+const Booking = require('./models/Booking');
+
+async function checkDetails() {
+  try {
+    const mongoUri = process.env.MONGODB_URI;
+    await mongoose.connect(mongoUri);
+
+    const owners = await User.find({ role: 'owner' });
+    console.log('--- OWNERS ---');
+    owners.forEach(o => {
+      console.log({
+        id: o._id,
+        name: o.name,
+        walletBalance: o.walletBalance,
+        transactions: o.walletTransactions
+      });
+    });
+
+    const seekers = await User.find({ role: 'seeker' });
+    console.log('--- SEEKERS ---');
+    seekers.forEach(s => {
+      console.log({
+        id: s._id,
+        name: s.name,
+        walletBalance: s.walletBalance,
+        transactions: s.walletTransactions
+      });
+    });
+
+    await mongoose.disconnect();
+    process.exit(0);
+  } catch (err) {
+    console.error(err);
+    process.exit(1);
+  }
 }
 
-check();
+checkDetails();
