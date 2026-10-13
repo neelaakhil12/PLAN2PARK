@@ -7,7 +7,7 @@ import {
   Bell, ChevronDown, Calendar, Search, LogOut, Settings,
   AlertTriangle, ShieldAlert, Heart, ClipboardList, HelpCircle, Star, MessageSquare,
   Menu, X, Send, Tag, Sparkles, Megaphone, FileText, Edit2, Trash2, Plus,
-  Percent, Upload, Eye, Landmark, Smartphone, Check, ExternalLink, QrCode
+  Percent, Upload, Eye, Landmark, Smartphone, Check, Save, ExternalLink, QrCode
 } from 'lucide-react';
 import Invoice from './Invoice';
 
@@ -117,9 +117,9 @@ const AdminDashboard = () => {
   const [termSearchQuery, setTermSearchQuery] = useState('');
   const [showAddTermModal, setShowAddTermModal] = useState(false);
   const [showBulkEditTermsModal, setShowBulkEditTermsModal] = useState(false);
-  const [bulkTermsList, setBulkTermsList] = useState([]);
+  const [bulkTermsText, setBulkTermsText] = useState('');
   const [showBulkEditFaqsModal, setShowBulkEditFaqsModal] = useState(false);
-  const [bulkFaqsList, setBulkFaqsList] = useState([]);
+  const [bulkFaqsText, setBulkFaqsText] = useState('');
   const [savingBulkFaqs, setSavingBulkFaqs] = useState(false);
   const [savingBulkTerms, setSavingBulkTerms] = useState(false);
 
@@ -273,13 +273,30 @@ const AdminDashboard = () => {
       .filter(t => t.type === termsType)
       .sort((a, b) => (a.order || 0) - (b.order || 0))
       .map(t => t.clause);
-    setBulkTermsList(currentList.length > 0 ? currentList : ['']);
+    let text = '';
+    if (currentList.length > 0) {
+      text = currentList.join('\n\n');
+    } else {
+      text = `TERMS AND CONDITIONS\n\nLast Updated: October 2026\n\nWelcome to Plan To Park. These Terms and Conditions ("Terms") govern your access to and use of the platform.\n\n1. About the Platform\nPlan To Park connects vehicle owners with available parking and storage spaces.\n\n2. User Responsibilities\nAll users agree to adhere to parking safety guidelines, timely check-outs, and lawful use of spots.`;
+    }
+    setBulkTermsText(text);
     setShowBulkEditTermsModal(true);
   };
 
   const handleSaveBulkTerms = async (e) => {
     if (e) e.preventDefault();
-    const cleaned = bulkTermsList.map(s => s.trim()).filter(Boolean);
+    if (!bulkTermsText || !bulkTermsText.trim()) {
+      alert('Please provide terms content before publishing.');
+      return;
+    }
+    const trimmed = bulkTermsText.trim();
+    let cleaned = [];
+    if (/\n\s*\n/.test(trimmed)) {
+      cleaned = trimmed.split(/\n\s*\n+/).map(s => s.trim()).filter(Boolean);
+    } else {
+      cleaned = trimmed.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+    }
+
     if (cleaned.length === 0) {
       alert('Please provide at least one clause text');
       return;
@@ -298,7 +315,7 @@ const AdminDashboard = () => {
       if (res.ok && data.terms) {
         setTerms(data.terms);
         setShowBulkEditTermsModal(false);
-        alert(`🎉 All ${cleaned.length} clauses saved successfully in one click!`);
+        alert(`🎉 Terms & Conditions saved and published live to app and web! (${cleaned.length} clauses saved)`);
       } else {
         alert(data.message || 'Failed to save terms');
       }
@@ -328,24 +345,104 @@ const AdminDashboard = () => {
     }
   };
 
+  // Helper to serialize FAQs into clean human-readable text
+  const serializeFaqsToText = (faqList) => {
+    if (!faqList || faqList.length === 0) {
+      return `[Category: General]\n\nQ: How do I book a parking spot?\nA: Search for your destination on the map, choose an available bay, and confirm payment.\n\nQ: What payment methods are accepted?\nA: UPI, cards, net banking, and wallets are supported.\n\n[Category: Cancellations & Refunds]\n\nQ: Can I cancel my booking?\nA: Yes, cancellations made at least 1 hour before scheduled arrival receive an instant refund.`;
+    }
+    let text = '';
+    let lastCategory = '';
+    faqList.forEach(faq => {
+      const cat = faq.category || 'General';
+      if (cat !== lastCategory) {
+        if (text) text += '\n\n';
+        text += `[Category: ${cat}]\n\n`;
+        lastCategory = cat;
+      } else {
+        text += '\n\n';
+      }
+      text += `Q: ${faq.question}\nA: ${faq.answer}`;
+    });
+    return text.trim();
+  };
+
+  // Helper to parse FAQs from clean human-readable text
+  const parseFaqsFromText = (raw) => {
+    if (!raw || !raw.trim()) return [];
+    const lines = raw.split(/\r?\n/);
+    const items = [];
+    let currentCategory = 'General';
+    let currentQ = '';
+    let currentA = [];
+
+    const pushCurrent = () => {
+      if (currentQ.trim() && currentA.join(' ').trim()) {
+        items.push({
+          category: currentCategory.trim() || 'General',
+          question: currentQ.trim(),
+          answer: currentA.join('\n').trim(),
+          isActive: true,
+        });
+      }
+      currentQ = '';
+      currentA = [];
+    };
+
+    for (const rawLine of lines) {
+      const line = rawLine.trim();
+      if (!line) continue;
+
+      const catMatch = line.match(/^\[(?:category:\s*)?([^\]]+)\]$/i) || line.match(/^category:\s*(.+)$/i);
+      if (catMatch) {
+        pushCurrent();
+        currentCategory = catMatch[1].trim();
+        continue;
+      }
+
+      const qMatch = line.match(/^(?:Q\d*|Question\s*\d*)\s*[:.-]\s*(.+)$/i);
+      if (qMatch) {
+        pushCurrent();
+        currentQ = qMatch[1].trim();
+        continue;
+      }
+
+      const aMatch = line.match(/^(?:A\d*|Answer\s*\d*)\s*[:.-]\s*(.+)$/i);
+      if (aMatch) {
+        currentA.push(aMatch[1].trim());
+        continue;
+      }
+
+      if (currentA.length > 0) {
+        currentA.push(line);
+        continue;
+      }
+
+      if (!currentQ && line.endsWith('?')) {
+        currentQ = line.replace(/^\d+[\.\)]\s*/, '').trim();
+        continue;
+      }
+
+      if (currentQ && currentA.length === 0) {
+        currentA.push(line);
+        continue;
+      }
+    }
+    pushCurrent();
+    return items;
+  };
+
   const openBulkEditFaqs = () => {
     const list = faqs
       .filter(f => (f.audience || 'parking_seeker') === faqsAudience)
-      .sort((a, b) => (a.order || 0) - (b.order || 0))
-      .map(f => ({
-        category: f.category || 'General',
-        question: f.question || '',
-        answer: f.answer || '',
-        isActive: f.isActive !== false,
-      }));
-    setBulkFaqsList(list.length > 0 ? list : [{ category: 'General', question: '', answer: '', isActive: true }]);
+      .sort((a, b) => (a.order || 0) - (b.order || 0));
+    setBulkFaqsText(serializeFaqsToText(list));
     setShowBulkEditFaqsModal(true);
   };
 
   const handleSaveBulkFaqs = async () => {
-    const cleaned = bulkFaqsList.filter(f => f.question.trim() && f.answer.trim());
+    const cleaned = parseFaqsFromText(bulkFaqsText);
     if (cleaned.length === 0) {
-      alert('Please provide at least one FAQ with a question and answer');
+      alert('Please provide at least one FAQ with Q: Question and A: Answer');
       return;
     }
     setSavingBulkFaqs(true);
@@ -362,7 +459,7 @@ const AdminDashboard = () => {
       if (res.ok && data.faqs) {
         setFaqs(data.faqs);
         setShowBulkEditFaqsModal(false);
-        alert(`🎉 All ${cleaned.length} FAQs saved successfully in one click!`);
+        alert(`🎉 All ${cleaned.length} FAQs saved and published live to chatbot & web!`);
       } else {
         alert(data.message || 'Failed to save FAQs');
       }
@@ -2580,92 +2677,68 @@ const AdminDashboard = () => {
                       </div>
                     </div>
 
-                    {/* ── BULK TERMS LIVE EDITOR MODAL (EDIT ALL AT ONCE IN 1-CLICK) ── */}
+                    {/* ── BULK TERMS LIVE EDITOR MODAL (MATCHING SCREENSHOT) ── */}
                     {showBulkEditTermsModal && (
                       <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-                        <div className="bg-white rounded-3xl border border-slate-200 max-w-3xl w-full max-h-[90vh] flex flex-col shadow-2xl animate-scaleUp overflow-hidden">
+                        <div className="bg-white rounded-3xl border border-slate-200 max-w-4xl w-full max-h-[92vh] flex flex-col shadow-2xl animate-scaleUp overflow-hidden">
                           {/* Modal Header */}
-                          <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/80 shrink-0">
+                          <div className="px-8 pt-6 pb-4 flex items-center justify-between shrink-0 border-b border-slate-100">
                             <div>
-                              <h3 className="font-black text-slate-900 text-base flex items-center gap-2">
-                                <FileText className="h-5 w-5 text-indigo-600" />
-                                Edit All Terms (1-Click) — {termsType === 'owner' ? '🏢 Space Owner' : '🚗 Parking Seeker'}
+                              <h3 className="font-extrabold text-slate-900 text-lg">
+                                {termsType === 'owner'
+                                  ? 'Space Owner Terms & Conditions'
+                                  : termsType === 'storage_owner'
+                                  ? 'Storage Yard Owner Terms & Conditions'
+                                  : termsType === 'bank_finance'
+                                  ? 'Bank & Finance Terms & Conditions'
+                                  : 'User / Student Terms & Conditions'}
                               </h3>
-                              <p className="text-[11px] text-slate-500 mt-0.5">
-                                Modify clauses below, add new clauses, or delete clauses. Click "Save All Terms" once to apply live to all users!
+                            </div>
+                            <div className="text-right">
+                              <p className="text-xs text-slate-500 font-medium">
+                                Displayed during {termsType === 'owner'
+                                  ? 'Space Owner'
+                                  : termsType === 'storage_owner'
+                                  ? 'Storage Yard Owner'
+                                  : termsType === 'bank_finance'
+                                  ? 'Bank & Finance'
+                                  : 'Student & Learner'} Login / Sign Up
                               </p>
                             </div>
-                            <button
-                              onClick={() => setShowBulkEditTermsModal(false)}
-                              className="h-8 w-8 rounded-full hover:bg-slate-200 flex items-center justify-center text-slate-400 hover:text-slate-700 transition-colors"
-                            >
-                              <X className="h-4 w-4" />
-                            </button>
                           </div>
 
-                          {/* Clauses Scrollable List */}
-                          <div className="p-6 overflow-y-auto space-y-4 flex-1">
-                            {bulkTermsList.map((clauseText, idx) => (
-                              <div key={idx} className="flex items-start gap-3 bg-slate-50 border border-slate-200 rounded-2xl p-3.5 focus-within:border-indigo-400 focus-within:ring-2 focus-within:ring-indigo-100 transition-all">
-                                <div className="h-7 w-7 rounded-lg bg-indigo-100 text-indigo-700 font-black text-xs flex items-center justify-center shrink-0 mt-0.5">
-                                  {idx + 1}
-                                </div>
-                                <textarea
-                                  rows={2}
-                                  value={clauseText}
-                                  onChange={(e) => {
-                                    const updated = [...bulkTermsList];
-                                    updated[idx] = e.target.value;
-                                    setBulkTermsList(updated);
-                                  }}
-                                  placeholder={`Enter clause #${idx + 1}...`}
-                                  className="flex-1 bg-white border border-slate-200 rounded-xl p-2.5 text-xs text-slate-800 font-medium placeholder-slate-400 focus:outline-none focus:border-indigo-500 resize-y"
-                                />
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const updated = bulkTermsList.filter((_, i) => i !== idx);
-                                    setBulkTermsList(updated.length > 0 ? updated : ['']);
-                                  }}
-                                  title="Remove this clause"
-                                  className="h-8 w-8 rounded-lg bg-white border border-slate-200 text-slate-400 hover:text-rose-600 hover:border-rose-200 flex items-center justify-center transition-colors shrink-0 mt-0.5"
-                                >
-                                  <Trash2 className="h-3.5 w-3.5" />
-                                </button>
-                              </div>
-                            ))}
-
-                            <button
-                              type="button"
-                              onClick={() => setBulkTermsList([...bulkTermsList, ''])}
-                              className="w-full py-3 border-2 border-dashed border-indigo-200 hover:border-indigo-400 rounded-2xl text-xs font-bold text-indigo-600 hover:bg-indigo-50/50 flex items-center justify-center gap-2 transition-all cursor-pointer"
-                            >
-                              <Plus className="h-4 w-4" /> + Add Another Point / Clause
-                            </button>
+                          {/* Editor Body */}
+                          <div className="px-8 py-5 flex-1 flex flex-col min-h-0 bg-slate-50/40">
+                            <textarea
+                              value={bulkTermsText}
+                              onChange={(e) => setBulkTermsText(e.target.value)}
+                              placeholder={`TERMS AND CONDITIONS\n\nLast Updated: October 2026\n\nWelcome to Plan To Park. These Terms and Conditions ("Terms") govern your access to and use of the platform.\n\n1. About the Platform\n...`}
+                              className="w-full flex-1 min-h-[440px] bg-white border border-slate-200/90 rounded-2xl p-6 text-slate-800 text-[13px] leading-relaxed font-sans placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all resize-y shadow-xs"
+                            />
+                            <div className="flex items-center justify-between pt-2.5 text-[11px] text-slate-400 font-medium px-1">
+                              <span>Separate paragraphs or numbered clauses with an empty line.</span>
+                              <span>{bulkTermsText.trim() ? `${bulkTermsText.split(/\n\s*\n+/).filter(Boolean).length} clauses / sections loaded` : '0 clauses'}</span>
+                            </div>
                           </div>
 
                           {/* Modal Footer */}
-                          <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-between bg-slate-50/80 shrink-0">
-                            <span className="text-xs text-slate-500 font-semibold">
-                              Total Active Clauses: {bulkTermsList.filter(s => s.trim()).length}
-                            </span>
-                            <div className="flex items-center gap-3">
-                              <button
-                                type="button"
-                                onClick={() => setShowBulkEditTermsModal(false)}
-                                className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-200 transition-colors cursor-pointer"
-                              >
-                                Cancel
-                              </button>
-                              <button
-                                type="button"
-                                onClick={handleSaveBulkTerms}
-                                disabled={savingBulkTerms}
-                                className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-extrabold px-5 py-2.5 rounded-xl text-xs flex items-center gap-2 shadow-lg shadow-indigo-600/25 transition-all cursor-pointer"
-                              >
-                                {savingBulkTerms ? '💾 Saving All Terms...' : '💾 Save All Terms (1-Click)'}
-                              </button>
-                            </div>
+                          <div className="px-8 py-4 border-t border-slate-100 flex items-center justify-end gap-3 shrink-0 bg-white">
+                            <button
+                              type="button"
+                              onClick={() => setShowBulkEditTermsModal(false)}
+                              className="px-6 py-2.5 rounded-xl text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 transition-all cursor-pointer"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handleSaveBulkTerms}
+                              disabled={savingBulkTerms}
+                              className="bg-[#0a5c36] hover:bg-[#074729] disabled:opacity-50 text-white font-extrabold px-6 py-2.5 rounded-xl text-xs flex items-center gap-2 shadow-md hover:shadow-lg transition-all cursor-pointer"
+                            >
+                              <Save className="h-4 w-4" />
+                              {savingBulkTerms ? 'Publishing...' : 'Save & Publish to App and Web'}
+                            </button>
                           </div>
                         </div>
                       </div>
@@ -2861,127 +2934,58 @@ const AdminDashboard = () => {
                       </div>
                     </div>
 
-                    {/* ── BULK FAQ LIVE EDITOR MODAL (EDIT ALL AT ONCE IN 1-CLICK) ── */}
+                    {/* ── BULK FAQ LIVE EDITOR MODAL (MATCHING SCREENSHOT) ── */}
                     {showBulkEditFaqsModal && (
-                      <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
-                        <div className="bg-white rounded-3xl border border-slate-200 max-w-4xl w-full max-h-[92vh] flex flex-col shadow-2xl overflow-hidden">
-                          <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/80 shrink-0">
+                      <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+                        <div className="bg-white rounded-3xl border border-slate-200 max-w-4xl w-full max-h-[92vh] flex flex-col shadow-2xl animate-scaleUp overflow-hidden">
+                          {/* Modal Header */}
+                          <div className="px-8 pt-6 pb-4 flex items-center justify-between shrink-0 border-b border-slate-100">
                             <div>
-                              <h3 className="font-black text-slate-900 text-base flex items-center gap-2">
-                                <HelpCircle className="h-5 w-5 text-cyan-600" />
-                                Edit All FAQs (1-Click) — {faqsAudience === 'bank_finance' ? '🏦 Bank & Finance' : '🚗 Parking Seeker'}
+                              <h3 className="font-extrabold text-slate-900 text-lg">
+                                {faqsAudience === 'bank_finance' ? 'Bank & Finance Seized Vehicle FAQs' : 'User / Seeker Chatbot FAQs'}
                               </h3>
-                              <p className="text-[11px] text-slate-500 mt-0.5">
-                                Edit every question and answer below, add new ones, or remove any. Click "Save All FAQs" once to apply live in the chatbot.
+                            </div>
+                            <div className="text-right">
+                              <p className="text-xs text-slate-500 font-medium">
+                                Displayed in {faqsAudience === 'bank_finance' ? 'Bank Recovery' : 'Student, Seeker & Driver'} AI Chatbot &amp; FAQ Center
                               </p>
                             </div>
-                            <button
-                              onClick={() => setShowBulkEditFaqsModal(false)}
-                              className="h-8 w-8 rounded-full hover:bg-slate-200 flex items-center justify-center text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
-                            >
-                              <X className="h-4 w-4" />
-                            </button>
                           </div>
 
-                          <div className="p-6 overflow-y-auto space-y-4 flex-1">
-                            {bulkFaqsList.map((item, idx) => (
-                              <div key={idx} className="flex items-start gap-3 bg-slate-50 border border-slate-200 rounded-2xl p-3.5 focus-within:border-cyan-400 focus-within:ring-2 focus-within:ring-cyan-100 transition-all">
-                                <div className="h-7 w-7 rounded-lg bg-cyan-100 text-cyan-700 font-black text-xs flex items-center justify-center shrink-0 mt-0.5">
-                                  {idx + 1}
-                                </div>
-                                <div className="flex-1 space-y-2 min-w-0">
-                                  <div className="flex flex-col sm:flex-row gap-2">
-                                    <input
-                                      type="text"
-                                      value={item.category}
-                                      onChange={(e) => {
-                                        const updated = [...bulkFaqsList];
-                                        updated[idx] = { ...updated[idx], category: e.target.value };
-                                        setBulkFaqsList(updated);
-                                      }}
-                                      placeholder="Category"
-                                      className="sm:w-48 bg-white border border-slate-200 rounded-xl px-2.5 py-2 text-xs font-bold text-slate-700 focus:outline-none focus:border-cyan-500"
-                                    />
-                                    <input
-                                      type="text"
-                                      value={item.question}
-                                      onChange={(e) => {
-                                        const updated = [...bulkFaqsList];
-                                        updated[idx] = { ...updated[idx], question: e.target.value };
-                                        setBulkFaqsList(updated);
-                                      }}
-                                      placeholder={`Question #${idx + 1}`}
-                                      className="flex-1 bg-white border border-slate-200 rounded-xl px-2.5 py-2 text-xs font-bold text-slate-900 focus:outline-none focus:border-cyan-500"
-                                    />
-                                  </div>
-                                  <textarea
-                                    rows={3}
-                                    value={item.answer}
-                                    onChange={(e) => {
-                                      const updated = [...bulkFaqsList];
-                                      updated[idx] = { ...updated[idx], answer: e.target.value };
-                                      setBulkFaqsList(updated);
-                                    }}
-                                    placeholder="Answer..."
-                                    className="w-full bg-white border border-slate-200 rounded-xl p-2.5 text-xs text-slate-800 font-medium focus:outline-none focus:border-cyan-500 resize-y"
-                                  />
-                                  <label className="inline-flex items-center gap-1.5 text-[11px] font-bold text-slate-500 cursor-pointer">
-                                    <input
-                                      type="checkbox"
-                                      checked={item.isActive}
-                                      onChange={(e) => {
-                                        const updated = [...bulkFaqsList];
-                                        updated[idx] = { ...updated[idx], isActive: e.target.checked };
-                                        setBulkFaqsList(updated);
-                                      }}
-                                    />
-                                    Active in chatbot
-                                  </label>
-                                </div>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const updated = bulkFaqsList.filter((_, i) => i !== idx);
-                                    setBulkFaqsList(updated.length > 0 ? updated : [{ category: 'General', question: '', answer: '', isActive: true }]);
-                                  }}
-                                  title="Remove this FAQ"
-                                  className="h-8 w-8 rounded-lg bg-white border border-slate-200 text-slate-400 hover:text-rose-600 hover:border-rose-200 flex items-center justify-center transition-colors shrink-0 mt-0.5 cursor-pointer"
-                                >
-                                  <Trash2 className="h-3.5 w-3.5" />
-                                </button>
-                              </div>
-                            ))}
+                          {/* Editor Body */}
+                          <div className="px-8 py-5 flex-1 flex flex-col min-h-0 bg-slate-50/40">
+                            <textarea
+                              value={bulkFaqsText}
+                              onChange={(e) => setBulkFaqsText(e.target.value)}
+                              placeholder={`[Category: Booking & Reservations]\n\nQ: How do I book a parking spot?\nA: Search for your destination, choose a slot, and confirm payment.\n\n[Category: Payments & Refunds]\n\nQ: What payment methods are supported?\nA: UPI, credit/debit cards, net banking, and wallets are accepted.`}
+                              className="w-full flex-1 min-h-[440px] bg-white border border-slate-200/90 rounded-2xl p-6 text-slate-800 text-[13px] leading-relaxed font-sans placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all resize-y shadow-xs"
+                            />
+                            <div className="flex items-center justify-between pt-2.5 text-[11px] text-slate-400 font-medium px-1">
+                              <span>Format: [Category: Name] followed by Q: Question and A: Answer.</span>
+                              <span className="font-bold text-emerald-700">
+                                {`${parseFaqsFromText(bulkFaqsText).length} Questions & Answers ready to publish`}
+                              </span>
+                            </div>
+                          </div>
 
+                          {/* Modal Footer */}
+                          <div className="px-8 py-4 border-t border-slate-100 flex items-center justify-end gap-3 shrink-0 bg-white">
                             <button
                               type="button"
-                              onClick={() => setBulkFaqsList([...bulkFaqsList, { category: bulkFaqsList[bulkFaqsList.length - 1]?.category || 'General', question: '', answer: '', isActive: true }])}
-                              className="w-full py-3 border-2 border-dashed border-cyan-200 hover:border-cyan-400 rounded-2xl text-xs font-bold text-cyan-600 hover:bg-cyan-50/50 flex items-center justify-center gap-2 transition-all cursor-pointer"
+                              onClick={() => setShowBulkEditFaqsModal(false)}
+                              className="px-6 py-2.5 rounded-xl text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 transition-all cursor-pointer"
                             >
-                              <Plus className="h-4 w-4" /> Add Another FAQ
+                              Cancel
                             </button>
-                          </div>
-
-                          <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-between bg-slate-50/80 shrink-0">
-                            <span className="text-xs text-slate-500 font-semibold">
-                              Total FAQs: {bulkFaqsList.filter(f => f.question.trim() && f.answer.trim()).length}
-                            </span>
-                            <div className="flex items-center gap-3">
-                              <button
-                                type="button"
-                                onClick={() => setShowBulkEditFaqsModal(false)}
-                                className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-200 transition-colors cursor-pointer"
-                              >
-                                Cancel
-                              </button>
-                              <button
-                                type="button"
-                                onClick={handleSaveBulkFaqs}
-                                disabled={savingBulkFaqs}
-                                className="bg-cyan-600 hover:bg-cyan-700 disabled:opacity-50 text-white font-extrabold px-5 py-2.5 rounded-xl text-xs shadow-lg shadow-cyan-600/25 transition-all cursor-pointer"
-                              >
-                                {savingBulkFaqs ? '💾 Saving All FAQs...' : '💾 Save All FAQs (1-Click)'}
-                              </button>
-                            </div>
+                            <button
+                              type="button"
+                              onClick={handleSaveBulkFaqs}
+                              disabled={savingBulkFaqs}
+                              className="bg-[#0a5c36] hover:bg-[#074729] disabled:opacity-50 text-white font-extrabold px-6 py-2.5 rounded-xl text-xs flex items-center gap-2 shadow-md hover:shadow-lg transition-all cursor-pointer"
+                            >
+                              <Save className="h-4 w-4" />
+                              {savingBulkFaqs ? 'Publishing...' : 'Save & Publish to App and Web'}
+                            </button>
                           </div>
                         </div>
                       </div>
