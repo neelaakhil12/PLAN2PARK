@@ -116,6 +116,7 @@ const AdminDashboard = () => {
   const [termOrderInput, setTermOrderInput] = useState(1);
   const [termSearchQuery, setTermSearchQuery] = useState('');
   const [showAddTermModal, setShowAddTermModal] = useState(false);
+  const [termLoading, setTermLoading] = useState(false);
   const [showBulkEditTermsModal, setShowBulkEditTermsModal] = useState(false);
   const [bulkTermsText, setBulkTermsText] = useState('');
   const [showBulkEditFaqsModal, setShowBulkEditFaqsModal] = useState(false);
@@ -1134,7 +1135,7 @@ const AdminDashboard = () => {
     revenue: 'Revenue Reports & Ledger',
     payouts: '💸 Owner Withdrawals & Payout Requests',
     terms: '📜 Terms & Conditions Management',
-    faqs: '💬 Chatbot FAQs (Parking & Bank Repo Yards)',
+    faqs: '💬 Chatbot FAQs (Parking Seeker)',
     settings: '⚙️ Platform Settings & Configurations',
   };
 
@@ -2875,7 +2876,7 @@ const AdminDashboard = () => {
                           Chatbot FAQs Live Editor & Content Manager
                         </h2>
                         <p className="text-xs text-slate-500 mt-1">
-                          Manage, edit, add, or customize questions & answers for General Parking Seekers and Bank/NBFC Repo Stockyards. Updates reflect instantly in the mobile AI assistant.
+                          Manage, edit, add, or customize questions & answers for Parking Seekers. Updates reflect instantly in the mobile AI assistant.
                         </p>
                       </div>
 
@@ -2887,7 +2888,7 @@ const AdminDashboard = () => {
                             setFaqQuestionInput('');
                             setFaqAnswerInput('');
                             setFaqOrderInput((audienceFaqs.length || 0) + 1);
-                            setFaqAudienceInput(faqsAudience);
+                            setFaqAudienceInput('parking_seeker');
                             setShowAddFaqModal(true);
                           }}
                           className="bg-slate-900 hover:bg-slate-800 text-white font-bold px-4 py-2.5 rounded-xl text-xs flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
@@ -2903,42 +2904,15 @@ const AdminDashboard = () => {
                       </div>
                     </div>
 
-                    {/* Audience Filter Tabs & Search & Category Filter */}
+                    {/* Filter Tabs & Search & Category Filter */}
                     <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4">
-                      <div className="flex flex-wrap items-center gap-2 bg-slate-200/60 p-1.5 rounded-2xl">
-                        <button
-                          onClick={() => {
-                            setFaqsAudience('parking_seeker');
-                            setFaqCategoryFilter('all');
-                          }}
-                          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
-                            faqsAudience === 'parking_seeker'
-                              ? 'bg-white text-blue-700 shadow-sm font-black'
-                              : 'text-slate-600 hover:text-slate-900'
-                          }`}
-                        >
+                      <div className="flex items-center gap-2 bg-slate-200/60 p-1.5 rounded-2xl">
+                        <div className="px-4 py-2 rounded-xl text-xs font-black bg-white text-blue-700 shadow-sm flex items-center gap-2">
                           <span>🚗 Parking Seeker FAQs</span>
                           <span className="px-2 py-0.5 rounded-full text-[10px] bg-blue-50 text-blue-600 font-bold">
-                            {faqs.filter(f => (f.audience || 'parking_seeker') === 'parking_seeker').length}
+                            {audienceFaqs.length}
                           </span>
-                        </button>
-
-                        <button
-                          onClick={() => {
-                            setFaqsAudience('bank_finance');
-                            setFaqCategoryFilter('all');
-                          }}
-                          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
-                            faqsAudience === 'bank_finance'
-                              ? 'bg-white text-cyan-700 shadow-sm font-black'
-                              : 'text-slate-600 hover:text-slate-900'
-                          }`}
-                        >
-                          <span>🏦 Bank & Finance Storage Yards FAQs</span>
-                          <span className="px-2 py-0.5 rounded-full text-[10px] bg-cyan-50 text-cyan-600 font-bold">
-                            {faqs.filter(f => f.audience === 'bank_finance').length}
-                          </span>
-                        </button>
+                        </div>
                       </div>
 
                       <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
@@ -2977,7 +2951,7 @@ const AdminDashboard = () => {
                       <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
                         <div>
                           <h3 className="font-extrabold text-slate-800 text-sm flex items-center gap-2">
-                            <span>{faqsAudience === 'bank_finance' ? '🏦 Bank & Finance Seized Vehicle FAQs' : '🚗 Parking Seeker Chatbot FAQs'}</span>
+                            <span>🚗 Parking Seeker Chatbot FAQs</span>
                             <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 font-bold">
                               {filteredFaqs.length} of {audienceFaqs.length} questions
                             </span>
@@ -3083,12 +3057,12 @@ const AdminDashboard = () => {
                           <div className="px-8 pt-6 pb-4 flex items-center justify-between shrink-0 border-b border-slate-100">
                             <div>
                               <h3 className="font-extrabold text-slate-900 text-lg">
-                                {faqsAudience === 'bank_finance' ? 'Bank & Finance Seized Vehicle FAQs' : 'User / Seeker Chatbot FAQs'}
+                                🚗 Parking Seeker Chatbot FAQs
                               </h3>
                             </div>
                             <div className="text-right">
                               <p className="text-xs text-slate-500 font-medium">
-                                Displayed in {faqsAudience === 'bank_finance' ? 'Bank Recovery' : 'Student, Seeker & Driver'} AI Chatbot &amp; FAQ Center
+                                Displayed in Seeker AI Chatbot &amp; FAQ Center
                               </p>
                             </div>
                           </div>
@@ -3150,17 +3124,6 @@ const AdminDashboard = () => {
                           </div>
 
                           <form onSubmit={handleSaveFaq} className="space-y-4">
-                            <div>
-                              <label className="block text-xs font-bold text-slate-600 mb-1">Target Chatbot Audience</label>
-                              <select
-                                value={faqAudienceInput}
-                                onChange={(e) => setFaqAudienceInput(e.target.value)}
-                                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:border-cyan-400"
-                              >
-                                <option value="parking_seeker">🚗 Parking Seeker Chatbot</option>
-                                <option value="bank_finance">🏦 Bank & Finance Seized Vehicle Storage Yards</option>
-                              </select>
-                            </div>
 
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                               <div>

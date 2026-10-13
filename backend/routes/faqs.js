@@ -111,18 +111,11 @@ router.get('/categories', async (req, res) => {
 // @access  Private (Admin)
 router.get('/admin/all', protect, adminOnly, async (req, res) => {
   try {
-    await Promise.all([
-      ensureDefaultFaqs('parking_seeker'),
-      ensureDefaultFaqs('bank_finance'),
-    ]);
+    await ensureDefaultFaqs('parking_seeker');
+    // Permanently remove legacy bank_finance FAQs from DB
+    await Faq.deleteMany({ audience: 'bank_finance' });
 
-    const { audience } = req.query;
-    const filter = {};
-    if (audience && audience !== 'all') {
-      filter.audience = normalizeAudience(audience);
-    }
-
-    const faqs = await Faq.find(filter).sort({ audience: 1, order: 1, createdAt: 1 });
+    const faqs = await Faq.find({ audience: 'parking_seeker' }).sort({ order: 1, createdAt: 1 });
     res.json(faqs);
   } catch (err) {
     res.status(500).json({ message: err.message });
