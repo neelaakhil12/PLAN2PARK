@@ -55,6 +55,8 @@ const AdminDashboard = () => {
   const [bellOpen, setBellOpen] = useState(false);
   const [filterDate, setFilterDate] = useState('');
   const [filterSpaceId, setFilterSpaceId] = useState('');
+  const [bookingStatusTab, setBookingStatusTab] = useState('all'); // 'all' | 'paid' | 'completed' | 'cancelled'
+  const [bookingSearchQuery, setBookingSearchQuery] = useState('');
   const [promoBroadcasts, setPromoBroadcasts] = useState([]);
   const [promoTitle, setPromoTitle] = useState('');
   const [promoMessage, setPromoMessage] = useState('');
@@ -4960,116 +4962,433 @@ const AdminDashboard = () => {
 
               {/* ── VIEW: PLATFORM BOOKINGS ────────────────────────────────── */}
               {currentView === 'bookings' && (() => {
+                // Apply date, space, status, and search filters
                 const filteredBookings = bookings.filter(b => {
                   const matchDate = filterDate ? new Date(b.createdAt).toISOString().split('T')[0] === filterDate : true;
                   const matchSpace = filterSpaceId ? b.spaceId?._id === filterSpaceId : true;
-                  return matchDate && matchSpace;
+                  const matchStatus = bookingStatusTab === 'all'
+                    ? true
+                    : bookingStatusTab === 'active'
+                    ? (b.status === 'paid' || b.status === 'allotted')
+                    : b.status === bookingStatusTab;
+
+                  const searchLower = bookingSearchQuery.trim().toLowerCase();
+                  const matchSearch = !searchLower
+                    ? true
+                    : (b.seekerName && b.seekerName.toLowerCase().includes(searchLower)) ||
+                      (b.vehicleNumber && b.vehicleNumber.toLowerCase().includes(searchLower)) ||
+                      (b.seekerContact && b.seekerContact.toLowerCase().includes(searchLower)) ||
+                      (b.slotId && b.slotId.toLowerCase().includes(searchLower)) ||
+                      (b.spaceId?.address && b.spaceId.address.toLowerCase().includes(searchLower)) ||
+                      (b.spaceId?.location && b.spaceId.location.toLowerCase().includes(searchLower));
+
+                  return matchDate && matchSpace && matchStatus && matchSearch;
                 });
                 
                 const uniqueSpaces = Array.from(new Map(bookings.filter(b => b.spaceId).map(b => [b.spaceId._id, b.spaceId])).values());
 
+                // KPI Summaries based on filtered bookings
+                const totalGrossPaid = filteredBookings.reduce((sum, b) => sum + (b.totalAmount || 0), 0);
+                const totalAdminCommission = filteredBookings.reduce((sum, b) => sum + (b.adminCommission || 0), 0);
+                const totalHostPayout = filteredBookings.reduce((sum, b) => sum + (b.ownerEarnings || 0), 0);
+                const totalRefundsGiven = filteredBookings.reduce((sum, b) => sum + (b.refundAmount || 0), 0);
+
+                // Tab Counts
+                const tabCounts = {
+                  all: bookings.length,
+                  active: bookings.filter(b => b.status === 'paid' || b.status === 'allotted').length,
+                  completed: bookings.filter(b => b.status === 'completed').length,
+                  cancelled: bookings.filter(b => b.status === 'cancelled').length,
+                };
+
+                const hasActiveFilters = Boolean(filterDate || filterSpaceId || bookingSearchQuery || bookingStatusTab !== 'all');
+
                 return (
-                  <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm animate-fadeIn">
-                    <div className="px-6 py-5 border-b border-slate-150 flex flex-col md:flex-row gap-4 items-center justify-between bg-white">
-                      <div>
-                        <h3 className="font-extrabold text-slate-800 text-lg">Unified Platform Booking Log</h3>
-                        <p className="text-xs text-slate-400 mt-0.5">Logs of active, completed, and cancelled vehicle slots across the marketplace.</p>
+                  <div className="space-y-6 animate-fadeIn">
+                    
+                    {/* KPI Summary Cards */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                      {/* Total Seeker Paid */}
+                      <div className="bg-white border border-slate-200/80 rounded-3xl p-5 shadow-sm flex items-center justify-between">
+                        <div>
+                          <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Total Seeker Paid</p>
+                          <h4 className="text-2xl font-black text-slate-900 mt-1">₹{totalGrossPaid.toLocaleString('en-IN')}</h4>
+                          <p className="text-[11px] text-slate-400 mt-0.5">Gross fees across {filteredBookings.length} bookings</p>
+                        </div>
+                        <div className="h-12 w-12 rounded-2xl bg-amber-50 border border-amber-100 flex items-center justify-center shrink-0">
+                          <DollarSign className="h-6 w-6 text-amber-600" />
+                        </div>
                       </div>
-                      <span className="text-xs font-bold text-slate-500 bg-slate-100 px-3 py-1.5 rounded-full shrink-0">
-                        Total {filteredBookings.length} booking records
-                      </span>
+
+                      {/* Admin Commission Earned */}
+                      <div className="bg-white border border-slate-200/80 rounded-3xl p-5 shadow-sm flex items-center justify-between">
+                        <div>
+                          <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Admin Commission</p>
+                          <h4 className="text-2xl font-black text-emerald-600 mt-1">₹{totalAdminCommission.toLocaleString('en-IN')}</h4>
+                          <p className="text-[11px] text-emerald-600/80 font-semibold mt-0.5">Platform retained revenue</p>
+                        </div>
+                        <div className="h-12 w-12 rounded-2xl bg-emerald-50 border border-emerald-100 flex items-center justify-center shrink-0">
+                          <Percent className="h-6 w-6 text-emerald-600" />
+                        </div>
+                      </div>
+
+                      {/* Host Payouts */}
+                      <div className="bg-white border border-slate-200/80 rounded-3xl p-5 shadow-sm flex items-center justify-between">
+                        <div>
+                          <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Space Owner Payouts</p>
+                          <h4 className="text-2xl font-black text-indigo-600 mt-1">₹{totalHostPayout.toLocaleString('en-IN')}</h4>
+                          <p className="text-[11px] text-indigo-600/80 font-semibold mt-0.5">Net host wallet earnings</p>
+                        </div>
+                        <div className="h-12 w-12 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center shrink-0">
+                          <Landmark className="h-6 w-6 text-indigo-600" />
+                        </div>
+                      </div>
+
+                      {/* Refunds Processed */}
+                      <div className="bg-white border border-slate-200/80 rounded-3xl p-5 shadow-sm flex items-center justify-between">
+                        <div>
+                          <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Refunds Processed</p>
+                          <h4 className="text-2xl font-black text-rose-500 mt-1">₹{totalRefundsGiven.toLocaleString('en-IN')}</h4>
+                          <p className="text-[11px] text-rose-400 font-semibold mt-0.5">Returned to commuter wallets</p>
+                        </div>
+                        <div className="h-12 w-12 rounded-2xl bg-rose-50 border border-rose-100 flex items-center justify-center shrink-0">
+                          <TrendingUp className="h-6 w-6 text-rose-500 rotate-180" />
+                        </div>
+                      </div>
                     </div>
 
-                    {/* Filter Panel */}
-                    <div className="px-6 py-4 bg-slate-50 border-b border-slate-150 flex flex-wrap gap-4 items-center">
-                      <div className="flex flex-col">
-                        <label className="text-[10px] font-bold text-slate-400 uppercase mb-1">Filter by Date</label>
-                        <input
-                          type="date"
-                          value={filterDate}
-                          onChange={e => setFilterDate(e.target.value)}
-                          className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-amber-500 cursor-pointer text-slate-700"
-                        />
-                      </div>
-                      <div className="flex flex-col">
-                        <label className="text-[10px] font-bold text-slate-400 uppercase mb-1">Filter by Parking Space</label>
-                        <select
-                          value={filterSpaceId}
-                          onChange={e => setFilterSpaceId(e.target.value)}
-                          className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-amber-500 cursor-pointer text-slate-750 max-w-xs"
-                        >
-                          <option value="">All Parking Spaces</option>
-                          {uniqueSpaces.map(sp => (
-                            <option key={sp._id} value={sp._id}>{sp.address}</option>
-                          ))}
-                        </select>
-                      </div>
-                      {(filterDate || filterSpaceId) && (
-                        <button
-                          onClick={() => { setFilterDate(''); setFilterSpaceId(''); }}
-                          className="mt-4 px-3.5 py-2 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 rounded-xl text-xs font-bold transition-all shadow-sm shrink-0"
-                        >
-                          Reset Filters
-                        </button>
-                      )}
-                    </div>
+                    {/* Main Bookings Card */}
+                    <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm">
+                      
+                      {/* Top Header & Status Tabs */}
+                      <div className="px-6 py-5 border-b border-slate-150 flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between bg-white">
+                        <div>
+                          <h3 className="font-extrabold text-slate-800 text-lg">Platform Bookings Management</h3>
+                          <p className="text-xs text-slate-400 mt-0.5">Live tracking of seeker payments, owner earnings, and admin commission splits.</p>
+                        </div>
 
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm text-left">
-                        <thead className="bg-slate-50 text-slate-400 text-xs uppercase border-b border-slate-100">
-                          <tr>
-                            <th className="px-6 py-3">Commuter</th>
-                            <th className="px-6 py-3">Vehicle Plate</th>
-                            <th className="px-6 py-3">Parking Spot Address</th>
-                            <th className="px-6 py-3">Allotted Slot</th>
-                            <th className="px-6 py-3">Duration (Fee)</th>
-                            <th className="px-6 py-3">Status</th>
-                            <th className="px-6 py-3">Transaction Split</th>
-                            <th className="px-6 py-3">Date</th>
-                            <th className="px-6 py-3 text-right">Action</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
-                          {filteredBookings.length === 0 ? (
-                            <tr><td colSpan="8" className="text-center py-12 text-slate-400">No matching booking logs found.</td></tr>
-                          ) : filteredBookings.map(b => (
-                            <tr key={b._id} className="hover:bg-slate-50">
-                              <td className="px-6 py-4">
-                                <p className="font-bold text-slate-900">{b.seekerName}</p>
-                                <p className="text-[10px] text-slate-400">{b.seekerContact}</p>
-                              </td>
-                              <td className="px-6 py-4 font-mono font-bold text-slate-655 text-xs uppercase">{b.vehicleNumber}</td>
-                              <td className="px-6 py-4 text-slate-500 truncate max-w-[160px]">
-                                <p className="font-bold text-slate-800">{b.spaceId?.address || 'Address Deleted'}</p>
-                                <p className="text-[10px] text-slate-450">{b.spaceId?.location || 'Location'}</p>
-                              </td>
-                              <td className="px-6 py-4">
-                                {b.slotId 
-                                  ? <span className="bg-emerald-50 text-emerald-750 border border-emerald-200 px-2 py-0.5 rounded-lg text-xs font-bold font-mono">{b.slotId}</span>
-                                  : <span className="text-amber-500 font-semibold italic text-xs">Unallotted</span>
-                                }
-                              </td>
-                              <td className="px-6 py-4">
-                                <p className="text-slate-600">{b.hours} hrs</p>
-                                <p className="text-xs font-bold text-slate-900">₹{b.totalAmount}</p>
-                              </td>
-                              <td className="px-6 py-4"><StatusBadge status={b.status} /></td>
-                              <td className="px-6 py-4 text-xs font-bold">
-                                <p className="text-emerald-600">Admin (10%): ₹{b.adminCommission || (b.totalAmount * 0.1).toFixed(0)}</p>
-                                <p className="text-slate-450 mt-0.5">Host (90%): ₹{b.ownerEarnings || (b.totalAmount * 0.9).toFixed(0)}</p>
-                              </td>
-                              <td className="px-6 py-4 text-slate-400 text-xs font-medium">{new Date(b.createdAt).toLocaleDateString()}</td>
-                              <td className="px-6 py-4 text-right">
-                                {(b.paymentStatus === 'paid' || b.invoiceId) && (
-                                  <button onClick={() => setViewingInvoiceId(b._id)} className="text-blue-600 hover:underline font-bold text-xs bg-blue-50 px-3 py-1.5 rounded-lg border border-blue-100">
-                                    Invoice
-                                  </button>
-                                )}
-                              </td>
+                        {/* Status Filter Tabs */}
+                        <div className="flex flex-wrap items-center gap-1.5 p-1 bg-slate-100 rounded-2xl border border-slate-200/60">
+                          <button
+                            onClick={() => setBookingStatusTab('all')}
+                            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
+                              bookingStatusTab === 'all'
+                                ? 'bg-white text-slate-900 shadow-sm'
+                                : 'text-slate-500 hover:text-slate-900'
+                            }`}
+                          >
+                            <span>All</span>
+                            <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${
+                              bookingStatusTab === 'all' ? 'bg-slate-900 text-white' : 'bg-slate-200 text-slate-600'
+                            }`}>{tabCounts.all}</span>
+                          </button>
+
+                          <button
+                            onClick={() => setBookingStatusTab('active')}
+                            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
+                              bookingStatusTab === 'active'
+                                ? 'bg-white text-slate-900 shadow-sm'
+                                : 'text-slate-500 hover:text-slate-900'
+                            }`}
+                          >
+                            <span>Active / Paid</span>
+                            <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${
+                              bookingStatusTab === 'active' ? 'bg-emerald-600 text-white' : 'bg-emerald-100 text-emerald-700'
+                            }`}>{tabCounts.active}</span>
+                          </button>
+
+                          <button
+                            onClick={() => setBookingStatusTab('completed')}
+                            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
+                              bookingStatusTab === 'completed'
+                                ? 'bg-white text-slate-900 shadow-sm'
+                                : 'text-slate-500 hover:text-slate-900'
+                            }`}
+                          >
+                            <span>Completed</span>
+                            <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${
+                              bookingStatusTab === 'completed' ? 'bg-indigo-600 text-white' : 'bg-indigo-100 text-indigo-700'
+                            }`}>{tabCounts.completed}</span>
+                          </button>
+
+                          <button
+                            onClick={() => setBookingStatusTab('cancelled')}
+                            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
+                              bookingStatusTab === 'cancelled'
+                                ? 'bg-white text-slate-900 shadow-sm'
+                                : 'text-slate-500 hover:text-slate-900'
+                            }`}
+                          >
+                            <span>Cancelled</span>
+                            <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${
+                              bookingStatusTab === 'cancelled' ? 'bg-rose-600 text-white' : 'bg-rose-100 text-rose-700'
+                            }`}>{tabCounts.cancelled}</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Filter Search Controls Bar */}
+                      <div className="px-6 py-4 bg-slate-50 border-b border-slate-150 flex flex-wrap gap-4 items-center justify-between">
+                        <div className="flex flex-wrap gap-3 items-center flex-1">
+                          {/* Search Input */}
+                          <div className="relative min-w-[240px] flex-1 max-w-sm">
+                            <Search className="h-4 w-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                            <input
+                              type="text"
+                              value={bookingSearchQuery}
+                              onChange={e => setBookingSearchQuery(e.target.value)}
+                              placeholder="Search commuter, plate, slot, location..."
+                              className="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-amber-500 text-slate-700 placeholder:text-slate-400 font-medium"
+                            />
+                            {bookingSearchQuery && (
+                              <button
+                                onClick={() => setBookingSearchQuery('')}
+                                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5"
+                              >
+                                <X className="h-3.5 w-3.5" />
+                              </button>
+                            )}
+                          </div>
+
+                          {/* Filter by Date */}
+                          <div className="flex items-center gap-2">
+                            <Calendar className="h-4 w-4 text-slate-400 hidden sm:block" />
+                            <input
+                              type="date"
+                              value={filterDate}
+                              onChange={e => setFilterDate(e.target.value)}
+                              className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-amber-500 cursor-pointer text-slate-700 font-medium"
+                            />
+                          </div>
+
+                          {/* Filter by Parking Space */}
+                          <div className="flex items-center gap-2">
+                            <MapPin className="h-4 w-4 text-slate-400 hidden sm:block" />
+                            <select
+                              value={filterSpaceId}
+                              onChange={e => setFilterSpaceId(e.target.value)}
+                              className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-amber-500 cursor-pointer text-slate-750 max-w-xs font-medium"
+                            >
+                              <option value="">All Parking Spaces</option>
+                              {uniqueSpaces.map(sp => (
+                                <option key={sp._id} value={sp._id}>{sp.address || sp.location || sp.title || 'Parking Space'}</option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+
+                        {/* Reset Filters & Count */}
+                        <div className="flex items-center gap-3">
+                          <span className="text-xs font-bold text-slate-500 bg-white border border-slate-200 px-3 py-1.5 rounded-xl shrink-0">
+                            Showing {filteredBookings.length} of {bookings.length}
+                          </span>
+                          {hasActiveFilters && (
+                            <button
+                              onClick={() => {
+                                setFilterDate('');
+                                setFilterSpaceId('');
+                                setBookingSearchQuery('');
+                                setBookingStatusTab('all');
+                              }}
+                              className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 rounded-xl text-xs font-bold transition flex items-center gap-1 shrink-0"
+                            >
+                              <X className="h-3.5 w-3.5" /> Reset All
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Bookings Table */}
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm text-left">
+                          <thead className="bg-slate-50/80 text-slate-400 text-[11px] uppercase tracking-wider border-b border-slate-100">
+                            <tr>
+                              <th className="px-6 py-3.5">Commuter Details</th>
+                              <th className="px-6 py-3.5">Vehicle &amp; Parking Spot</th>
+                              <th className="px-6 py-3.5">Slot</th>
+                              <th className="px-6 py-3.5">Seeker Paid (Gross)</th>
+                              <th className="px-6 py-3.5">Admin Commission</th>
+                              <th className="px-6 py-3.5">Space Owner Payout</th>
+                              <th className="px-6 py-3.5">Status</th>
+                              <th className="px-6 py-3.5">Booking Date</th>
+                              <th className="px-6 py-3.5 text-right">Invoice</th>
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
+                            {filteredBookings.length === 0 ? (
+                              <tr>
+                                <td colSpan="9" className="text-center py-16 text-slate-400">
+                                  <div className="flex flex-col items-center justify-center">
+                                    <ClipboardList className="h-10 w-10 text-slate-300 mb-2" />
+                                    <p className="font-bold text-slate-700 text-sm">No matching booking logs found</p>
+                                    <p className="text-xs text-slate-400 mt-1">Try adjusting your date, space, search keywords, or status tab.</p>
+                                  </div>
+                                </td>
+                              </tr>
+                            ) : filteredBookings.map(b => {
+                              const isCancelled = b.status === 'cancelled';
+                              const grossAmount = b.totalAmount || 0;
+                              const refundAmount = b.refundAmount || 0;
+                              const retainedGross = Math.max(0, grossAmount - refundAmount);
+
+                              // Dynamic commission and owner split percentages
+                              let adminRatePercent = commissionRate;
+                              let hostRatePercent = 100 - commissionRate;
+
+                              if (isCancelled && b.refundPolicyApplied === 'full') {
+                                adminRatePercent = 0;
+                                hostRatePercent = 0;
+                              } else if (retainedGross > 0 && b.adminCommission > 0) {
+                                adminRatePercent = Math.round((b.adminCommission / retainedGross) * 100);
+                                hostRatePercent = Math.max(0, 100 - adminRatePercent);
+                              } else if (grossAmount > 0 && b.adminCommission > 0) {
+                                adminRatePercent = Math.round((b.adminCommission / grossAmount) * 100);
+                                hostRatePercent = Math.max(0, 100 - adminRatePercent);
+                              }
+
+                              const adminAmount = b.adminCommission !== undefined ? b.adminCommission : 0;
+                              const ownerAmount = b.ownerEarnings !== undefined ? b.ownerEarnings : 0;
+
+                              return (
+                                <tr key={b._id} className="hover:bg-slate-50/80 transition-colors">
+                                  {/* Commuter */}
+                                  <td className="px-6 py-4">
+                                    <div className="flex items-center gap-3">
+                                      <div className="h-9 w-9 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-xs font-black text-slate-700 shrink-0">
+                                        {(b.seekerName || 'U').charAt(0).toUpperCase()}
+                                      </div>
+                                      <div>
+                                        <p className="font-bold text-slate-900 leading-tight">{b.seekerName || 'Commuter'}</p>
+                                        <p className="text-[11px] text-slate-400 font-mono mt-0.5">{b.seekerContact || 'No contact'}</p>
+                                      </div>
+                                    </div>
+                                  </td>
+
+                                  {/* Vehicle & Parking Space */}
+                                  <td className="px-6 py-4">
+                                    <div className="space-y-1">
+                                      <span className="font-mono font-black text-slate-800 text-xs px-2 py-0.5 rounded-md bg-slate-100 border border-slate-200 uppercase inline-block">
+                                        {b.vehicleNumber}
+                                      </span>
+                                      <p className="font-bold text-slate-800 text-xs truncate max-w-[200px]" title={b.spaceId?.address || 'Parking Spot'}>
+                                        {b.spaceId?.address || 'Address Deleted'}
+                                      </p>
+                                      <p className="text-[10px] text-slate-400 truncate max-w-[200px]">{b.spaceId?.location || 'Location'}</p>
+                                    </div>
+                                  </td>
+
+                                  {/* Slot */}
+                                  <td className="px-6 py-4">
+                                    {b.slotId ? (
+                                      <span className="bg-emerald-50 text-emerald-800 border border-emerald-200 px-2.5 py-1 rounded-xl text-xs font-black font-mono shadow-xs">
+                                        {b.slotId}
+                                      </span>
+                                    ) : (
+                                      <span className="text-amber-600 bg-amber-50 border border-amber-200/60 px-2 py-0.5 rounded-lg font-bold text-[11px]">
+                                        Unallotted
+                                      </span>
+                                    )}
+                                  </td>
+
+                                  {/* Seeker Paid (Gross & Duration) */}
+                                  <td className="px-6 py-4">
+                                    <div>
+                                      <div className="flex items-baseline gap-1.5">
+                                        <span className={`text-sm font-black ${isCancelled ? 'line-through text-slate-400' : 'text-slate-900'}`}>
+                                          ₹{grossAmount}
+                                        </span>
+                                        <span className="text-[11px] text-slate-400 font-medium">({b.hours} hrs)</span>
+                                      </div>
+
+                                      {/* Refund Details for Cancelled Bookings */}
+                                      {isCancelled && (
+                                        <div className="mt-1">
+                                          {b.refundPolicyApplied === 'half' ? (
+                                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md">
+                                              <span>₹{refundAmount} Refunded</span>
+                                              <span className="text-amber-500">(50% Policy)</span>
+                                            </span>
+                                          ) : b.refundPolicyApplied === 'full' ? (
+                                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-md">
+                                              <span>₹{refundAmount} Refunded</span>
+                                              <span className="text-rose-500">(100% Policy)</span>
+                                            </span>
+                                          ) : b.refundPolicyApplied === 'none' ? (
+                                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-purple-700 bg-purple-50 border border-purple-200 px-2 py-0.5 rounded-md">
+                                              <span>No Refund</span>
+                                              <span className="text-purple-500">(0% Policy)</span>
+                                            </span>
+                                          ) : (
+                                            <span className="text-[10px] font-bold text-rose-600">
+                                              ₹{refundAmount} Refunded
+                                            </span>
+                                          )}
+                                        </div>
+                                      )}
+                                    </div>
+                                  </td>
+
+                                  {/* Admin Commission */}
+                                  <td className="px-6 py-4">
+                                    <div className="bg-emerald-50/80 border border-emerald-200/80 rounded-2xl px-3 py-2 inline-block min-w-[110px]">
+                                      <div className="flex items-center justify-between gap-2">
+                                        <span className="text-xs font-black text-emerald-700">₹{adminAmount}</span>
+                                        <span className="text-[10px] font-black bg-emerald-600 text-white px-1.5 py-0.2 rounded-md">
+                                          {adminRatePercent}%
+                                        </span>
+                                      </div>
+                                      <p className="text-[9px] font-bold text-emerald-800/70 uppercase tracking-wider mt-0.5">Admin Fee</p>
+                                    </div>
+                                  </td>
+
+                                  {/* Space Owner Payout */}
+                                  <td className="px-6 py-4">
+                                    <div className="bg-indigo-50/80 border border-indigo-200/80 rounded-2xl px-3 py-2 inline-block min-w-[120px]">
+                                      <div className="flex items-center justify-between gap-2">
+                                        <span className="text-xs font-black text-indigo-700">₹{ownerAmount}</span>
+                                        <span className="text-[10px] font-black bg-indigo-600 text-white px-1.5 py-0.2 rounded-md">
+                                          {hostRatePercent}%
+                                        </span>
+                                      </div>
+                                      <p className="text-[9px] font-bold text-indigo-800/70 truncate max-w-[110px] mt-0.5" title={b.spaceId?.ownerId?.name || 'Owner'}>
+                                        {b.spaceId?.ownerId?.name ? `Host: ${b.spaceId.ownerId.name}` : 'Host Share'}
+                                      </p>
+                                    </div>
+                                  </td>
+
+                                  {/* Status */}
+                                  <td className="px-6 py-4">
+                                    <StatusBadge status={b.status} />
+                                  </td>
+
+                                  {/* Booking Date */}
+                                  <td className="px-6 py-4">
+                                    <p className="text-xs font-bold text-slate-700">
+                                      {new Date(b.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                    </p>
+                                    <p className="text-[10px] text-slate-400 font-medium">
+                                      {new Date(b.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                    </p>
+                                  </td>
+
+                                  {/* Action / Invoice */}
+                                  <td className="px-6 py-4 text-right">
+                                    {(b.paymentStatus === 'paid' || b.invoiceId || b.totalAmount > 0) && (
+                                      <button
+                                        onClick={() => setViewingInvoiceId(b._id)}
+                                        className="inline-flex items-center gap-1 text-xs font-bold text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 border border-blue-200 px-3 py-1.5 rounded-xl transition shadow-xs active:scale-95"
+                                      >
+                                        <FileText className="h-3.5 w-3.5" />
+                                        <span>Invoice</span>
+                                      </button>
+                                    )}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
                     </div>
                   </div>
                 );

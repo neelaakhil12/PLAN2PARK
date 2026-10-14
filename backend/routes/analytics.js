@@ -42,24 +42,28 @@ router.get('/admin', protect, adminOnly, async (req, res) => {
     // 4. Complaints counts
     const activeComplaints = await Complaint.countDocuments({ status: { $ne: 'resolved' } });
 
-    // 5. Financial totals (Strictly exclude cancelled/refunded bookings)
+    // 5. Financial totals (Include paid bookings and any retained commissions/earnings from cancelled bookings)
     const bookingsData = await Booking.find({
       paymentStatus: 'paid',
-      status: { $nin: ['cancelled'] },
     });
-    const totalRevenue = bookingsData.reduce((sum, b) => sum + (b.totalAmount || 0), 0);
+    const totalRevenue = bookingsData.reduce((sum, b) => {
+      const retained = Math.max(0, (b.totalAmount || 0) - (b.refundAmount || 0));
+      return sum + retained;
+    }, 0);
     const totalCommission = bookingsData.reduce((sum, b) => sum + (b.adminCommission || 0), 0);
     const totalOwnerPayout = bookingsData.reduce((sum, b) => sum + (b.ownerEarnings || 0), 0);
 
-    // Today's revenue calculation (Excluding cancelled)
+    // Today's revenue calculation (Net retained revenue after refunds)
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
     const todayBookings = await Booking.find({
       paymentStatus: 'paid',
-      status: { $nin: ['cancelled'] },
       createdAt: { $gte: todayStart }
     });
-    const todayRevenue = todayBookings.reduce((sum, b) => sum + (b.totalAmount || 0), 0);
+    const todayRevenue = todayBookings.reduce((sum, b) => {
+      const retained = Math.max(0, (b.totalAmount || 0) - (b.refundAmount || 0));
+      return sum + retained;
+    }, 0);
 
     // 6. Recent Bookings (limit to 10 for detailed tables)
     const recentBookings = await Booking.find()
@@ -86,8 +90,9 @@ router.get('/admin', protect, adminOnly, async (req, res) => {
       const idx = chartLabels.indexOf(bDateStr);
       if (idx !== -1) {
         chartBookings[idx] += 1;
-        if (b.paymentStatus === 'paid' && b.status !== 'cancelled') {
-          chartRevenue[idx] += b.totalAmount || 0;
+        if (b.paymentStatus === 'paid') {
+          const retained = Math.max(0, (b.totalAmount || 0) - (b.refundAmount || 0));
+          chartRevenue[idx] += retained;
         }
       }
     });

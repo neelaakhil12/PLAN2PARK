@@ -409,7 +409,10 @@ router.get('/owner-bookings', protect, ownerOnly, async (req, res) => {
 router.get('/admin-bookings', protect, adminOnly, async (req, res) => {
   try {
     const bookings = await Booking.find()
-      .populate('spaceId')
+      .populate({
+        path: 'spaceId',
+        populate: { path: 'ownerId', select: 'name email contact' }
+      })
       .populate('seekerId', 'name email contact profileImage driverLicenseImage')
       .sort({ createdAt: -1 });
     res.json(bookings);
@@ -934,7 +937,6 @@ router.get('/revenue-report', protect, adminOnly, async (req, res) => {
   try {
     const matchQuery = { 
       paymentStatus: 'paid',
-      status: { $nin: ['cancelled'] },
     };
 
     if (startDate || endDate) {
@@ -958,7 +960,8 @@ router.get('/revenue-report', protect, adminOnly, async (req, res) => {
     let totalOwnerEarnings = 0;
 
     bookings.forEach((b) => {
-      totalRevenue += b.totalAmount || 0;
+      const retained = Math.max(0, (b.totalAmount || 0) - (b.refundAmount || 0));
+      totalRevenue += retained;
       totalCommission += b.adminCommission || 0;
       totalOwnerEarnings += b.ownerEarnings || 0;
     });
@@ -985,10 +988,9 @@ router.get('/owner-revenue-summary', protect, adminOnly, async (req, res) => {
     // 1. Get all owners/hosts
     const owners = await User.find({ role: 'owner' }).select('name email contact ownerPaidRevenue bankAccountDetails walletBalance status createdAt');
 
-    // 2. Fetch all paid non-cancelled bookings populate spaceId
+    // 2. Fetch all paid bookings populate spaceId
     const paidBookings = await Booking.find({ 
       paymentStatus: 'paid',
-      status: { $nin: ['cancelled'] },
     }).populate('spaceId');
 
     // 3. Fetch all parking spaces
@@ -1005,7 +1007,10 @@ router.get('/owner-revenue-summary', protect, adminOnly, async (req, res) => {
         (s) => s.ownerId && s.ownerId.toString() === owner._id.toString()
       );
 
-      const grossRevenue = ownerBookings.reduce((sum, b) => sum + (b.totalAmount || 0), 0);
+      const grossRevenue = ownerBookings.reduce((sum, b) => {
+        const retained = Math.max(0, (b.totalAmount || 0) - (b.refundAmount || 0));
+        return sum + retained;
+      }, 0);
       const totalAdminCommission = ownerBookings.reduce((sum, b) => sum + (b.adminCommission || 0), 0);
       const totalEarnings = ownerBookings.reduce((sum, b) => sum + (b.ownerEarnings || 0), 0);
       const paid = owner.ownerPaidRevenue || 0;

@@ -3,7 +3,11 @@ import { TouchableOpacity, Text, StyleSheet, ActivityIndicator, View } from 'rea
 import * as WebBrowser from 'expo-web-browser';
 import * as AuthSession from 'expo-auth-session';
 
-WebBrowser.maybeCompleteAuthSession();
+try {
+  WebBrowser.maybeCompleteAuthSession();
+} catch (e) {
+  // Ignore in case environment does not support it
+}
 
 const GOOGLE_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID || '908977180-dkg2d8h9109b4tvsnaf51scbmi4l09or.apps.googleusercontent.com';
 
@@ -13,15 +17,38 @@ const discovery = {
   revocationEndpoint: 'https://oauth2.googleapis.com/revoke',
 };
 
-export default function GoogleSignInButton({ onAuthSuccess, text = 'Sign in with Google', disabled = false }) {
+class GoogleErrorBoundary extends React.Component {
+  state = { hasError: false };
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+  componentDidCatch(error) {
+    console.warn('Google Sign-In button failed to load:', error);
+  }
+  render() {
+    if (this.state.hasError) {
+      return null;
+    }
+    return this.props.children;
+  }
+}
+
+function GoogleSignInButtonInner({ onAuthSuccess, text = 'Sign in with Google', disabled = false }) {
   const [loading, setLoading] = useState(false);
+
+  let redirectUri;
+  try {
+    redirectUri = AuthSession.makeRedirectUri({ scheme: 'plantopark-seeker' });
+  } catch (e) {
+    redirectUri = 'plantopark-seeker://';
+  }
 
   const [request, response, promptAsync] = AuthSession.useAuthRequest(
     {
       clientId: GOOGLE_CLIENT_ID,
       scopes: ['openid', 'profile', 'email'],
       responseType: AuthSession.ResponseType.Token,
-      redirectUri: AuthSession.makeRedirectUri({ scheme: 'plantopark' }),
+      redirectUri,
     },
     discovery
   );
@@ -36,10 +63,22 @@ export default function GoogleSignInButton({ onAuthSuccess, text = 'Sign in with
     }
   }, [response]);
 
+  const handlePress = async () => {
+    if (!promptAsync) return;
+    try {
+      setLoading(true);
+      await promptAsync();
+    } catch (e) {
+      console.warn('Google promptAsync error:', e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <TouchableOpacity
       style={[styles.btn, (disabled || loading) && styles.disabled]}
-      onPress={() => promptAsync()}
+      onPress={handlePress}
       disabled={disabled || loading || !request}
       activeOpacity={0.8}
     >
@@ -56,6 +95,14 @@ export default function GoogleSignInButton({ onAuthSuccess, text = 'Sign in with
         )}
       </View>
     </TouchableOpacity>
+  );
+}
+
+export default function GoogleSignInButton(props) {
+  return (
+    <GoogleErrorBoundary>
+      <GoogleSignInButtonInner {...props} />
+    </GoogleErrorBoundary>
   );
 }
 
