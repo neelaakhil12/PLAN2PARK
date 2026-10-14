@@ -48,6 +48,7 @@ function GoogleSignInButtonInner({ onAuthSuccess, text = 'Sign in with Google', 
       clientId: GOOGLE_CLIENT_ID,
       scopes: ['openid', 'profile', 'email'],
       responseType: AuthSession.ResponseType.Token,
+      usePKCE: false,
       redirectUri,
     },
     discovery
