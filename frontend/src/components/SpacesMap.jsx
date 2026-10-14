@@ -97,8 +97,8 @@ const SpacesMap = ({
 
         Leaflet.control.zoom({ position: 'topright' }).addTo(map);
 
-        Leaflet.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-          attribution: '&copy; OpenStreetMap &copy; CARTO',
+        Leaflet.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '&copy; OpenStreetMap contributors',
           maxZoom: 19,
         }).addTo(map);
 

@@ -1353,7 +1353,6 @@ const SeekerDashboard = () => {
                     {[
                       { id: 'all', label: '🌐 All Spaces' },
                       { id: 'standard', label: '🅿️ Standard Parking' },
-                      { id: 'commercial_vehicle_storage', label: '🏢 Bank Repo Stockyards (1+ Acre)' },
                     ].map(cat => (
                       <button
                         key={cat.id}
@@ -2015,7 +2014,6 @@ const SeekerDashboard = () => {
                   {[
                     { id: 'all', label: '🌐 All Spaces' },
                     { id: 'standard', label: '🅿️ Standard Parking' },
-                    { id: 'commercial_vehicle_storage', label: '🏢 Bank Repo Stockyards (1+ Acre)' },
                   ].map(cat => (
                     <button
                       key={cat.id}
