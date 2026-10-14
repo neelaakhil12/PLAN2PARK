@@ -158,6 +158,63 @@ export const AuthProvider = ({ children }) => {
     return signupForRole(role, name, email, password, contact);
   };
 
+  const googleLogin = async (credential, role) => {
+    const res = await fetch(`${API_URL}/auth/google/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ credential, role }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      const err = new Error(data.message || 'Google login failed');
+      err.notFound = data.notFound;
+      err.email = data.email;
+      err.name = data.name;
+      throw err;
+    }
+
+    localStorage.setItem('token', data.token);
+    setToken(data.token);
+    setUser({
+      _id: data._id,
+      name: data.name,
+      email: data.email,
+      role: data.role,
+      status: data.status,
+      contact: data.contact,
+      profileImage: data.profileImage,
+      accountCategory: data.accountCategory,
+      organizationName: data.organizationName,
+    });
+    return data;
+  };
+
+  const googleRegister = async (credential, role, contact = '') => {
+    const res = await fetch(`${API_URL}/auth/google/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ credential, role, contact }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.message || 'Google registration failed');
+    }
+
+    localStorage.setItem('token', data.token);
+    setToken(data.token);
+    setUser({
+      _id: data._id,
+      name: data.name,
+      email: data.email,
+      role: data.role,
+      status: data.status,
+      contact: data.contact,
+      profileImage: data.profileImage,
+      accountCategory: data.accountCategory,
+    });
+    return data;
+  };
+
   const logout = () => {
     localStorage.removeItem('token');
     setToken('');
@@ -173,6 +230,8 @@ export const AuthProvider = ({ children }) => {
       signup,
       loginForRole,
       signupForRole,
+      googleLogin,
+      googleRegister,
       logout,
       API_URL,
       getImageUrl,

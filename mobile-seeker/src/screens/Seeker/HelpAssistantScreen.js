@@ -144,7 +144,7 @@ const BANK_FINANCE_TOPIC_CATEGORIES = [
   },
 ];
 
-const BOT_NAME = 'Agent Plan2Park';
+const BOT_NAME = 'Agent PlanToPark';
 
 export default function HelpAssistantScreen({ navigation }) {
   const { user } = useContext(AuthContext);
@@ -162,8 +162,8 @@ export default function HelpAssistantScreen({ navigation }) {
 
   // Initial greeting based on role
   const greetingText = isBankSeeker
-    ? "Hello! Welcome to Plant2Park Bank & Finance Support. I'm Agent Plan2Park, here to assist with your vehicle storage yard requests."
-    : "Hello! Welcome to PlanToPark Support. I'm Agent Plan2Park, here to assist you.";
+    ? "Hello! Welcome to PlanToPark Bank & Finance Support. I'm Agent PlanToPark, here to assist with your vehicle storage yard requests."
+    : "Hello! Welcome to PlanToPark Support. I'm Agent PlanToPark, here to assist you.";
 
   const [messages, setMessages] = useState(() => [
     {

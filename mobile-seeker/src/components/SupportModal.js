@@ -60,24 +60,24 @@ export default function SupportModal({ visible, onClose, isBankFinance = false }
   const handleCall = () => {
     const cleanNumber = activePhone.replace(/[^\d+]/g, '');
     Linking.openURL(`tel:${cleanNumber}`).catch(() => {
-      alert(`Plan2Park Support Phone: ${activePhone}`);
+      alert(`PlanToPark Support Phone: ${activePhone}`);
     });
   };
 
   const handleEmail = () => {
     const subject = isBankFinance
-      ? 'Bank Recovery Fleet Support - Plan2Park Help Desk'
-      : 'Parking Support Inquiry - Plan2Park Help Desk';
+      ? 'Bank Recovery Fleet Support - PlanToPark Help Desk'
+      : 'Parking Support Inquiry - PlanToPark Help Desk';
     Linking.openURL(`mailto:${activeEmail}?subject=${encodeURIComponent(subject)}`).catch(() => {
-      alert(`Plan2Park Support Email: ${activeEmail}`);
+      alert(`PlanToPark Support Email: ${activeEmail}`);
     });
   };
 
   const handleWhatsapp = () => {
     const cleanNumber = activeWhatsapp.replace(/[^\d]/g, '');
     const msg = isBankFinance
-      ? 'Hello Plan2Park Support, I am an authorized Bank Recovery / Fleet representative requesting support.'
-      : 'Hello Plan2Park Support, I am a parking seeker requesting assistance with my booking.';
+      ? 'Hello PlanToPark Support, I am an authorized Bank Recovery / Fleet representative requesting support.'
+      : 'Hello PlanToPark Support, I am a parking seeker requesting assistance with my booking.';
     const url = `https://wa.me/${cleanNumber}?text=${encodeURIComponent(msg)}`;
     Linking.openURL(url).catch(() => {
       alert(`WhatsApp Number: ${activeWhatsapp}`);
@@ -99,7 +99,7 @@ export default function SupportModal({ visible, onClose, isBankFinance = false }
                 {isBankFinance ? '🏦 Bank & Fleet Support Desk' : '📞 24/7 Customer Support Desk'}
               </Text>
               <Text style={styles.subtitle}>
-                Official Plan2Park Support • Immediate Concierge & Emergency Assistance
+                Official PlanToPark Support • Immediate Concierge & Emergency Assistance
               </Text>
             </View>
             <TouchableOpacity style={styles.closeBtn} onPress={onClose} activeOpacity={0.7}>

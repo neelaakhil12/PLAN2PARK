@@ -15,9 +15,10 @@ import { AuthContext } from '../../context/AuthContext';
 import { COLORS } from '../../theme/colors';
 import Button from '../../components/Button';
 import Header from '../../components/Header';
+import GoogleSignInButton from '../../components/GoogleSignInButton';
 
 export default function LoginScreen({ route, navigation }) {
-  const { loginForRole } = useContext(AuthContext);
+  const { loginForRole, googleLogin } = useContext(AuthContext);
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -42,6 +43,40 @@ export default function LoginScreen({ route, navigation }) {
       const msg = err.message || 'Invalid credentials';
       setErrorMsg(msg);
       Alert.alert('Login Failed', msg);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleSuccess = async (googleToken) => {
+    setLoading(true);
+    setErrorMsg('');
+    try {
+      await googleLogin('owner', googleToken);
+    } catch (err) {
+      if (err.notFound) {
+        Alert.alert(
+          'No Account Found',
+          'No space owner account found with this Google email. Please register/sign up first.',
+          [
+            {
+              text: 'Sign Up',
+              onPress: () =>
+                navigation.navigate('Register', {
+                  role: 'owner',
+                  category: 'standard',
+                  email: err.email,
+                  name: err.name,
+                }),
+            },
+            { text: 'Cancel', style: 'cancel' },
+          ]
+        );
+      } else {
+        const msg = err.message || 'Google sign-in failed';
+        setErrorMsg(msg);
+        Alert.alert('Google Sign-In Failed', msg);
+      }
     } finally {
       setLoading(false);
     }
@@ -123,6 +158,13 @@ export default function LoginScreen({ route, navigation }) {
           onPress={handleLogin}
           disabled={loading}
           style={[styles.submitBtn, { backgroundColor: themeColor }]}
+        />
+
+        {/* Google Sign In */}
+        <GoogleSignInButton
+          onAuthSuccess={handleGoogleSuccess}
+          text="Sign in with Google"
+          disabled={loading}
         />
 
         <View style={styles.footerRow}>

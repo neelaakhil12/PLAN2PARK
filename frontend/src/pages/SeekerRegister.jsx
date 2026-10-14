@@ -1,11 +1,13 @@
-import React, { useState, useContext } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import React, { useState, useContext, useEffect } from 'react';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import { User, Mail, Phone, Lock, AlertCircle, CheckSquare, Square, Eye, EyeOff } from 'lucide-react';
+import GoogleAuthButton from '../components/GoogleAuthButton';
 
 const SeekerRegister = () => {
-  const { signupForRole } = useContext(AuthContext);
+  const { signupForRole, googleRegister } = useContext(AuthContext);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -15,6 +17,13 @@ const SeekerRegister = () => {
   const [agreed, setAgreed] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const qEmail = searchParams.get('email');
+    const qName = searchParams.get('name');
+    if (qEmail) setEmail(qEmail);
+    if (qName) setName(qName);
+  }, [searchParams]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -27,6 +36,19 @@ const SeekerRegister = () => {
       navigate('/seeker/dashboard');
     } catch (err) {
       setError(err.message || 'Registration failed. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleSuccess = async (credential) => {
+    setError('');
+    setLoading(true);
+    try {
+      await googleRegister(credential, 'seeker', contact);
+      navigate('/seeker/dashboard');
+    } catch (err) {
+      setError(err.message || 'Google registration failed');
     } finally {
       setLoading(false);
     }
@@ -161,7 +183,24 @@ const SeekerRegister = () => {
             </button>
           </form>
 
-          <p className="text-center text-sm text-slate-500 mt-6">
+          {/* Divider */}
+          <div className="relative my-5">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-slate-200" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-white px-3 text-slate-400 font-bold">Or sign up with</span>
+            </div>
+          </div>
+
+          {/* Google Sign Up Button */}
+          <GoogleAuthButton
+            onCredentialSuccess={handleGoogleSuccess}
+            text="signup_with"
+            disabled={loading}
+          />
+
+          <p className="text-center text-sm text-slate-500 mt-5">
             Already have an account?{' '}
             <Link to="/seeker/login" className="text-blue-600 font-bold hover:underline">Sign in</Link>
           </p>

@@ -30,7 +30,7 @@ router.get('/support', async (req, res) => {
       setting = await SystemSetting.create({
         key: 'support_contacts',
         value: DEFAULT_SUPPORT_SETTINGS,
-        description: '24/7 Plan2Park Help Desk and Contact Details for all roles',
+        description: '24/7 PlanToPark Help Desk and Contact Details for all roles',
       });
     }
     // Merge any missing keys with defaults
@@ -55,7 +55,7 @@ router.put('/support', protect, adminOnly, async (req, res) => {
 
     setting = await SystemSetting.findOneAndUpdate(
       { key: 'support_contacts' },
-      { value: updatedValue, description: '24/7 Plan2Park Help Desk and Contact Details for all roles' },
+      { value: updatedValue, description: '24/7 PlanToPark Help Desk and Contact Details for all roles' },
       { upsert: true, new: true }
     );
 

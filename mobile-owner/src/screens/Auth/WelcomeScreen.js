@@ -21,7 +21,7 @@ export default function WelcomeScreen({ navigation }) {
             style={styles.logoImage}
             resizeMode="contain"
           />
-          <Text style={styles.brandTitle}>Plan2Park Owner</Text>
+          <Text style={styles.brandTitle}>PlanToPark Owner</Text>
           <Text style={styles.tagline}>List Your Parking Space or Land & Earn Smart.</Text>
         </View>
 

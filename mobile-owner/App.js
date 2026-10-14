@@ -108,7 +108,7 @@ function AppContent() {
   );
 
   return Platform.OS === 'web' ? (
-    <WebDesktopFrame appName="Plan2Park Owner App">
+    <WebDesktopFrame appName="PlanToPark Owner App">
       {content}
     </WebDesktopFrame>
   ) : (

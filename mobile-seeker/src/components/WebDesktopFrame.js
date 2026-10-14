@@ -105,7 +105,7 @@ export default function WebDesktopFrame({ children, downloadUrl = "https://expo.
       {/* Big Right-Side Vertically Centered Play Store Download Card (Shown on Wide Desktops) */}
       {showSidePanel && (
         <View style={styles.rightSidePanel}>
-          <Text style={styles.panelTitle}>Get Plan2Park Seeker App</Text>
+          <Text style={styles.panelTitle}>Get PlanToPark Seeker App</Text>
           <Text style={styles.panelSubtitle}>Install directly on your Android phone</Text>
 
           <TouchableOpacity style={styles.downloadBtnBig} onPress={handleDownload} activeOpacity={0.85}>

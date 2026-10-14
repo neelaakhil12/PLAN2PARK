@@ -16,12 +16,15 @@ import { AuthContext } from '../../context/AuthContext';
 import { COLORS } from '../../theme/colors';
 import Button from '../../components/Button';
 import Header from '../../components/Header';
+import GoogleSignInButton from '../../components/GoogleSignInButton';
 
 export default function RegisterScreen({ route, navigation }) {
-  const { signupForRole } = useContext(AuthContext);
+  const { signupForRole, googleRegister } = useContext(AuthContext);
 
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
+  const initialEmail = route?.params?.email || '';
+  const initialName = route?.params?.name || '';
+  const [name, setName] = useState(initialName);
+  const [email, setEmail] = useState(initialEmail);
   const [contact, setContact] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -55,6 +58,18 @@ export default function RegisterScreen({ route, navigation }) {
         'Registration Issue',
         err.message || 'Could not register account'
       );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleSuccess = async (googleToken) => {
+    setLoading(true);
+    try {
+      await googleRegister('owner', googleToken, contact);
+      Alert.alert('🎉 Welcome!', 'Account registered successfully with Google!');
+    } catch (err) {
+      Alert.alert('Registration Issue', err.message || 'Google registration failed');
     } finally {
       setLoading(false);
     }
@@ -142,6 +157,13 @@ export default function RegisterScreen({ route, navigation }) {
           onPress={handleRegister}
           disabled={loading}
           style={[styles.submitBtn, { backgroundColor: themeColor }]}
+        />
+
+        {/* Google Sign Up */}
+        <GoogleSignInButton
+          onAuthSuccess={handleGoogleSuccess}
+          text="Sign up with Google"
+          disabled={loading}
         />
 
         <View style={styles.footerRow}>

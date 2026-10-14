@@ -48,6 +48,187 @@ const generateToken = (id) => {
   });
 };
 
+// ─── GOOGLE OAUTH VERIFICATION & AUTHENTICATION ─────────────────────────────
+const { OAuth2Client } = require('google-auth-library');
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '908977180-dkg2d8h9109b4tvsnaf51scbmi4l09or.apps.googleusercontent.com';
+const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
+
+async function verifyGoogleToken(token) {
+  try {
+    // 1. Try verifying as Google ID Token (standard from Google Identity Services button)
+    const ticket = await googleClient.verifyIdToken({
+      idToken: token,
+      audience: GOOGLE_CLIENT_ID,
+    });
+    const payload = ticket.getPayload();
+    return {
+      email: payload.email,
+      name: payload.name || `${payload.given_name || ''} ${payload.family_name || ''}`.trim(),
+      picture: payload.picture || '',
+      sub: payload.sub,
+      email_verified: payload.email_verified,
+    };
+  } catch (idErr) {
+    // 2. Fallback: Verify as OAuth2 Access Token (e.g. from mobile Expo / browser popup)
+    try {
+      const resp = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (resp.ok) {
+        const info = await resp.json();
+        return {
+          email: info.email,
+          name: info.name || `${info.given_name || ''} ${info.family_name || ''}`.trim(),
+          picture: info.picture || '',
+          sub: info.sub,
+          email_verified: info.email_verified,
+        };
+      }
+    } catch (accessErr) {}
+    throw new Error('Invalid Google token: ' + idErr.message);
+  }
+}
+
+// @desc    Google Sign In (Strict database lookup: if not found, reject & prompt registration)
+// @route   POST /api/auth/google/login
+router.post('/google/login', async (req, res) => {
+  const { credential, idToken, accessToken, role } = req.body;
+  const token = credential || idToken || accessToken;
+  if (!token) {
+    return res.status(400).json({ message: 'Google credential/token is required.' });
+  }
+
+  try {
+    const googleUser = await verifyGoogleToken(token);
+    const normalizedEmail = (googleUser.email || '').trim().toLowerCase();
+
+    if (!normalizedEmail) {
+      return res.status(400).json({ message: 'Google account did not return a valid email address.' });
+    }
+
+    // Step 1: Query the database to check if user already exists
+    const query = { email: normalizedEmail };
+    if (role) {
+      query.role = role;
+    }
+    const user = await User.findOne(query);
+
+    // Step 2: If NOT found in database, do NOT log in. Require registration!
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        notFound: true,
+        message: 'No account found with this Google email. Please register/sign up first.',
+        email: normalizedEmail,
+        name: googleUser.name || '',
+        picture: googleUser.picture || '',
+      });
+    }
+
+    // Step 3: Check role mismatch
+    if (role && user.role !== role) {
+      return res.status(403).json({
+        message: `This account is registered as a ${user.role}. Please log in through the ${user.role} portal.`,
+      });
+    }
+
+    if (!user.uniqueId) {
+      user.uniqueId = await generateUniqueId(user.role);
+      await user.save();
+    }
+
+    // Update profile image if user doesn't have one and Google provides it
+    if ((!user.profileImage || user.profileImage === '') && googleUser.picture) {
+      user.profileImage = googleUser.picture;
+      await user.save();
+    }
+
+    res.json({
+      success: true,
+      _id: user._id,
+      uniqueId: user.uniqueId,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      accountCategory: user.accountCategory || 'standard',
+      organizationName: user.organizationName || '',
+      status: user.status,
+      contact: user.contact,
+      profileImage: user.profileImage || '',
+      vehicles: user.vehicles || [],
+      token: generateToken(user._id),
+      message: 'Google login successful.',
+    });
+  } catch (error) {
+    console.error('Google login error:', error);
+    res.status(401).json({ message: 'Google authentication failed: ' + error.message });
+  }
+});
+
+// @desc    Google Sign Up (Register new user with Google details)
+// @route   POST /api/auth/google/register
+router.post('/google/register', async (req, res) => {
+  const { credential, idToken, accessToken, role, contact, phone } = req.body;
+  const token = credential || idToken || accessToken;
+  if (!token) {
+    return res.status(400).json({ message: 'Google credential/token is required.' });
+  }
+
+  try {
+    const googleUser = await verifyGoogleToken(token);
+    const normalizedEmail = (googleUser.email || '').trim().toLowerCase();
+
+    if (!normalizedEmail) {
+      return res.status(400).json({ message: 'Google account did not return a valid email address.' });
+    }
+
+    const targetRole = role === 'owner' ? 'owner' : 'seeker';
+
+    // Check if user already exists
+    const existing = await User.findOne({ email: normalizedEmail, role: targetRole });
+    if (existing) {
+      return res.status(400).json({
+        message: `An account with this email already exists as a ${targetRole}. Please log in instead.`,
+        alreadyExists: true,
+      });
+    }
+
+    const uniqueId = await generateUniqueId(targetRole);
+    const randomPassword = Math.random().toString(36).slice(-10) + 'P@rk1!';
+
+    const user = await User.create({
+      uniqueId,
+      name: googleUser.name || 'PlanToPark User',
+      email: normalizedEmail,
+      password: randomPassword,
+      role: targetRole,
+      accountCategory: 'standard',
+      contact: contact || phone || '',
+      profileImage: googleUser.picture || '',
+      status: 'verified',
+    });
+
+    res.status(201).json({
+      success: true,
+      _id: user._id,
+      uniqueId: user.uniqueId,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      accountCategory: user.accountCategory,
+      status: user.status,
+      contact: user.contact,
+      profileImage: user.profileImage || '',
+      vehicles: user.vehicles || [],
+      token: generateToken(user._id),
+      message: 'Account registered successfully with Google.',
+    });
+  } catch (error) {
+    console.error('Google register error:', error);
+    res.status(401).json({ message: 'Google registration failed: ' + error.message });
+  }
+});
+
 // ─── ROLE-SPECIFIC REGISTRATION & AUTHENTICATION ENDPOINTS ───────────────────
 
 // @desc    Register a new parking seeker (or Bank / Auto Finance Repossession Department)

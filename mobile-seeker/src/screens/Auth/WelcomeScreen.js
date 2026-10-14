@@ -21,7 +21,7 @@ export default function WelcomeScreen({ navigation }) {
             style={styles.logoImage}
             resizeMode="contain"
           />
-          <Text style={styles.brandTitle}>Plan2Park Seeker</Text>
+          <Text style={styles.brandTitle}>PlanToPark Seeker</Text>
           <Text style={styles.tagline}>Park Smart. Find & Reserve Parking Spots Instantly.</Text>
         </View>
 

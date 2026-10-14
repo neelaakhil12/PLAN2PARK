@@ -183,6 +183,90 @@ export const AuthProvider = ({ children }) => {
     return localUpdatedUser;
   };
 
+  const googleLogin = async (role, token) => {
+    const baseUrl = await getBaseApiUrl();
+    const endpoint = `${baseUrl}/auth/google/login`;
+
+    let res;
+    try {
+      res = await fetch(endpoint, {
+        method: 'POST',
+        headers: COMMON_HEADERS,
+        body: JSON.stringify({ role, credential: token, idToken: token, accessToken: token }),
+      });
+    } catch (netErr) {
+      throw new Error('Cannot connect to server. Please check your internet connection.');
+    }
+
+    const data = await res.json();
+    if (!res.ok) {
+      const error = new Error(data.message || 'Google login failed');
+      error.notFound = data.notFound;
+      error.email = data.email;
+      error.name = data.name;
+      throw error;
+    }
+
+    const userData = {
+      _id: data._id,
+      name: data.name,
+      email: data.email,
+      role: data.role || role,
+      accountCategory: data.accountCategory || 'standard',
+      contact: data.contact,
+      status: data.status,
+      profileImage: data.profileImage || '',
+      vehicles: data.vehicles || [],
+    };
+
+    setToken(data.token);
+    setUser(userData);
+    await AsyncStorage.setItem('user_token', data.token);
+    await AsyncStorage.setItem('user_data', JSON.stringify(userData));
+
+    return userData;
+  };
+
+  const googleRegister = async (role, token, contact = '') => {
+    const baseUrl = await getBaseApiUrl();
+    const endpoint = `${baseUrl}/auth/google/register`;
+
+    let res;
+    try {
+      res = await fetch(endpoint, {
+        method: 'POST',
+        headers: COMMON_HEADERS,
+        body: JSON.stringify({ role, credential: token, idToken: token, accessToken: token, contact }),
+      });
+    } catch (netErr) {
+      throw new Error('Cannot connect to server. Please check your internet connection.');
+    }
+
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.message || 'Google registration failed');
+    }
+
+    const userData = {
+      _id: data._id,
+      name: data.name,
+      email: data.email,
+      role: data.role || role,
+      accountCategory: data.accountCategory || 'standard',
+      contact: data.contact,
+      status: data.status,
+      profileImage: data.profileImage || '',
+      vehicles: data.vehicles || [],
+    };
+
+    setToken(data.token);
+    setUser(userData);
+    await AsyncStorage.setItem('user_token', data.token);
+    await AsyncStorage.setItem('user_data', JSON.stringify(userData));
+
+    return userData;
+  };
+
   const logout = async () => {
     try {
       await AsyncStorage.removeItem('user_token');
@@ -196,7 +280,7 @@ export const AuthProvider = ({ children }) => {
 
   return (
     <AuthContext.Provider
-      value={{ user, token, loading, loginForRole, signupForRole, updateProfile, logout, setUser }}
+      value={{ user, token, loading, loginForRole, signupForRole, googleLogin, googleRegister, updateProfile, logout, setUser }}
     >
       {children}
     </AuthContext.Provider>

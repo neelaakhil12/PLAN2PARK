@@ -1,0 +1,107 @@
+import React, { useState, useEffect } from 'react';
+import { TouchableOpacity, Text, StyleSheet, ActivityIndicator, View } from 'react-native';
+import * as WebBrowser from 'expo-web-browser';
+import * as AuthSession from 'expo-auth-session';
+
+WebBrowser.maybeCompleteAuthSession();
+
+const GOOGLE_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID || '908977180-dkg2d8h9109b4tvsnaf51scbmi4l09or.apps.googleusercontent.com';
+
+const discovery = {
+  authorizationEndpoint: 'https://accounts.google.com/o/oauth2/v2/auth',
+  tokenEndpoint: 'https://oauth2.googleapis.com/token',
+  revocationEndpoint: 'https://oauth2.googleapis.com/revoke',
+};
+
+export default function GoogleSignInButton({ onAuthSuccess, text = 'Sign in with Google', disabled = false }) {
+  const [loading, setLoading] = useState(false);
+
+  const [request, response, promptAsync] = AuthSession.useAuthRequest(
+    {
+      clientId: GOOGLE_CLIENT_ID,
+      scopes: ['openid', 'profile', 'email'],
+      responseType: AuthSession.ResponseType.Token,
+      redirectUri: AuthSession.makeRedirectUri({ scheme: 'plantopark' }),
+    },
+    discovery
+  );
+
+  useEffect(() => {
+    if (response?.type === 'success') {
+      const { access_token, id_token } = response.params;
+      const token = id_token || access_token;
+      if (token) {
+        onAuthSuccess(token);
+      }
+    }
+  }, [response]);
+
+  return (
+    <TouchableOpacity
+      style={[styles.btn, (disabled || loading) && styles.disabled]}
+      onPress={() => promptAsync()}
+      disabled={disabled || loading || !request}
+      activeOpacity={0.8}
+    >
+      <View style={styles.content}>
+        {loading ? (
+          <ActivityIndicator size="small" color="#1e293b" />
+        ) : (
+          <>
+            <View style={styles.iconCircle}>
+              <Text style={styles.googleLetter}>G</Text>
+            </View>
+            <Text style={styles.txt}>{text}</Text>
+          </>
+        )}
+      </View>
+    </TouchableOpacity>
+  );
+}
+
+const styles = StyleSheet.create({
+  btn: {
+    backgroundColor: '#ffffff',
+    borderWidth: 1.5,
+    borderColor: '#e2e8f0',
+    borderRadius: 14,
+    paddingVertical: 13,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginVertical: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  disabled: {
+    opacity: 0.6,
+  },
+  content: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  iconCircle: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#4285F4',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  googleLetter: {
+    color: '#ffffff',
+    fontWeight: '900',
+    fontSize: 13,
+    lineHeight: 15,
+  },
+  txt: {
+    color: '#1e293b',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+});

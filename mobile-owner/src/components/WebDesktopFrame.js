@@ -23,7 +23,7 @@ export default function WebDesktopFrame({ children, downloadUrl = "https://expo.
   useEffect(() => {
     if (Platform.OS === 'web' && typeof document !== 'undefined') {
       document.body.style.backgroundColor = '#0b0f19';
-      const styleId = 'plan2park-web-scrollbars';
+      const styleId = 'plantopark-web-scrollbars';
       if (!document.getElementById(styleId)) {
         const style = document.createElement('style');
         style.id = styleId;
@@ -84,7 +84,7 @@ export default function WebDesktopFrame({ children, downloadUrl = "https://expo.
       {/* Big Right-Side Vertically Centered Play Store Download Card (Shown on Wide Desktops) */}
       {showSidePanel && (
         <View style={styles.rightSidePanel}>
-          <Text style={styles.panelTitle}>Get Plan2Park Owner App</Text>
+          <Text style={styles.panelTitle}>Get PlanToPark Owner App</Text>
           <Text style={styles.panelSubtitle}>Install directly on your Android phone</Text>
 
           <TouchableOpacity style={styles.downloadBtnBig} onPress={handleDownload} activeOpacity={0.85}>

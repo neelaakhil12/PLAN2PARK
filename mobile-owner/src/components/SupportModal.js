@@ -61,19 +61,19 @@ export default function SupportModal({ visible, onClose, isStorageYard = false }
   const handleCall = () => {
     const cleanNumber = activePhone.replace(/[^\d+]/g, '');
     Linking.openURL(`tel:${cleanNumber}`).catch(() => {
-      alert(`Plan2Park Support Phone: ${activePhone}`);
+      alert(`PlanToPark Support Phone: ${activePhone}`);
     });
   };
 
   const handleEmail = () => {
-    Linking.openURL(`mailto:${activeEmail}?subject=Support Request - Plan2Park Host Desk`).catch(() => {
-      alert(`Plan2Park Support Email: ${activeEmail}`);
+    Linking.openURL(`mailto:${activeEmail}?subject=Support Request - PlanToPark Host Desk`).catch(() => {
+      alert(`PlanToPark Support Email: ${activeEmail}`);
     });
   };
 
   const handleWhatsapp = () => {
     const cleanNumber = activeWhatsapp.replace(/[^\d]/g, '');
-    const url = `https://wa.me/${cleanNumber}?text=Hello%20Plan2Park%20Support%2C%20I%20am%20a%20host%20requesting%20assistance.`;
+    const url = `https://wa.me/${cleanNumber}?text=Hello%20PlanToPark%20Support%2C%20I%20am%20a%20host%20requesting%20assistance.`;
     Linking.openURL(url).catch(() => {
       alert(`WhatsApp Number: ${activeWhatsapp}`);
     });
@@ -94,7 +94,7 @@ export default function SupportModal({ visible, onClose, isStorageYard = false }
                 {isStorageYard ? '🚜 Storage Yard Help Desk' : '✉️ Owner Support Desk'}
               </Text>
               <Text style={styles.subtitle}>
-                Official Plan2Park Support • Email Concierge Assistance
+                Official PlanToPark Support • Email Concierge Assistance
               </Text>
             </View>
             <TouchableOpacity style={styles.closeBtn} onPress={onClose} activeOpacity={0.7}>
@@ -107,7 +107,7 @@ export default function SupportModal({ visible, onClose, isStorageYard = false }
             <View style={styles.priorityCard}>
               <Text style={styles.priorityTitle}>Need Help or Have a Query?</Text>
               <Text style={styles.priorityDesc}>
-                Connect directly with the Plan2Park platform management and operations desk for spot listings, vehicle repossession holding, gate inquiries, or wallet payouts.
+                Connect directly with the PlanToPark platform management and operations desk for spot listings, vehicle repossession holding, gate inquiries, or wallet payouts.
               </Text>
 
               {/* Email Button */}

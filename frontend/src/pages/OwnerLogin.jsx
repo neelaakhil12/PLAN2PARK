@@ -2,9 +2,10 @@ import React, { useState, useContext } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import { Mail, Lock, AlertCircle, ArrowRight, Eye, EyeOff } from 'lucide-react';
+import GoogleAuthButton from '../components/GoogleAuthButton';
 
 const OwnerLogin = () => {
-  const { loginForRole } = useContext(AuthContext);
+  const { loginForRole, googleLogin } = useContext(AuthContext);
   const navigate = useNavigate();
 
   const [email, setEmail] = useState('');
@@ -23,6 +24,26 @@ const OwnerLogin = () => {
       navigate('/owner/dashboard');
     } catch (err) {
       setError(err.message || 'Invalid email or password');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleSuccess = async (credential) => {
+    setError('');
+    setLoading(true);
+    try {
+      await googleLogin(credential, 'owner');
+      navigate('/owner/dashboard');
+    } catch (err) {
+      if (err.notFound) {
+        setError('No owner account found with this Google email. Redirecting you to sign up...');
+        setTimeout(() => {
+          navigate(`/owner/register?email=${encodeURIComponent(err.email || '')}&name=${encodeURIComponent(err.name || '')}`);
+        }, 1800);
+      } else {
+        setError(err.message || 'Google sign in failed');
+      }
     } finally {
       setLoading(false);
     }
@@ -112,7 +133,24 @@ const OwnerLogin = () => {
             </button>
           </form>
 
-          <p className="text-center text-sm text-slate-500 mt-6">
+          {/* Divider */}
+          <div className="relative my-5">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-slate-200" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-white px-3 text-slate-400 font-bold">Or continue with</span>
+            </div>
+          </div>
+
+          {/* Google Sign In Button */}
+          <GoogleAuthButton
+            onCredentialSuccess={handleGoogleSuccess}
+            text="signin_with"
+            disabled={loading}
+          />
+
+          <p className="text-center text-sm text-slate-500 mt-5">
             Don't have an account?{' '}
             <Link
               to="/owner/register"

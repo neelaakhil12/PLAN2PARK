@@ -121,7 +121,7 @@ export default function AppNavigator() {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <Text style={styles.loadingLogo}>🅿️ Plan2Park</Text>
+        <Text style={styles.loadingLogo}>🅿️ PlanToPark</Text>
         <Text style={styles.loadingTxt}>Loading Parking Seeker App...</Text>
       </View>
     );
