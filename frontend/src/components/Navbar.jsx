@@ -2,7 +2,7 @@ import React, { useContext, useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import {
-  Bell, ChevronDown, User, LogOut, Search, BookOpen,
+  ChevronDown, User, LogOut, Search, BookOpen,
   Clock, Heart, MessageSquare, LayoutDashboard, Menu, X,
   MapPin, Car, Wallet, Plus
 } from 'lucide-react';
@@ -16,20 +16,15 @@ const Navbar = () => {
 
   // Dropdown states — all start CLOSED
   const [profileOpen, setProfileOpen] = useState(false);
-  const [notifOpen, setNotifOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const profileRef = useRef(null);
-  const notifRef = useRef(null);
 
   // Close dropdowns when clicking outside
   useEffect(() => {
     const handler = (e) => {
       if (profileRef.current && !profileRef.current.contains(e.target)) {
         setProfileOpen(false);
-      }
-      if (notifRef.current && !notifRef.current.contains(e.target)) {
-        setNotifOpen(false);
       }
     };
     document.addEventListener('mousedown', handler);
@@ -39,7 +34,6 @@ const Navbar = () => {
   // Close dropdowns on route change
   useEffect(() => {
     setProfileOpen(false);
-    setNotifOpen(false);
     setMobileOpen(false);
   }, [location.pathname, location.search]);
 
@@ -90,13 +84,6 @@ const Navbar = () => {
     return currentView === view;
   };
 
-  // Sample notifications (in production, fetch from API / context)
-  const notifications = [
-    { id: 1, text: 'Your booking at Indiranagar spot has been confirmed', time: '5m ago', read: false },
-    { id: 2, text: 'Payment of ₹450 processed successfully', time: '1h ago', read: false },
-    { id: 3, text: 'New parking space available near your area', time: '3h ago', read: true },
-  ];
-  const unreadCount = notifications.filter(n => !n.read).length;
 
   return (
     <nav className="sticky top-0 z-50 w-full bg-white border-b border-slate-200 shadow-sm font-sans">
@@ -198,61 +185,10 @@ const Navbar = () => {
                 {user.role === 'seeker' ? '🅿️ I want parking' : user.role === 'owner' ? '🅿️ I have parking' : 'Admin'}
               </span>
 
-              {/* ── NOTIFICATION BELL ─────────────────────────────────── */}
-              <div className="relative" ref={notifRef}>
-                <button
-                  onClick={() => { setNotifOpen(v => !v); setProfileOpen(false); }}
-                  className="relative p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-full transition-colors"
-                  aria-label="Notifications"
-                >
-                  <Bell className="h-[18px] w-[18px]" />
-                  {unreadCount > 0 && (
-                    <span className="absolute top-1 right-1 h-4 w-4 bg-rose-500 rounded-full flex items-center justify-center text-white text-[9px] font-black leading-none">
-                      {unreadCount}
-                    </span>
-                  )}
-                </button>
-
-                {/* Notification Dropdown */}
-                {notifOpen && (
-                  <div className="absolute right-0 mt-2 w-[min(320px,90vw)] bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden z-50 animate-fadeIn">
-                    <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
-                      <h3 className="font-bold text-slate-800 text-sm">Notifications</h3>
-                      {unreadCount > 0 && (
-                        <span className="text-[11px] font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
-                          {unreadCount} new
-                        </span>
-                      )}
-                    </div>
-                    <div className="divide-y divide-slate-50 max-h-72 overflow-y-auto">
-                      {notifications.map(n => (
-                        <div
-                          key={n.id}
-                          className={`px-4 py-3 flex items-start gap-3 cursor-pointer transition-colors hover:bg-slate-50 ${!n.read ? 'bg-emerald-50/20' : ''}`}
-                        >
-                          <span className={`mt-1.5 h-2 w-2 rounded-full shrink-0 ${n.read ? 'bg-slate-300' : 'bg-emerald-500'}`} />
-                          <div className="flex-1 min-w-0">
-                            <p className={`text-xs leading-relaxed ${n.read ? 'text-slate-500' : 'text-slate-800 font-medium'}`}>
-                              {n.text}
-                            </p>
-                            <p className="text-[10px] text-slate-400 mt-0.5 font-medium">{n.time}</p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                    <div className="px-4 py-2.5 border-t border-slate-100 text-center bg-slate-50/50">
-                      <button className="text-xs font-semibold text-emerald-600 hover:text-emerald-700 transition-colors">
-                        View all notifications
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-
               {/* ── PROFILE DROPDOWN ──────────────────────────────────── */}
               <div className="relative" ref={profileRef}>
                 <button
-                  onClick={() => { setProfileOpen(v => !v); setNotifOpen(false); }}
+                  onClick={() => setProfileOpen(v => !v)}
                   className="flex items-center gap-1.5 pl-1 pr-2 py-1 rounded-full border border-slate-200 hover:border-emerald-300 hover:bg-slate-50 transition-all"
                   aria-label="Profile menu"
                 >
