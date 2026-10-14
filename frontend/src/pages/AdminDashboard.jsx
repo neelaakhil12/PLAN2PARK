@@ -1533,7 +1533,7 @@ const AdminDashboard = () => {
                         Platform Financial & Payout Rules
                       </h3>
                       <p className="text-xs text-slate-500 mt-0.5">
-                        These rates directly govern space owner earnings and payout withdrawal eligibility across Plan2Park.
+                        These rates directly govern space owner earnings and payout withdrawal eligibility across PlanToPark.
                       </p>
                     </div>
 
@@ -1551,7 +1551,7 @@ const AdminDashboard = () => {
                             </span>
                           </div>
                           <p className="text-xs text-slate-500 mb-4 leading-relaxed">
-                            Percentage retained by Plan2Park from each completed booking. The remaining amount is credited directly to the space owner's wallet.
+                            Percentage retained by PlanToPark from each completed booking. The remaining amount is credited directly to the space owner's wallet.
                           </p>
                           <div className="relative">
                             <input
@@ -1566,7 +1566,7 @@ const AdminDashboard = () => {
                             <span className="absolute right-3.5 top-2.5 text-sm text-slate-400 font-bold">%</span>
                           </div>
                           <div className="mt-3 text-[11px] text-slate-600 font-medium bg-white/80 p-2.5 rounded-lg border border-slate-200">
-                            💡 Example: On a ₹100 booking, Plan2Park keeps <strong>₹{Number(commissionInput) || 0}</strong> and the space host receives <strong>₹{Math.max(0, 100 - (Number(commissionInput) || 0))}</strong>.
+                            💡 Example: On a ₹100 booking, PlanToPark keeps <strong>₹{Number(commissionInput) || 0}</strong> and the space host receives <strong>₹{Math.max(0, 100 - (Number(commissionInput) || 0))}</strong>.
                           </div>
                         </div>
 
@@ -2645,7 +2645,7 @@ const AdminDashboard = () => {
                             <span className="text-lg">✉️</span> Official Platform Support Desk & Email Settings
                           </h3>
                           <p className="text-xs text-slate-500 mt-0.5">
-                            Configure the official Plan2Park support email and customer response note. Updates reflect instantly across Space Owner App, Seeker App, and Web Dashboards.
+                            Configure the official PlanToPark support email and customer response note. Updates reflect instantly across Space Owner App, Seeker App, and Web Dashboards.
                           </p>
                         </div>
                         {supportSettingsSuccess && (

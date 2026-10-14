@@ -1508,7 +1508,7 @@ const OwnerDashboard = () => {
                 </span>
                 <h3 className="text-lg font-black text-slate-900 mt-2">📞 24/7 Owner Support Desk</h3>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Official Plan2Park Support • Immediate assistance for space listings &amp; yard operations.
+                  Official PlanToPark Support • Immediate assistance for space listings &amp; yard operations.
                 </p>
               </div>
 
@@ -1528,7 +1528,7 @@ const OwnerDashboard = () => {
                 </a>
 
                 <a
-                  href={`https://wa.me/${(supportContacts.supportWhatsapp || supportContacts.supportPhone || '918919360467').replace(/[^\d]/g, '')}?text=Hello%20Plan2Park%20Support%2C%20I%20am%20a%20host%20requesting%20assistance.`}
+                  href={`https://wa.me/${(supportContacts.supportWhatsapp || supportContacts.supportPhone || '918919360467').replace(/[^\d]/g, '')}?text=Hello%20PlanToPark%20Support%2C%20I%20am%20a%20host%20requesting%20assistance.`}
                   target="_blank"
                   rel="noreferrer"
                   className="flex items-center justify-between p-3.5 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-2xl text-emerald-900 font-bold text-xs transition-colors"

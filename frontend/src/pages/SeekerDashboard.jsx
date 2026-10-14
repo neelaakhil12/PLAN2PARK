@@ -2994,7 +2994,7 @@ const SeekerDashboard = () => {
                   ✉️ Customer Support Desk
                 </h3>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Official Plan2Park Support • Email assistance for bookings, slots, and inquiries.
+                  Official PlanToPark Support • Email assistance for bookings, slots, and inquiries.
                 </p>
               </div>
 

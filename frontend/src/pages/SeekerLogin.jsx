@@ -1,17 +1,11 @@
 import React, { useState, useContext } from 'react';
-import { useNavigate, Link, useSearchParams } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
-import { Mail, Lock, AlertCircle, ArrowRight, Car, Landmark, Eye, EyeOff } from 'lucide-react';
+import { Mail, Lock, AlertCircle, ArrowRight, Eye, EyeOff } from 'lucide-react';
 
 const SeekerLogin = () => {
   const { loginForRole } = useContext(AuthContext);
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-
-  const [category, setCategory] = useState(
-    searchParams.get('category') === 'bank_finance_seeker' ? 'bank_finance_seeker' : 'standard'
-  );
-  const isBankSeeker = category === 'bank_finance_seeker';
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -40,37 +34,15 @@ const SeekerLogin = () => {
         {/* Brand Header */}
         <div className="text-center mb-6">
           <Link to="/" className="inline-flex items-center gap-2 mb-3">
-            <img src="/logo.png" alt="Plan2Park" className="h-10 w-10 object-contain rounded" />
-            <span className="font-black text-2xl text-slate-900 tracking-tight">Plan<span className="text-blue-600">2</span>Park</span>
+            <img src="/logo.png" alt="PlanToPark" className="h-10 w-10 object-contain rounded" />
+            <span className="font-black text-2xl text-slate-900 tracking-tight">Plan<span className="text-blue-600">To</span>Park</span>
           </Link>
           <h1 className="text-2xl sm:text-3xl font-black text-slate-900 font-sans">
-            {isBankSeeker ? 'Banks & Auto Finance Login' : 'Parking Seeker Login'}
+            Parking Seeker Login
           </h1>
           <p className="text-slate-500 text-xs sm:text-sm mt-1">
-            {isBankSeeker ? 'Locate & manage secure repossession storage stockyards' : 'Sign in to search, book and navigate to parking spaces'}
+            Sign in to search, book and navigate to parking spaces
           </p>
-        </div>
-
-        {/* Portal Switcher Tabs */}
-        <div className="flex bg-slate-200 p-1 rounded-xl mb-5 text-xs font-bold">
-          <button
-            type="button"
-            onClick={() => setCategory('standard')}
-            className={`flex-1 py-2.5 rounded-lg transition-all flex items-center justify-center gap-1.5 ${
-              !isBankSeeker ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <Car className="h-3.5 w-3.5" /> Parking Seeker
-          </button>
-          <button
-            type="button"
-            onClick={() => setCategory('bank_finance_seeker')}
-            className={`flex-1 py-2.5 rounded-lg transition-all flex items-center justify-center gap-1.5 ${
-              isBankSeeker ? 'bg-cyan-600 text-white font-black shadow-sm' : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <Landmark className="h-3.5 w-3.5" /> Banks & Auto Finance
-          </button>
         </div>
 
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 sm:p-8">
@@ -84,7 +56,7 @@ const SeekerLogin = () => {
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* Email */}
             <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">Official Email Address</label>
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">Email Address</label>
               <div className="relative">
                 <Mail className="absolute left-3.5 top-3.5 h-4 w-4 text-slate-400" />
                 <input
@@ -127,11 +99,7 @@ const SeekerLogin = () => {
             <button
               type="submit"
               disabled={loading}
-              className={`w-full font-bold py-3.5 rounded-xl transition-all shadow-md flex items-center justify-center gap-2 text-sm disabled:opacity-60 mt-2 ${
-                isBankSeeker
-                  ? 'bg-cyan-600 hover:bg-cyan-700 text-white font-black shadow-cyan-600/20'
-                  : 'bg-blue-600 hover:bg-blue-700 text-white shadow-blue-600/20'
-              }`}
+              className="w-full font-bold py-3.5 rounded-xl transition-all shadow-md flex items-center justify-center gap-2 text-sm disabled:opacity-60 mt-2 bg-blue-600 hover:bg-blue-700 text-white shadow-blue-600/20"
             >
               {loading ? (
                 <>
@@ -139,7 +107,7 @@ const SeekerLogin = () => {
                   Signing In...
                 </>
               ) : (
-                <>{isBankSeeker ? 'Sign In as Auto Finance Team' : 'Sign In as Seeker'} <ArrowRight className="h-4 w-4" /></>
+                <>Sign In (I want parking) <ArrowRight className="h-4 w-4" /></>
               )}
             </button>
           </form>
@@ -147,7 +115,7 @@ const SeekerLogin = () => {
           <p className="text-center text-sm text-slate-500 mt-6">
             Don't have an account?{' '}
             <Link
-              to={isBankSeeker ? "/seeker/register?category=bank_finance_seeker" : "/seeker/register"}
+              to="/seeker/register"
               className="text-blue-600 font-bold hover:underline"
             >
               Sign up free
@@ -156,7 +124,7 @@ const SeekerLogin = () => {
 
           <div className="border-t border-slate-100 mt-5 pt-4 text-center">
             <Link to="/owner/login" className="text-xs text-slate-400 hover:text-slate-600 font-semibold">
-              Are you a Parking Owner or Storage Yard Partner? Host Login →
+              Are you a Parking Owner? (I have parking) Click here to Login →
             </Link>
           </div>
         </div>

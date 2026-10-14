@@ -9,16 +9,16 @@ const Footer = () => {
         <div className="flex flex-col md:flex-row justify-between gap-8 mb-8">
           <div>
             <div className="flex items-center gap-3 mb-3">
-              <img src="/logo.png" alt="Plan2Park" className="h-9 w-9 object-contain rounded drop-shadow-sm" />
+              <img src="/logo.png" alt="PlanToPark" className="h-9 w-9 object-contain rounded drop-shadow-sm" />
               <div className="flex flex-col">
                 <span className="font-extrabold text-xl text-slate-900 tracking-tight font-sans">
-                  Plan<span className="text-blue-600">2</span>Park
+                  Plan<span className="text-blue-600">to</span>Park
                 </span>
-                <span className="text-[9px] uppercase tracking-widest text-blue-600 font-bold">Smart Park • Vehicle Storage</span>
+                <span className="text-[9px] uppercase tracking-widest text-slate-400 font-bold">Smart Park • Smart Earn</span>
               </div>
             </div>
             <p className="text-slate-500 text-sm max-w-xs">
-              India's premier smart parking and commercial vehicle storage platform for drivers, hosts, and bank recovery fleets.
+              India's most trusted peer-to-peer parking network. Connecting drivers with verified parking hosts.
             </p>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-8 text-sm">
@@ -27,8 +27,6 @@ const Footer = () => {
               <ul className="space-y-2 text-slate-500">
                 <li><Link to="/seeker/login" className="hover:text-blue-600 transition-colors">Find Parking</Link></li>
                 <li><Link to="/owner/login" className="hover:text-blue-600 transition-colors">List Parking Space</Link></li>
-                <li><Link to="/owner/login?category=vehicle_storage_owner" className="hover:text-amber-600 font-bold transition-colors">1+ Acre Vehicle Storage</Link></li>
-                <li><Link to="/seeker/login?category=bank_finance_seeker" className="hover:text-cyan-600 font-bold transition-colors">Banks & Repo Yards</Link></li>
               </ul>
             </div>
             <div>

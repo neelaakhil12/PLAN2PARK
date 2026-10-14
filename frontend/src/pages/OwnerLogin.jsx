@@ -1,17 +1,11 @@
 import React, { useState, useContext } from 'react';
-import { useNavigate, Link, useSearchParams } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
-import { Mail, Lock, AlertCircle, ArrowRight, Building2, Eye, EyeOff, ShieldCheck } from 'lucide-react';
+import { Mail, Lock, AlertCircle, ArrowRight, Eye, EyeOff } from 'lucide-react';
 
 const OwnerLogin = () => {
   const { loginForRole } = useContext(AuthContext);
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-
-  const [category, setCategory] = useState(
-    searchParams.get('category') === 'vehicle_storage_owner' ? 'vehicle_storage_owner' : 'standard'
-  );
-  const isStorageYard = category === 'vehicle_storage_owner';
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -40,53 +34,16 @@ const OwnerLogin = () => {
         {/* Brand Header */}
         <div className="text-center mb-6">
           <Link to="/" className="inline-flex items-center gap-2 mb-3">
-            <img src="/logo.png" alt="Plan2Park" className="h-10 w-10 object-contain rounded" />
-            <span className="font-black text-2xl text-slate-900 tracking-tight">Plan<span className="text-blue-600">2</span>Park</span>
+            <img src="/logo.png" alt="PlanToPark" className="h-10 w-10 object-contain rounded" />
+            <span className="font-black text-2xl text-slate-900 tracking-tight">Plan<span className="text-blue-600">To</span>Park</span>
           </Link>
           <h1 className="text-2xl sm:text-3xl font-black text-slate-900 font-sans">
-            {isStorageYard ? 'Vehicle Storage Partner Login' : 'Host / Landowner Login'}
+            Host / Landowner Login
           </h1>
           <p className="text-slate-500 text-xs sm:text-sm mt-1">
-            {isStorageYard ? 'Access your 1+ Acre bank repossession stockyard dashboard' : 'Sign in to manage parking listings & track earnings'}
+            Sign in to manage parking listings &amp; track earnings
           </p>
         </div>
-
-        {/* Portal Switcher Tabs */}
-        <div className="flex bg-slate-200 p-1 rounded-xl mb-5 text-xs font-bold">
-          <button
-            type="button"
-            onClick={() => setCategory('standard')}
-            className={`flex-1 py-2.5 rounded-lg transition-all flex items-center justify-center gap-1.5 ${
-              !isStorageYard ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <Building2 className="h-3.5 w-3.5" /> Parking Host
-          </button>
-          <button
-            type="button"
-            onClick={() => setCategory('vehicle_storage_owner')}
-            className={`flex-1 py-2.5 rounded-lg transition-all flex items-center justify-center gap-1.5 ${
-              isStorageYard ? 'bg-amber-500 text-slate-950 font-black shadow-sm' : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <ShieldCheck className="h-3.5 w-3.5" /> Vehicle Storage (1+ Ac)
-          </button>
-        </div>
-
-        {/* Mandatory Policy Warning for Storage Yard */}
-        {isStorageYard && (
-          <div className="bg-amber-500/10 border-2 border-amber-400 rounded-2xl p-4 mb-5 text-left">
-            <div className="flex items-center gap-2 mb-1">
-              <span className="text-lg">⚠️</span>
-              <span className="text-xs font-black uppercase text-amber-950 tracking-wider">
-                MANDATORY POLICY REQUIREMENT
-              </span>
-            </div>
-            <p className="text-xs text-amber-900 leading-relaxed font-medium">
-              Authorized Vehicle Storage Partner registration strictly requires <strong className="font-extrabold text-amber-950 underline decoration-amber-500">minimum 1.0 Acre contiguous land</strong> with compound wall or fencing for secure bank repossession fleets.
-            </p>
-          </div>
-        )}
 
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 sm:p-8">
           {error && (
@@ -142,11 +99,7 @@ const OwnerLogin = () => {
             <button
               type="submit"
               disabled={loading}
-              className={`w-full font-bold py-3.5 rounded-xl transition-all shadow-md flex items-center justify-center gap-2 text-sm disabled:opacity-60 mt-2 ${
-                isStorageYard
-                  ? 'bg-amber-500 hover:bg-amber-600 text-slate-950 font-black shadow-amber-500/20'
-                  : 'bg-blue-600 hover:bg-blue-700 text-white shadow-blue-600/20'
-              }`}
+              className="w-full font-bold py-3.5 rounded-xl transition-all shadow-md flex items-center justify-center gap-2 text-sm disabled:opacity-60 mt-2 bg-blue-600 hover:bg-blue-700 text-white shadow-blue-600/20"
             >
               {loading ? (
                 <>
@@ -154,7 +107,7 @@ const OwnerLogin = () => {
                   Signing In...
                 </>
               ) : (
-                <>{isStorageYard ? 'Sign In to Storage Dashboard' : 'Sign In as Host'} <ArrowRight className="h-4 w-4" /></>
+                <>Sign In (I have parking) <ArrowRight className="h-4 w-4" /></>
               )}
             </button>
           </form>
@@ -162,7 +115,7 @@ const OwnerLogin = () => {
           <p className="text-center text-sm text-slate-500 mt-6">
             Don't have an account?{' '}
             <Link
-              to={isStorageYard ? "/owner/register?category=vehicle_storage_owner" : "/owner/register"}
+              to="/owner/register"
               className="text-blue-600 font-bold hover:underline"
             >
               Sign up free
@@ -171,7 +124,7 @@ const OwnerLogin = () => {
 
           <div className="border-t border-slate-100 mt-5 pt-4 text-center">
             <Link to="/seeker/login" className="text-xs text-slate-400 hover:text-slate-600 font-semibold">
-              Looking for Parking or Bank Repo Yards? Seeker / Bank Login →
+              Are you a Parking Seeker? (I want parking) Click here to Login →
             </Link>
           </div>
         </div>
