@@ -19,6 +19,7 @@ const DEFAULT_SUPPORT = {
   supportEmail: 'plantopark@gmail.com',
   supportWhatsapp: '+91 8919360467',
   supportHours: '24/7 Dedicated Support Desk',
+  supportResponseNote: 'Contact us through email. If you have any query, response will be received within 24 to 48 hours.',
   seekerSupportPhone: '+91 8919360467',
   seekerSupportEmail: 'plantopark@gmail.com',
   bankFinanceSupportPhone: '+91 8919360467',
@@ -47,22 +48,9 @@ export default function SupportModal({ visible, onClose, isBankFinance = false }
     }
   };
 
-  const activePhone = isBankFinance
-    ? (supportData.bankFinanceSupportPhone || supportData.supportPhone)
-    : (supportData.seekerSupportPhone || supportData.supportPhone);
-
   const activeEmail = isBankFinance
     ? (supportData.bankFinanceSupportEmail || supportData.supportEmail)
     : (supportData.seekerSupportEmail || supportData.supportEmail);
-
-  const activeWhatsapp = supportData.supportWhatsapp || activePhone;
-
-  const handleCall = () => {
-    const cleanNumber = activePhone.replace(/[^\d+]/g, '');
-    Linking.openURL(`tel:${cleanNumber}`).catch(() => {
-      alert(`PlanToPark Support Phone: ${activePhone}`);
-    });
-  };
 
   const handleEmail = () => {
     const subject = isBankFinance
@@ -70,17 +58,6 @@ export default function SupportModal({ visible, onClose, isBankFinance = false }
       : 'Parking Support Inquiry - PlanToPark Help Desk';
     Linking.openURL(`mailto:${activeEmail}?subject=${encodeURIComponent(subject)}`).catch(() => {
       alert(`PlanToPark Support Email: ${activeEmail}`);
-    });
-  };
-
-  const handleWhatsapp = () => {
-    const cleanNumber = activeWhatsapp.replace(/[^\d]/g, '');
-    const msg = isBankFinance
-      ? 'Hello PlanToPark Support, I am an authorized Bank Recovery / Fleet representative requesting support.'
-      : 'Hello PlanToPark Support, I am a parking seeker requesting assistance with my booking.';
-    const url = `https://wa.me/${cleanNumber}?text=${encodeURIComponent(msg)}`;
-    Linking.openURL(url).catch(() => {
-      alert(`WhatsApp Number: ${activeWhatsapp}`);
     });
   };
 
@@ -93,13 +70,13 @@ export default function SupportModal({ visible, onClose, isBankFinance = false }
             <View style={{ flex: 1 }}>
               <View style={styles.badgeRow}>
                 <View style={styles.liveDot} />
-                <Text style={styles.badgeTxt}>LIVE 24/7 HELPDESK</Text>
+                <Text style={styles.badgeTxt}>OFFICIAL HELPDESK</Text>
               </View>
               <Text style={styles.title}>
-                {isBankFinance ? '🏦 Bank & Fleet Support Desk' : '📞 24/7 Customer Support Desk'}
+                {isBankFinance ? '🏦 Bank & Fleet Support Desk' : '✉️ Customer Support Desk'}
               </Text>
               <Text style={styles.subtitle}>
-                Official PlanToPark Support • Immediate Concierge & Emergency Assistance
+                Official PlanToPark Support • Email Assistance
               </Text>
             </View>
             <TouchableOpacity style={styles.closeBtn} onPress={onClose} activeOpacity={0.7}>
@@ -110,44 +87,16 @@ export default function SupportModal({ visible, onClose, isBankFinance = false }
           <ScrollView style={styles.body} showsVerticalScrollIndicator={false}>
             {/* Main Action Card */}
             <View style={styles.priorityCard}>
-              <Text style={styles.priorityTitle}>We're Available Around the Clock</Text>
+              <Text style={styles.priorityTitle}>Need Help or Have a Query?</Text>
               <Text style={styles.priorityDesc}>
                 {isBankFinance
                   ? 'Connect with dedicated bank liaison officers for staging yard inquiries, impounded vehicle release passes, and corporate billing.'
-                  : 'Get rapid assistance for parking spot directions, gate access issues, booking extensions, or refund requests.'}
+                  : 'Connect directly with the PlanToPark support desk for parking spot directions, gate access issues, booking assistance, or refund requests.'}
               </Text>
-
-              {/* Direct Call Button */}
-              <TouchableOpacity
-                style={styles.actionBtnPrimary}
-                onPress={handleCall}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.actionBtnIcon}>📞</Text>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.actionBtnLabel}>Call Support Hotline</Text>
-                  <Text style={styles.actionBtnVal}>{activePhone}</Text>
-                </View>
-                <Text style={styles.actionBtnArrow}>→</Text>
-              </TouchableOpacity>
-
-              {/* WhatsApp Button */}
-              <TouchableOpacity
-                style={styles.actionBtnWhatsapp}
-                onPress={handleWhatsapp}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.actionBtnIcon}>💬</Text>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.actionBtnLabel}>Chat on WhatsApp</Text>
-                  <Text style={styles.actionBtnVal}>{activeWhatsapp}</Text>
-                </View>
-                <Text style={styles.actionBtnArrow}>→</Text>
-              </TouchableOpacity>
 
               {/* Email Button */}
               <TouchableOpacity
-                style={styles.actionBtnEmail}
+                style={styles.actionBtnPrimary}
                 onPress={handleEmail}
                 activeOpacity={0.8}
               >
@@ -160,21 +109,15 @@ export default function SupportModal({ visible, onClose, isBankFinance = false }
               </TouchableOpacity>
             </View>
 
-            {/* Operating Hours & Guarantee */}
+            {/* Expected Response Time Note */}
             <View style={styles.infoBox}>
               <View style={styles.infoRow}>
                 <Text style={styles.infoIcon}>⏱️</Text>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.infoLabel}>Helpdesk Availability</Text>
-                  <Text style={styles.infoVal}>{supportData.supportHours}</Text>
-                </View>
-              </View>
-              <View style={styles.infoDivider} />
-              <View style={styles.infoRow}>
-                <Text style={styles.infoIcon}>⚡</Text>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.infoLabel}>Direct Resolution SLA</Text>
-                  <Text style={styles.infoVal}>Immediate phone response • Instant WhatsApp concierge</Text>
+                  <Text style={styles.infoLabel}>Response Time</Text>
+                  <Text style={styles.infoVal}>
+                    {supportData.supportResponseNote || 'Contact us through email. If you have any query, response will be received within 24 to 48 hours.'}
+                  </Text>
                 </View>
               </View>
             </View>
