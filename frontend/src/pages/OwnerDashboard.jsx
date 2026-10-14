@@ -557,8 +557,8 @@ const OwnerDashboard = () => {
               </div>
             )}
 
-            {/* Add Spot Promo Banners */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Add Spot Promo Banner */}
+            <div className="w-full">
               <div
                 onClick={() => {
                   setEditingSpot(null);
@@ -579,43 +579,12 @@ const OwnerDashboard = () => {
                   →
                 </span>
               </div>
-
-              <div
-                onClick={() => {
-                  setEditingSpot(null);
-                  setSpotForm(p => ({
-                    ...p,
-                    spaceCategory: 'commercial_vehicle_storage',
-                    landAcres: user?.landAcres ? String(user.landAcres) : '1.0',
-                    monthlyStorageRate: '1500',
-                  }));
-                  setCurrentView('add_spot');
-                }}
-                className="bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-amber-300 hover:border-amber-500 rounded-3xl p-6 shadow-sm cursor-pointer flex items-center justify-between gap-4 transition-all hover:shadow-md group"
-              >
-                <div>
-                  <div className="flex items-center gap-2 mb-1">
-                    <h3 className="text-base font-black text-amber-950 group-hover:text-amber-700 transition-colors">
-                      🏢 List Vehicle Storage Yard
-                    </h3>
-                    <span className="text-[10px] font-black bg-amber-200 text-amber-900 px-2 py-0.5 rounded">
-                      MIN 1 ACRE
-                    </span>
-                  </div>
-                  <p className="text-xs text-amber-900/80">
-                    Monetize 1+ Acre land for bank repossessed vehicle holding contracts
-                  </p>
-                </div>
-                <span className="h-10 w-10 bg-amber-500 text-white rounded-2xl flex items-center justify-center font-black transition-colors shrink-0 shadow-sm">
-                  →
-                </span>
-              </div>
             </div>
 
             {/* My Parking Spots Section */}
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <h2 className="text-xl font-black text-slate-900">My Parking & Storage Listings</h2>
+                <h2 className="text-xl font-black text-slate-900">My Parking Listings</h2>
                 <span className="text-xs font-bold text-slate-400">{spaces.length} properties</span>
               </div>
 
@@ -923,46 +892,6 @@ const OwnerDashboard = () => {
 
             {/* Clean White Card Container Matching Website Theme */}
             <form onSubmit={handleSpotSubmit} className="bg-white border border-slate-200 text-slate-800 rounded-3xl p-8 shadow-sm">
-              {/* Category Selector Tabs */}
-              <div className="flex bg-slate-100 p-1.5 rounded-2xl mb-6 text-xs font-bold border border-slate-200">
-                <button
-                  type="button"
-                  onClick={() => setSpotForm(p => ({ ...p, spaceCategory: 'standard' }))}
-                  className={`flex-1 py-3 rounded-xl transition-all flex items-center justify-center gap-2 ${
-                    spotForm.spaceCategory !== 'commercial_vehicle_storage'
-                      ? 'bg-blue-600 text-white font-black shadow-sm'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  🅿️ Standard Parking Spot
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSpotForm(p => ({ ...p, spaceCategory: 'commercial_vehicle_storage' }))}
-                  className={`flex-1 py-3 rounded-xl transition-all flex items-center justify-center gap-2 ${
-                    spotForm.spaceCategory === 'commercial_vehicle_storage'
-                      ? 'bg-amber-500 text-slate-950 font-black shadow-sm'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  🏢 Commercial Storage Yard (1+ Acre Required)
-                </button>
-              </div>
-
-              {/* Mandatory Policy Warning if Storage Yard */}
-              {spotForm.spaceCategory === 'commercial_vehicle_storage' && (
-                <div className="bg-amber-500/10 border-2 border-amber-400 rounded-2xl p-4 mb-6 text-left">
-                  <div className="flex items-center gap-2 mb-1.5">
-                    <span className="text-xl">⚠️</span>
-                    <span className="text-xs font-black tracking-wide uppercase text-amber-950">
-                      MANDATORY POLICY REQUIREMENT FOR BANKS & REPO FLEETS
-                    </span>
-                  </div>
-                  <p className="text-xs text-amber-950/90 leading-relaxed font-medium">
-                    Commercial Vehicle Storage partner yards MUST possess a <strong className="font-extrabold underline decoration-amber-500">minimum of 1.0 contiguous Acre of land</strong>. This provides secure, authorized staging capacity for repossessed cars with perimeter fencing and security.
-                  </p>
-                </div>
-              )}
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-5">
 

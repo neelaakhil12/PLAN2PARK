@@ -749,14 +749,74 @@ const SeekerDashboard = () => {
           setUserLat(lat);
           setUserLng(lng);
           try {
-            const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`);
+            const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1`, {
+              headers: { 'Accept': 'application/json' }
+            });
             const data = await res.json();
-            const areaName = data.address
-              ? (data.address.suburb || data.address.neighbourhood || data.address.residential || data.address.city_district || data.address.city || 'Current Area')
-              : 'Current GPS Location';
-            setPinnedLocationName(`🎯 ${areaName}`);
+
+            let detailedAddress = '';
+            if (data && data.address) {
+              const a = data.address;
+              const parts = [];
+
+              // 1. Plot / House / Building / Landmark / Shop / Amenity
+              const premise = a.house_number || a.house_name || a.building || a.landmark || a.amenity || a.shop || a.office || a.isolated_dwelling;
+              if (premise) parts.push(premise);
+
+              // 2. Street / Road / Lane / Colony
+              const road = a.road || a.street || a.residential || a.pedestrian || a.path || a.lane || a.footway;
+              if (road && !parts.includes(road)) parts.push(road);
+
+              // 3. Neighbourhood / Colony / Block
+              const neighbourhood = a.neighbourhood || a.quarter || a.hamlet;
+              if (neighbourhood && !parts.includes(neighbourhood)) parts.push(neighbourhood);
+
+              // 4. Suburb / Area / Locality
+              const suburb = a.suburb || a.locality || a.subdistrict;
+              if (suburb && !parts.includes(suburb)) parts.push(suburb);
+
+              // 5. Mandal / County / City District / Zone
+              const county = a.county || a.city_district || a.district;
+              if (county && !parts.includes(county) && county !== a.city) parts.push(county);
+
+              // 6. City / Town / Municipality
+              const city = a.city || a.town || a.municipality || a.state_district;
+              if (city && !parts.includes(city)) parts.push(city);
+
+              // 7. State
+              if (a.state && !parts.includes(a.state)) parts.push(a.state);
+
+              // 8. Postcode / PIN Code
+              if (a.postcode && !parts.includes(a.postcode)) parts.push(a.postcode);
+
+              if (parts.length >= 2) {
+                detailedAddress = parts.join(', ');
+              }
+            }
+
+            if (!detailedAddress && data && data.display_name) {
+              detailedAddress = data.display_name.replace(/,\s*(India|IN)$/i, '').trim();
+            }
+
+            // Fallback to client reverse geocode if needed
+            if (!detailedAddress) {
+              try {
+                const bdcRes = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lng}&localityLanguage=en`);
+                const bdcData = await bdcRes.json();
+                if (bdcData) {
+                  const bdcParts = [];
+                  if (bdcData.locality) bdcParts.push(bdcData.locality);
+                  if (bdcData.city && !bdcParts.includes(bdcData.city)) bdcParts.push(bdcData.city);
+                  if (bdcData.principalSubdivision && !bdcParts.includes(bdcData.principalSubdivision)) bdcParts.push(bdcData.principalSubdivision);
+                  if (bdcData.postcode && !bdcParts.includes(bdcData.postcode)) bdcParts.push(bdcData.postcode);
+                  if (bdcParts.length > 0) detailedAddress = bdcParts.join(', ');
+                }
+              } catch (bdcErr) {}
+            }
+
+            setPinnedLocationName(detailedAddress ? `🎯 ${detailedAddress}` : `🎯 GPS Location (${lat.toFixed(4)}, ${lng.toFixed(4)})`);
           } catch (e) {
-            setPinnedLocationName(`🎯 GPS Location (${lat.toFixed(3)}, ${lng.toFixed(3)})`);
+            setPinnedLocationName(`🎯 GPS Location (${lat.toFixed(4)}, ${lng.toFixed(4)})`);
           } finally {
             setLocatingGps(false);
             setShowPinModal(false);
@@ -764,15 +824,14 @@ const SeekerDashboard = () => {
         },
         (error) => {
           console.warn('Geolocation error:', error);
-          setUserLat(17.313);
-          setUserLng(78.545);
-          setPinnedLocationName('🎯 Almasguda, Hyderabad');
+          alert('Could not detect GPS location automatically. Please check your browser location permissions or choose an area from the search list.');
           setLocatingGps(false);
           setShowPinModal(false);
         },
-        { enableHighAccuracy: true, timeout: 8000 }
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
       );
     } else {
+      alert('Geolocation is not supported by your browser.');
       setLocatingGps(false);
       setShowPinModal(false);
     }
@@ -1269,7 +1328,7 @@ const SeekerDashboard = () => {
                     </div>
                     <div className="min-w-0">
                       <p className="text-[10px] font-black text-emerald-800 uppercase tracking-widest">Pinned Search Location</p>
-                      <p className="text-sm font-extrabold text-slate-900 truncate">{pinnedLocationName}</p>
+                      <p className="text-sm font-extrabold text-slate-900 break-words line-clamp-2" title={pinnedLocationName}>{pinnedLocationName}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
