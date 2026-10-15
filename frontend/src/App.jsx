@@ -25,6 +25,7 @@ import RefundPolicy from './pages/RefundPolicy';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
+import GoogleAuthBridge from './pages/GoogleAuthBridge';
 // ─── PROTECTED ROUTE COMPONENT BY ROLE ──────────────────────────────────────
 const ProtectedRoute = ({ children, allowedRole, redirectPath }) => {
   const { user, loading } = useContext(AuthContext);
@@ -126,6 +127,7 @@ const AppContent = () => {
           } />
 
           {/* Choice & Legacy Redirection Pages */}
+          <Route path="/google-auth-bridge" element={<GoogleAuthBridge />} />
           <Route path="/login" element={<LoginChoice />} />
           <Route path="/register" element={<RegisterChoice />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />

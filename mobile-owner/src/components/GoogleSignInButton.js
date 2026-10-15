@@ -1,8 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { TouchableOpacity, Text, StyleSheet, ActivityIndicator, View, Platform } from 'react-native';
+import {
+  TouchableOpacity,
+  Text,
+  StyleSheet,
+  ActivityIndicator,
+  View,
+  Linking,
+} from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
-import * as Google from 'expo-auth-session/providers/google';
-import * as AuthSession from 'expo-auth-session';
 
 try {
   WebBrowser.maybeCompleteAuthSession();
@@ -10,8 +15,37 @@ try {
   // Ignore in case environment does not support it
 }
 
-const GOOGLE_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID || '908977180-dkg2d8h9109b4tvsnaf51scbmi4l09or.apps.googleusercontent.com';
-const GOOGLE_ANDROID_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID || '908977180-1t50tibmdnuji3t4d4rn0ic9f7rdrbut.apps.googleusercontent.com';
+const GOOGLE_CLIENT_ID =
+  process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID ||
+  '908977180-dkg2d8h9109b4tvsnaf51scbmi4l09or.apps.googleusercontent.com';
+const BRIDGE_REDIRECT_URI = 'https://plantopark.com/google-auth-bridge';
+const APP_SCHEME = 'plantopark-owner';
+
+function extractTokenFromUrl(url) {
+  if (!url) return null;
+  try {
+    // 1. Search params (?id_token=... or ?access_token=...)
+    const queryIdx = url.indexOf('?');
+    if (queryIdx !== -1) {
+      const qs = url.substring(queryIdx + 1).split('#')[0];
+      const params = new URLSearchParams(qs);
+      const token = params.get('id_token') || params.get('access_token');
+      if (token) return token;
+    }
+
+    // 2. Hash params (#id_token=... or #access_token=...)
+    const hashIdx = url.indexOf('#');
+    if (hashIdx !== -1) {
+      const hs = url.substring(hashIdx + 1);
+      const params = new URLSearchParams(hs);
+      const token = params.get('id_token') || params.get('access_token');
+      if (token) return token;
+    }
+  } catch (e) {
+    console.warn('Error extracting token from URL:', e);
+  }
+  return null;
+}
 
 class GoogleErrorBoundary extends React.Component {
   state = { hasError: false };
@@ -32,45 +66,60 @@ class GoogleErrorBoundary extends React.Component {
 function GoogleSignInButtonInner({ onAuthSuccess, text = 'Sign in with Google', disabled = false }) {
   const [loading, setLoading] = useState(false);
 
-  let redirectUri;
-  try {
-    redirectUri = AuthSession.makeRedirectUri({ scheme: 'plantopark-owner' });
-  } catch (e) {
-    redirectUri = 'plantopark-owner://';
-  }
-
-  const [request, response, promptAsync] = Google.useAuthRequest({
-    androidClientId: GOOGLE_ANDROID_CLIENT_ID,
-    webClientId: GOOGLE_CLIENT_ID,
-    clientId: Platform.OS === 'android' ? GOOGLE_ANDROID_CLIENT_ID : GOOGLE_CLIENT_ID,
-    scopes: ['openid', 'profile', 'email'],
-    selectAccount: true,
-    extraParams: {
-      prompt: 'select_account',
-    },
-    redirectUri,
-  });
-
   useEffect(() => {
-    if (response?.type === 'success') {
-      const token =
-        response.authentication?.idToken ||
-        response.authentication?.accessToken ||
-        response.params?.id_token ||
-        response.params?.access_token;
-      if (token) {
-        onAuthSuccess(token);
+    const handleDeepLink = (event) => {
+      if (event?.url && event.url.startsWith(`${APP_SCHEME}://`)) {
+        try {
+          WebBrowser.dismissBrowser();
+        } catch (e) {}
+        const token = extractTokenFromUrl(event.url);
+        if (token) {
+          onAuthSuccess(token);
+        }
       }
-    }
-  }, [response]);
+    };
+
+    const subscription = Linking.addEventListener('url', handleDeepLink);
+
+    // Check if app was opened via cold-start deep link
+    Linking.getInitialURL().then((initialUrl) => {
+      if (initialUrl && initialUrl.startsWith(`${APP_SCHEME}://`)) {
+        const token = extractTokenFromUrl(initialUrl);
+        if (token) {
+          onAuthSuccess(token);
+        }
+      }
+    }).catch(() => {});
+
+    return () => {
+      subscription.remove();
+    };
+  }, [onAuthSuccess]);
 
   const handlePress = async () => {
-    if (!promptAsync) return;
     try {
       setLoading(true);
-      await promptAsync();
+
+      const authUrl =
+        `https://accounts.google.com/o/oauth2/v2/auth` +
+        `?client_id=${encodeURIComponent(GOOGLE_CLIENT_ID)}` +
+        `&redirect_uri=${encodeURIComponent(BRIDGE_REDIRECT_URI)}` +
+        `&response_type=token%20id_token` +
+        `&scope=${encodeURIComponent('openid email profile')}` +
+        `&nonce=${Date.now()}` +
+        `&prompt=select_account` +
+        `&state=${encodeURIComponent(APP_SCHEME)}`;
+
+      const result = await WebBrowser.openAuthSessionAsync(authUrl, `${APP_SCHEME}://`);
+
+      if (result.type === 'success' && result.url) {
+        const token = extractTokenFromUrl(result.url);
+        if (token) {
+          onAuthSuccess(token);
+        }
+      }
     } catch (e) {
-      console.warn('Google promptAsync error:', e);
+      console.warn('Google auth bridge error:', e);
     } finally {
       setLoading(false);
     }
@@ -80,7 +129,7 @@ function GoogleSignInButtonInner({ onAuthSuccess, text = 'Sign in with Google', 
     <TouchableOpacity
       style={[styles.btn, (disabled || loading) && styles.disabled]}
       onPress={handlePress}
-      disabled={disabled || loading || !request}
+      disabled={disabled || loading}
       activeOpacity={0.8}
     >
       <View style={styles.content}>
