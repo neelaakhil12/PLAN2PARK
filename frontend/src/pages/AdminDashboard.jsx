@@ -2015,42 +2015,6 @@ const AdminDashboard = () => {
                     );
                   })()}
 
-                  {/* Graphs Panel */}
-                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                    {/* Line Chart */}
-                    <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm lg:col-span-2">
-                      <div className="flex justify-between items-center mb-6">
-                        <div>
-                          <h3 className="font-extrabold text-slate-800">Bookings &amp; Revenue Trend</h3>
-                          <p className="text-slate-400 text-xs mt-0.5">Platform volume analytics (last 10 days)</p>
-                        </div>
-                        <div className="flex gap-4 text-xs font-semibold">
-                          <span className="flex items-center gap-1.5 text-emerald-600"><span className="h-2 w-2 rounded-full bg-emerald-500"></span> Bookings</span>
-                          <span className="flex items-center gap-1.5 text-blue-600"><span className="h-2 w-2 rounded-full bg-blue-500"></span> Revenue (₹)</span>
-                        </div>
-                      </div>
-                      <div className="h-44 flex items-end justify-center w-full">
-                        {renderSVGLineChart()}
-                      </div>
-                    </div>
-
-                    {/* Donut Chart */}
-                    <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm flex flex-col justify-between">
-                      <div>
-                        <h3 className="font-extrabold text-slate-800">Parking Status</h3>
-                        <p className="text-slate-400 text-xs mt-0.5">Realtime platform-wide slot distribution</p>
-                      </div>
-                      <div className="py-4">
-                        {renderSVGPieChart()}
-                      </div>
-                      <div className="grid grid-cols-4 gap-1 text-center text-[10px] font-bold border-t border-slate-100 pt-4">
-                        <div className="text-emerald-500">Available<br /><span className="text-slate-700 font-black text-xs">{analytics.parkingDistribution?.available || 0}</span></div>
-                        <div className="text-blue-500">Booked<br /><span className="text-slate-700 font-black text-xs">{analytics.parkingDistribution?.booked || 0}</span></div>
-                        <div className="text-amber-500">Blocked<br /><span className="text-slate-700 font-black text-xs">{analytics.parkingDistribution?.blocked || 0}</span></div>
-                        <div className="text-rose-500">Inactive<br /><span className="text-slate-700 font-black text-xs">{analytics.parkingDistribution?.inactive || 0}</span></div>
-                      </div>
-                    </div>
-                  </div>
 
 
                   {/* Recent Bookings List */}
