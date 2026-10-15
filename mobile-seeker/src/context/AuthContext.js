@@ -287,6 +287,10 @@ export const AuthProvider = ({ children }) => {
     try {
       await AsyncStorage.removeItem('user_token');
       await AsyncStorage.removeItem('user_data');
+      try {
+        const { GoogleSignin } = require('@react-native-google-signin/google-signin');
+        await GoogleSignin.signOut();
+      } catch (gErr) {}
     } catch (e) {
       console.error(e);
     }

@@ -51,6 +51,14 @@ function GoogleSignInButtonInner({ onAuthSuccess, text = 'Sign in with Google', 
     try {
       setLoading(true);
       await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+
+      // Clear any cached session so Google ALWAYS opens the Account Chooser dialog
+      try {
+        await GoogleSignin.signOut();
+      } catch (signOutErr) {
+        // Ignore if no session active
+      }
+
       const userInfo = await GoogleSignin.signIn();
       const token = userInfo.data?.idToken || userInfo.idToken;
       if (token) {
