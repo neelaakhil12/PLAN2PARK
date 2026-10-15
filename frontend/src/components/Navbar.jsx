@@ -58,6 +58,7 @@ const Navbar = () => {
   const ownerLinks = [
     { label: 'Dashboard', view: 'dashboard', icon: <LayoutDashboard className="h-4 w-4" /> },
     { label: 'Orders', view: 'orders', icon: <BookOpen className="h-4 w-4" /> },
+    { label: 'Wallet', view: 'wallet', icon: <Wallet className="h-4 w-4" /> },
     { label: 'Add Spot', view: 'add_spot', icon: <Plus className="h-4 w-4" /> },
     { label: 'Profile', view: 'profile', icon: <User className="h-4 w-4" /> },
   ];

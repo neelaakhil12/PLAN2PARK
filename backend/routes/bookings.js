@@ -936,7 +936,10 @@ router.get('/revenue-report', protect, adminOnly, async (req, res) => {
 
   try {
     const matchQuery = { 
-      paymentStatus: 'paid',
+      $or: [
+        { paymentStatus: 'paid', status: { $nin: ['cancelled'] } },
+        { status: 'cancelled', ownerEarnings: { $gt: 0 } },
+      ],
     };
 
     if (startDate || endDate) {
@@ -988,9 +991,12 @@ router.get('/owner-revenue-summary', protect, adminOnly, async (req, res) => {
     // 1. Get all owners/hosts
     const owners = await User.find({ role: 'owner' }).select('name email contact ownerPaidRevenue bankAccountDetails walletBalance status createdAt');
 
-    // 2. Fetch all paid bookings populate spaceId
+    // 2. Fetch all paid bookings populate spaceId (exclude cancelled bookings with 0 earnings)
     const paidBookings = await Booking.find({ 
-      paymentStatus: 'paid',
+      $or: [
+        { paymentStatus: 'paid', status: { $nin: ['cancelled'] } },
+        { status: 'cancelled', ownerEarnings: { $gt: 0 } },
+      ],
     }).populate('spaceId');
 
     // 3. Fetch all parking spaces
@@ -1012,9 +1018,19 @@ router.get('/owner-revenue-summary', protect, adminOnly, async (req, res) => {
         return sum + retained;
       }, 0);
       const totalAdminCommission = ownerBookings.reduce((sum, b) => sum + (b.adminCommission || 0), 0);
-      const totalEarnings = ownerBookings.reduce((sum, b) => sum + (b.ownerEarnings || 0), 0);
-      const paid = owner.ownerPaidRevenue || 0;
-      const owed = Math.max(0, totalEarnings - paid);
+      
+      const paid = Number((owner.ownerPaidRevenue || 0).toFixed(2));
+      const liveBalance = Number((owner.walletBalance || 0).toFixed(2));
+      const bookingEarnings = ownerBookings.reduce((sum, b) => sum + (b.ownerEarnings || 0), 0);
+
+      // Perfect synchronization with the Host mobile app wallet:
+      // Live wallet balance + paid amount represents the true generated host revenue
+      const totalEarnings = liveBalance > 0 || paid > 0
+        ? Number((liveBalance + paid).toFixed(2))
+        : Number(bookingEarnings.toFixed(2));
+
+      // Pending balance owed to host by admin is their live wallet balance
+      const owed = liveBalance;
 
       return {
         ownerId: owner._id,
@@ -1023,7 +1039,7 @@ router.get('/owner-revenue-summary', protect, adminOnly, async (req, res) => {
         contact: owner.contact,
         status: owner.status,
         createdAt: owner.createdAt,
-        walletBalance: owner.walletBalance || 0,
+        walletBalance: liveBalance,
         spacesCount: ownerSpaces.length,
         bookingsCount: ownerBookings.length,
         grossRevenue: Number(grossRevenue.toFixed(2)),
@@ -1058,13 +1074,42 @@ router.post('/payout-owner', protect, adminOnly, async (req, res) => {
       return res.status(400).json({ message: 'Invalid payout amount' });
     }
 
-    // Increment ownerPaidRevenue
-    owner.ownerPaidRevenue = (owner.ownerPaidRevenue || 0) + payoutVal;
+    // Increment ownerPaidRevenue and debit live walletBalance
+    owner.ownerPaidRevenue = Number(((owner.ownerPaidRevenue || 0) + payoutVal).toFixed(2));
+    owner.walletBalance = Math.max(0, Number(((owner.walletBalance || 0) - payoutVal).toFixed(2)));
+
+    if (!owner.walletTransactions) owner.walletTransactions = [];
+    owner.walletTransactions.push({
+      type: 'debit',
+      amount: payoutVal,
+      status: 'completed',
+      description: `Admin Payout Disbursed (Direct Bank/UPI Settlement of ₹${payoutVal})`,
+      date: new Date(),
+    });
+
     await owner.save();
+
+    // Send Real-Time Notification to Owner
+    try {
+      await Notification.create({
+        userId: owner._id,
+        targetRole: 'owner',
+        type: 'payout_processed',
+        title: '💸 Payout Released by Admin',
+        message: `Admin has recorded a payout of ₹${payoutVal} to your bank account. Your wallet has been updated.`,
+        data: {
+          ownerId: owner._id,
+          amount: payoutVal,
+        },
+      });
+    } catch (notifErr) {
+      console.warn('Payout notification error:', notifErr.message);
+    }
 
     res.json({
       message: `Successfully recorded payout of ₹${payoutVal} to host ${owner.name}.`,
       ownerPaidRevenue: owner.ownerPaidRevenue,
+      walletBalance: owner.walletBalance,
     });
   } catch (error) {
     res.status(500).json({ message: error.message });

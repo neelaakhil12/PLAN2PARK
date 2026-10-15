@@ -70,35 +70,66 @@ const formatImageUrl = (req, file, fallbackUrl) => {
 // @access  Public
 router.post('/parse-maps-link', async (req, res) => {
   const { url } = req.body;
-  if (!url) return res.status(400).json({ message: 'URL is required' });
+  if (!url || typeof url !== 'string' || !url.trim()) {
+    return res.status(400).json({ message: 'URL is required' });
+  }
 
   try {
-    let targetUrl = url;
+    // 1. Clean the incoming url string
+    let targetUrl = url.trim();
+    // Strip leading/trailing quotes or backticks if user copied them
+    targetUrl = targetUrl.replace(/^['"`\s]+|['"`\s]+$/g, '');
+    // Handle leading slashes (e.g. '/maps.google.com' or '//maps.google.com')
+    if (targetUrl.startsWith('//')) {
+      targetUrl = 'https:' + targetUrl;
+    } else if (targetUrl.startsWith('/')) {
+      targetUrl = 'https:/' + targetUrl;
+    } else if (!targetUrl.startsWith('http://') && !targetUrl.startsWith('https://')) {
+      targetUrl = 'https://' + targetUrl;
+    }
 
     // Expand shortened URLs like maps.app.goo.gl
-    if (url.includes('goo.gl') || url.includes('maps.app.goo.gl')) {
+    if (targetUrl.includes('goo.gl') || targetUrl.includes('maps.app.goo.gl')) {
       try {
-        const response = await fetch(url, { redirect: 'follow' });
-        targetUrl = response.url || url;
+        const response = await fetch(targetUrl, { redirect: 'follow' });
+        targetUrl = response.url || targetUrl;
       } catch (e) {
         console.error('Error expanding URL:', e);
       }
+    }
+
+    // Decode URL for regex matching (decodes %2C -> , %20 -> space)
+    let decodedUrl = targetUrl;
+    try {
+      decodedUrl = decodeURIComponent(targetUrl);
+    } catch (e) {
+      decodedUrl = targetUrl;
     }
 
     let lat = null;
     let lng = null;
     let placeName = '';
 
-    // Extract coordinates from @lat,lng
-    const atMatch = targetUrl.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
-    if (atMatch) {
-      lat = parseFloat(atMatch[1]);
-      lng = parseFloat(atMatch[2]);
+    // Check !3d(lat)!4d(lng) (common Google Maps desktop & mobile share URLs)
+    const dMatch = decodedUrl.match(/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/) || targetUrl.match(/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/);
+    if (dMatch) {
+      lat = parseFloat(dMatch[1]);
+      lng = parseFloat(dMatch[2]);
     }
 
-    // Extract from q=lat,lng
+    // Check @lat,lng
     if (!lat) {
-      const qMatch = targetUrl.match(/[?&]q=(-?\d+\.\d+),(-?\d+\.\d+)/);
+      const atMatch = decodedUrl.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/) || targetUrl.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
+      if (atMatch) {
+        lat = parseFloat(atMatch[1]);
+        lng = parseFloat(atMatch[2]);
+      }
+    }
+
+    // Check q=lat,lng or ll=lat,lng (handles both decoded ',' and encoded '%2C'/'%2c')
+    if (!lat) {
+      const qMatch = decodedUrl.match(/[?&](?:q|ll)=(-?\d+\.\d+)\s*[,/]\s*(-?\d+\.\d+)/)
+        || targetUrl.match(/[?&](?:q|ll)=(-?\d+\.\d+)(?:%2c|%2C|,)(-?\d+\.\d+)/i);
       if (qMatch) {
         lat = parseFloat(qMatch[1]);
         lng = parseFloat(qMatch[2]);
@@ -106,19 +137,20 @@ router.post('/parse-maps-link', async (req, res) => {
     }
 
     // Extract place name from /place/PlaceName/
-    const placeMatch = targetUrl.match(/\/place\/([^/]+)\/?/);
+    const placeMatch = decodedUrl.match(/\/place\/([^/?#]+)/);
     if (placeMatch) {
-      placeName = decodeURIComponent(placeMatch[1].replace(/\+/g, ' '));
+      placeName = placeMatch[1].replace(/\+/g, ' ').trim();
     }
 
-    // Extract search query if any
-    const searchMatch = targetUrl.match(/[?&]q=([^&]+)/);
+    // Extract search query if any and not coords
+    const searchMatch = decodedUrl.match(/[?&]q=([^&]+)/);
     if (!placeName && searchMatch && !searchMatch[1].includes(',')) {
-      placeName = decodeURIComponent(searchMatch[1].replace(/\+/g, ' '));
+      placeName = searchMatch[1].replace(/\+/g, ' ').trim();
     }
 
     let address = placeName || '';
     let city = 'Hyderabad';
+    let pincode = '';
     let plotNo = '';
     let colonyArea = '';
     let landmark = placeName || '';
@@ -132,8 +164,9 @@ router.post('/parse-maps-link', async (req, res) => {
         plotNo = mbRes.plotNo || '';
         colonyArea = mbRes.colonyArea || '';
         if (mbRes.landmark) landmark = mbRes.landmark;
+        if (mbRes.pincode) pincode = mbRes.pincode;
       } else {
-        // Fallback to Nominatim
+        // Fallback to Nominatim Reverse Geocoding
         try {
           const geoRes = await fetch(
             `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`,
@@ -146,6 +179,7 @@ router.post('/parse-maps-link', async (req, res) => {
             city = a.city || a.town || a.village || a.county || 'Hyderabad';
             if (a.house_number) plotNo = `Plot No. ${a.house_number}`;
             if (area) colonyArea = area;
+            if (a.postcode) pincode = a.postcode;
             address = placeName ? `${placeName}, ${area ? area + ', ' : ''}${city}` : geoData.display_name;
           }
         } catch (err) {
@@ -159,8 +193,10 @@ router.post('/parse-maps-link', async (req, res) => {
         address = mbSearch[0].address;
         lat = mbSearch[0].lat;
         lng = mbSearch[0].lng;
+        city = mbSearch[0].city || city;
+        if (mbSearch[0].pincode) pincode = mbSearch[0].pincode;
       } else {
-        // Fallback to Nominatim
+        // Fallback to Nominatim Forward Search
         try {
           const geoRes = await fetch(
             `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(placeName)}`,
@@ -171,6 +207,7 @@ router.post('/parse-maps-link', async (req, res) => {
             address = geoData[0].display_name;
             lat = parseFloat(geoData[0].lat);
             lng = parseFloat(geoData[0].lon);
+            if (geoData[0].address?.postcode) pincode = geoData[0].address.postcode;
           }
         } catch (err) {
           console.error('Search geocode error:', err);
@@ -194,9 +231,23 @@ router.post('/parse-maps-link', async (req, res) => {
       }
     }
 
+    // Extract 6-digit Indian PIN code if not already detected
+    if (!pincode && address) {
+      const pinMatch = address.match(/\b(5\d{5})\b/) || address.match(/\b(\d{6})\b/);
+      if (pinMatch) pincode = pinMatch[1];
+    }
+    if (!pincode) pincode = '500097';
+
+    // Normalize city
+    const addrLower = (address || '').toLowerCase();
+    if (addrLower.includes('hyderabad')) city = 'Hyderabad';
+    else if (addrLower.includes('secunderabad')) city = 'Secunderabad';
+    else if (addrLower.includes('cyberabad')) city = 'Hyderabad';
+
     return res.json({
       address: address || placeName || targetUrl,
       city: city || 'Hyderabad',
+      pincode: pincode || '500097',
       plotNo,
       colonyArea,
       landmark,
@@ -326,6 +377,7 @@ router.post('/', protect, ownerOnly, upload.single('imageFile'), async (req, res
       address: finalAddress,
       location: finalLocation,
       city: finalCity,
+      pincode: req.body.pincode || '',
       googleMapsLink: finalMapsLink,
       hasEvCharger: (hasEvCharger === true || hasEvCharger === 'true' || hasEvCharger === 1 || hasEvCharger === '1'),
       totalSlots: finalTotalSlots,
@@ -672,6 +724,8 @@ router.put('/:id', protect, upload.single('imageFile'), async (req, res) => {
     if (req.body.city)         space.city        = req.body.city;
     if (req.body.location)     space.location    = req.body.location;
     if (req.body.locationLink) space.locationLink = req.body.locationLink;
+    if (req.body.googleMapsLink) space.googleMapsLink = req.body.googleMapsLink;
+    if (req.body.pincode)      space.pincode      = req.body.pincode;
     if (req.body.hasEvCharger !== undefined) {
       space.hasEvCharger = req.body.hasEvCharger === true || req.body.hasEvCharger === 'true' || req.body.hasEvCharger === 1 || req.body.hasEvCharger === '1';
     }

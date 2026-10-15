@@ -1796,9 +1796,11 @@ const AdminDashboard = () => {
                             bookingsCount: ownerBookings.length,
                             grossRevenue: Number(gross.toFixed(2)),
                             adminCommission: Number(comm.toFixed(2)),
-                            totalEarnings: Number(net.toFixed(2)),
+                            totalEarnings: o.walletBalance !== undefined
+                              ? Number(((o.walletBalance || 0) + (o.ownerPaidRevenue || 0)).toFixed(2))
+                              : Number(net.toFixed(2)),
                             paidAmount: Number((o.ownerPaidRevenue || 0).toFixed(2)),
-                            owedAmount: Number(Math.max(0, net - (o.ownerPaidRevenue || 0)).toFixed(2)),
+                            owedAmount: Number((o.walletBalance !== undefined ? o.walletBalance : Math.max(0, net - (o.ownerPaidRevenue || 0))).toFixed(2)),
                           };
                         });
 
@@ -3743,7 +3745,8 @@ const AdminDashboard = () => {
                               type="button"
                               onClick={() => {
                                 setPayoutOwnerId(owner._id);
-                                setPayoutAmount(osSummary ? osSummary.owedAmount.toString() : '0');
+                                const pendingVal = osSummary?.walletBalance !== undefined ? osSummary.walletBalance : (osSummary ? osSummary.owedAmount : (owner.walletBalance || 0));
+                                setPayoutAmount(pendingVal.toString());
                               }}
                               className="bg-slate-900 hover:bg-slate-800 text-white font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-1.5 shadow-sm"
                             >
@@ -3768,7 +3771,7 @@ const AdminDashboard = () => {
                           </div>
                           <div className="bg-slate-50 p-3.5 rounded-2xl">
                             <span className="text-slate-400 block font-semibold mb-1">Pending Payout</span>
-                            <span className="font-black text-amber-600 text-sm">₹{osSummary?.owedAmount || 0}</span>
+                            <span className="font-black text-amber-600 text-sm">₹{osSummary?.walletBalance !== undefined ? osSummary.walletBalance : (osSummary?.owedAmount || owner.walletBalance || 0)}</span>
                           </div>
                         </div>
 
@@ -3982,7 +3985,7 @@ const AdminDashboard = () => {
                                   {osSummary && (
                                     <p className="flex items-center justify-between">
                                       <span className="text-slate-400">Pending Payout:</span>
-                                      <span className="font-black text-amber-600">₹{osSummary.owedAmount || 0}</span>
+                                      <span className="font-black text-amber-600">₹{osSummary.walletBalance !== undefined ? osSummary.walletBalance : (osSummary.owedAmount || 0)}</span>
                                     </p>
                                   )}
                                 </div>
@@ -4141,7 +4144,8 @@ const AdminDashboard = () => {
                               type="button"
                               onClick={() => {
                                 setPayoutOwnerId(owner._id);
-                                setPayoutAmount(osSummary ? osSummary.owedAmount.toString() : '0');
+                                const pendingVal = osSummary?.walletBalance !== undefined ? osSummary.walletBalance : (osSummary ? osSummary.owedAmount : (owner.walletBalance || 0));
+                                setPayoutAmount(pendingVal.toString());
                               }}
                               className="bg-slate-900 hover:bg-slate-800 text-white font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-1.5 shadow-sm"
                             >
@@ -5497,7 +5501,7 @@ const AdminDashboard = () => {
                       <p className="text-xs text-emerald-500 mt-1">Net platform operating revenue</p>
                     </div>
                     <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm text-left">
-                      <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Host Share Generated (90%)</p>
+                      <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Host Share Generated ({100 - commissionRate}%)</p>
                       <p className="text-3xl font-black text-slate-800 mt-2">
                         ₹{revenueReport ? revenueReport.summary.ownerEarnings : (analytics?.finances?.totalOwnerPayout || 0)}
                       </p>
@@ -5510,7 +5514,7 @@ const AdminDashboard = () => {
                     <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between text-left">
                       <div>
                         <h3 className="font-extrabold text-slate-800 text-lg">Host Revenue &amp; Payout Ledger</h3>
-                        <p className="text-xs text-slate-400 mt-0.5">Track total host earnings generated (90%), payouts released, and pending balances owed.</p>
+                        <p className="text-xs text-slate-400 mt-0.5">Track total host earnings generated ({100 - commissionRate}%), payouts released, and pending balances owed.</p>
                       </div>
                     </div>
                     <div className="overflow-x-auto">
@@ -5519,7 +5523,7 @@ const AdminDashboard = () => {
                           <tr>
                             <th className="px-6 py-3">Host / Owner</th>
                             <th className="px-6 py-3">Contact</th>
-                            <th className="px-6 py-3">Generated Revenue (90%)</th>
+                            <th className="px-6 py-3">Generated Revenue ({100 - commissionRate}%)</th>
                             <th className="px-6 py-3">Paid by Admin</th>
                             <th className="px-6 py-3">Pending Balance</th>
                             <th className="px-6 py-3">Bank Info</th>
@@ -5529,41 +5533,47 @@ const AdminDashboard = () => {
                         <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
                           {ownerSummaries.length === 0 ? (
                             <tr><td colSpan="6" className="text-center py-10 text-slate-400">No host accounts registered.</td></tr>
-                          ) : ownerSummaries.map((os) => (
-                            <tr key={os.ownerId} className="hover:bg-slate-50">
-                              <td className="px-6 py-4">
-                                <p className="font-bold text-slate-900">{os.name}</p>
-                                <p className="text-[10px] text-slate-400">{os.email}</p>
-                              </td>
-                              <td className="px-6 py-4 text-xs text-slate-500">{os.contact}</td>
-                              <td className="px-6 py-4 font-black text-slate-900">₹{os.totalEarnings}</td>
-                              <td className="px-6 py-4 font-semibold text-emerald-600">₹{os.paidAmount}</td>
-                              <td className="px-6 py-4 font-black text-amber-600">₹{os.owedAmount}</td>
-                              <td className="px-6 py-4 text-xs text-slate-500">
-                                {os.bankAccountDetails?.accountNumber ? (
-                                  <div>
-                                    <p className="font-bold text-slate-700">{os.bankAccountDetails.bankName}</p>
-                                    <p className="font-mono">{os.bankAccountDetails.accountNumber}</p>
-                                    <p className="font-mono text-[10px]">{os.bankAccountDetails.ifscCode}</p>
-                                    <p className="text-[10px] uppercase">{os.bankAccountDetails.accountName}</p>
-                                  </div>
-                                ) : (
-                                  <span className="italic text-slate-400">Not provided</span>
-                                )}
-                              </td>
-                              <td className="px-6 py-4">
-                                <button
-                                  onClick={() => {
-                                    setPayoutOwnerId(os.ownerId);
-                                    setPayoutAmount(os.owedAmount.toString());
-                                  }}
-                                  className="bg-slate-900 hover:bg-slate-800 text-white font-bold px-3 py-1.5 rounded-lg text-xs transition-colors"
-                                >
-                                  Record Payout
-                                </button>
-                              </td>
-                            </tr>
-                          ))}
+                          ) : ownerSummaries.map((os) => {
+                            const pendingBal = os.walletBalance !== undefined ? os.walletBalance : os.owedAmount;
+                            const genRevenue = os.walletBalance !== undefined && (os.walletBalance > 0 || os.paidAmount > 0)
+                              ? Number(((os.walletBalance || 0) + (os.paidAmount || 0)).toFixed(2))
+                              : os.totalEarnings;
+                            return (
+                              <tr key={os.ownerId} className="hover:bg-slate-50">
+                                <td className="px-6 py-4">
+                                  <p className="font-bold text-slate-900">{os.name}</p>
+                                  <p className="text-[10px] text-slate-400">{os.email}</p>
+                                </td>
+                                <td className="px-6 py-4 text-xs text-slate-500">{os.contact}</td>
+                                <td className="px-6 py-4 font-black text-slate-900">₹{genRevenue}</td>
+                                <td className="px-6 py-4 font-semibold text-emerald-600">₹{os.paidAmount}</td>
+                                <td className="px-6 py-4 font-black text-amber-600">₹{pendingBal}</td>
+                                <td className="px-6 py-4 text-xs text-slate-500">
+                                  {os.bankAccountDetails?.accountNumber ? (
+                                    <div>
+                                      <p className="font-bold text-slate-700">{os.bankAccountDetails.bankName}</p>
+                                      <p className="font-mono">{os.bankAccountDetails.accountNumber}</p>
+                                      <p className="font-mono text-[10px]">{os.bankAccountDetails.ifscCode}</p>
+                                      <p className="text-[10px] uppercase">{os.bankAccountDetails.accountName}</p>
+                                    </div>
+                                  ) : (
+                                    <span className="italic text-slate-400">Not provided</span>
+                                  )}
+                                </td>
+                                <td className="px-6 py-4">
+                                  <button
+                                    onClick={() => {
+                                      setPayoutOwnerId(os.ownerId);
+                                      setPayoutAmount(pendingBal.toString());
+                                    }}
+                                    className="bg-slate-900 hover:bg-slate-800 text-white font-bold px-3 py-1.5 rounded-lg text-xs transition-colors"
+                                  >
+                                    Record Payout
+                                  </button>
+                                </td>
+                              </tr>
+                            );
+                          })}
                         </tbody>
                       </table>
                     </div>

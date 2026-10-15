@@ -1,13 +1,28 @@
-import React, { useState, useEffect } from 'react';
-import { FileText, CheckCircle, ShieldCheck, Car, Building2, Search, RefreshCw, Warehouse, Landmark } from 'lucide-react';
+import React, { useState, useEffect, useContext } from 'react';
+import { FileText, ShieldCheck, Car, Building2, Search, RefreshCw } from 'lucide-react';
+import { AuthContext } from '../context/AuthContext';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'https://api.plantopark.com/api';
 
 const Terms = () => {
-  const [activeTab, setActiveTab] = useState('seeker');
+  const { user } = useContext(AuthContext);
+
+  const isSeeker = user?.role === 'seeker';
+  const isOwner = user?.role === 'owner';
+
+  const defaultTab = isOwner ? 'owner' : 'seeker';
+  const [activeTab, setActiveTab] = useState(defaultTab);
   const [terms, setTerms] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+
+  useEffect(() => {
+    if (isSeeker) {
+      setActiveTab('seeker');
+    } else if (isOwner) {
+      setActiveTab('owner');
+    }
+  }, [user?.role]);
 
   useEffect(() => {
     fetchTerms(activeTab);
@@ -45,8 +60,20 @@ const Terms = () => {
               <FileText className="w-6 h-6 text-emerald-100" />
             </div>
             <div>
-              <h1 className="text-3xl font-black tracking-tight">Terms & Conditions</h1>
-              <p className="text-emerald-100 text-sm mt-0.5">Official platform agreements and legal obligations across all roles</p>
+              <h1 className="text-3xl font-black tracking-tight">
+                {isSeeker
+                  ? 'Parking Seeker Terms & Conditions'
+                  : isOwner
+                  ? 'Space Owner Terms & Conditions'
+                  : 'Terms & Conditions'}
+              </h1>
+              <p className="text-emerald-100 text-sm mt-0.5">
+                {isSeeker
+                  ? 'Official commuter parking agreements, booking rules, and guidelines'
+                  : isOwner
+                  ? 'Official space host agreements, earnings payout policies, and listing guidelines'
+                  : 'Official platform agreements and legal obligations'}
+              </p>
             </div>
           </div>
           <div className="flex items-center gap-3 mt-4 text-xs font-semibold text-emerald-200">
@@ -60,52 +87,40 @@ const Terms = () => {
 
         {/* Tab Switcher & Search Bar */}
         <div className="p-6 border-b border-slate-100 bg-slate-50/50 flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4">
-          <div className="flex flex-wrap bg-slate-200/80 p-1 rounded-2xl gap-1">
-            <button
-              onClick={() => { setActiveTab('seeker'); setSearchQuery(''); }}
-              className={`flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl text-xs font-black transition-all ${
-                activeTab === 'seeker'
-                  ? 'bg-white text-emerald-700 shadow-sm'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <Car className="h-3.5 w-3.5" />
-              Parking Seeker (30 Pts)
-            </button>
-            <button
-              onClick={() => { setActiveTab('owner'); setSearchQuery(''); }}
-              className={`flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl text-xs font-black transition-all ${
-                activeTab === 'owner'
-                  ? 'bg-white text-emerald-700 shadow-sm'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <Building2 className="h-3.5 w-3.5" />
-              Space Owner (30 Pts)
-            </button>
-            <button
-              onClick={() => { setActiveTab('storage_owner'); setSearchQuery(''); }}
-              className={`flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl text-xs font-black transition-all ${
-                activeTab === 'storage_owner'
-                  ? 'bg-white text-emerald-700 shadow-sm'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <Warehouse className="h-3.5 w-3.5" />
-              Storage Yard Owner (30 Pts)
-            </button>
-            <button
-              onClick={() => { setActiveTab('bank_finance'); setSearchQuery(''); }}
-              className={`flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl text-xs font-black transition-all ${
-                activeTab === 'bank_finance'
-                  ? 'bg-white text-emerald-700 shadow-sm'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <Landmark className="h-3.5 w-3.5" />
-              Bank & Finance (30 Pts)
-            </button>
-          </div>
+          {/* Only show tab switcher if user is not restricted to single role */}
+          {!isSeeker && !isOwner ? (
+            <div className="flex flex-wrap bg-slate-200/80 p-1 rounded-2xl gap-1">
+              <button
+                onClick={() => { setActiveTab('seeker'); setSearchQuery(''); }}
+                className={`flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl text-xs font-black transition-all ${
+                  activeTab === 'seeker'
+                    ? 'bg-white text-emerald-700 shadow-sm'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <Car className="h-3.5 w-3.5" />
+                Parking Seeker
+              </button>
+              <button
+                onClick={() => { setActiveTab('owner'); setSearchQuery(''); }}
+                className={`flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl text-xs font-black transition-all ${
+                  activeTab === 'owner'
+                    ? 'bg-white text-emerald-700 shadow-sm'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <Building2 className="h-3.5 w-3.5" />
+                Space Owner
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <span className="px-3.5 py-2 rounded-xl text-xs font-black bg-emerald-100 text-emerald-800 flex items-center gap-1.5 border border-emerald-200">
+                {isSeeker ? <Car className="h-3.5 w-3.5" /> : <Building2 className="h-3.5 w-3.5" />}
+                {isSeeker ? 'Parking Seeker Agreements' : 'Space Owner Agreements'}
+              </span>
+            </div>
+          )}
 
           <div className="relative w-full lg:w-64">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />

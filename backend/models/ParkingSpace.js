@@ -42,6 +42,10 @@ const parkingSpaceSchema = new mongoose.Schema(
       type: String,
       default: '',
     },
+    pincode: {
+      type: String,
+      default: '',
+    },
     hasEvCharger: {
       type: Boolean,
       default: false,
