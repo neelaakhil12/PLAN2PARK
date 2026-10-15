@@ -7,7 +7,7 @@ const ParkingSpace = require('../models/ParkingSpace');
 const Booking = require('../models/Booking');
 const { protect, adminOnly } = require('../middleware/auth');
 const { sendVerificationEmail, sendPasswordResetEmail } = require('../utils/mailer');
-const { generateUniqueId } = require('../utils/generateId');
+const { generateUniqueId, resequenceUniqueIds } = require('../utils/generateId');
 const path = require('path');
 const fs = require('fs');
 
@@ -691,7 +691,34 @@ router.delete('/admin/users/:id', protect, adminOnly, async (req, res) => {
     }
 
     await User.findByIdAndDelete(req.params.id);
+
+    // Re-sequence remaining users of this role chronologically to eliminate gaps
+    if (user.role === 'seeker' || user.role === 'owner') {
+      try {
+        await resequenceUniqueIds(user.role);
+      } catch (seqErr) {
+        console.warn('Resequence uniqueIds error:', seqErr.message);
+      }
+    }
+
     res.json({ message: 'User account and associated records deleted successfully', userId: req.params.id });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// @desc    Admin: Re-sequence all unique IDs chronologically without gaps
+// @route   POST /api/auth/admin/resequence-ids
+// @access  Private (Admin only)
+router.post('/admin/resequence-ids', protect, adminOnly, async (req, res) => {
+  try {
+    const seekerCount = await resequenceUniqueIds('seeker');
+    const ownerCount = await resequenceUniqueIds('owner');
+    res.json({
+      message: 'All unique IDs re-sequenced successfully without gaps',
+      seekerCount,
+      ownerCount,
+    });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

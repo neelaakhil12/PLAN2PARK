@@ -99,14 +99,27 @@ export default function WalletScreen({ navigation }) {
 
   const handleOpenWithdraw = () => {
     const minLimit = walletData.minWithdrawalAmount || 2000;
+    const available = walletData.availableBalance !== undefined
+      ? walletData.availableBalance
+      : Math.max(0, (walletData.walletBalance || 0) - (walletData.pendingWithdrawal || 0));
+
     if ((walletData.walletBalance || 0) <= 0) {
       Alert.alert('Zero Balance', 'You currently do not have any available balance to withdraw.');
       return;
     }
-    if ((walletData.walletBalance || 0) < minLimit) {
+    if (available <= 0) {
+      Alert.alert(
+        'Payout Pending',
+        `You currently have ₹${Number(walletData.pendingWithdrawal || 0).toFixed(2)} in pending withdrawal requests awaiting admin approval.\n\nPlease wait for the admin to verify and transfer your payout.`
+      );
+      return;
+    }
+    if (available < minLimit) {
       Alert.alert(
         'Minimum Limit Not Reached',
-        `The minimum withdrawal limit set by admin is ₹${minLimit.toLocaleString('en-IN')}.\n\nYour current available balance is ₹${Number(walletData.walletBalance || 0).toFixed(2)}.`
+        `The minimum withdrawal limit set by admin is ₹${minLimit.toLocaleString('en-IN')}.\n\nYour available withdrawable balance is ₹${Number(available).toFixed(2)}${
+          walletData.pendingWithdrawal > 0 ? ` (Wallet: ₹${Number(walletData.walletBalance).toFixed(2)}, Pending: ₹${Number(walletData.pendingWithdrawal).toFixed(2)})` : ''
+        }.`
       );
       return;
     }
@@ -138,6 +151,9 @@ export default function WalletScreen({ navigation }) {
   const handleWithdrawSubmit = async () => {
     const amountVal = parseFloat(withdrawAmount);
     const minLimit = walletData.minWithdrawalAmount || 2000;
+    const available = walletData.availableBalance !== undefined
+      ? walletData.availableBalance
+      : Math.max(0, (walletData.walletBalance || 0) - (walletData.pendingWithdrawal || 0));
 
     if (isNaN(amountVal) || amountVal <= 0) {
       Alert.alert('Invalid Amount', 'Please enter a valid withdrawal amount.');
@@ -147,8 +163,13 @@ export default function WalletScreen({ navigation }) {
       Alert.alert('Minimum Limit Not Met', `Minimum withdrawal amount configured by admin is ₹${minLimit.toLocaleString('en-IN')}.`);
       return;
     }
-    if (amountVal > walletData.walletBalance) {
-      Alert.alert('Insufficient Balance', `Maximum available to withdraw is ₹${walletData.walletBalance.toFixed(2)}`);
+    if (amountVal > available) {
+      Alert.alert(
+        'Insufficient Available Balance',
+        `Maximum available to withdraw right now is ₹${available.toFixed(2)}${
+          walletData.pendingWithdrawal > 0 ? ` (₹${Number(walletData.pendingWithdrawal).toFixed(2)} is pending approval)` : ''
+        }`
+      );
       return;
     }
 
@@ -243,13 +264,18 @@ export default function WalletScreen({ navigation }) {
         contentContainerStyle={styles.scrollContent}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.ownerAccent} />}
       >
-        {/* Main Hero Card: Available Balance */}
+        {/* Main Hero Card: Wallet Balance */}
         <View style={styles.heroCard}>
           <View style={styles.heroGlow} />
           <View style={styles.heroTopRow}>
             <View>
-              <Text style={styles.heroLabel}>AVAILABLE BALANCE</Text>
+              <Text style={styles.heroLabel}>WALLET BALANCE</Text>
               <Text style={styles.heroBalance}>₹{Number(walletData.walletBalance || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</Text>
+              {walletData.pendingWithdrawal > 0 ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 5, backgroundColor: '#f59e0b20', borderColor: '#f59e0b60', borderWidth: 1, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, alignSelf: 'flex-start' }}>
+                  <Text style={{ color: '#fbbf24', fontSize: 11, fontWeight: '700' }}>⏳ ₹{Number(walletData.pendingWithdrawal).toFixed(2)} Pending Admin Approval</Text>
+                </View>
+              ) : null}
             </View>
             <View style={styles.rateBadge}>
               <Text style={styles.rateBadgeText}>{walletData.platformCommissionRate || 10}% Admin Fee</Text>
@@ -257,7 +283,9 @@ export default function WalletScreen({ navigation }) {
           </View>
 
           <Text style={styles.heroExplainer}>
-            Net earnings automatically credited after platform commission deduction.
+            {walletData.pendingWithdrawal > 0
+              ? `Available to withdraw: ₹${Number(walletData.availableBalance !== undefined ? walletData.availableBalance : Math.max(0, (walletData.walletBalance || 0) - walletData.pendingWithdrawal)).toFixed(2)}. Net earnings credited automatically.`
+              : 'Net earnings automatically credited after platform commission deduction.'}
           </Text>
 
           <View style={styles.heroActionRow}>
@@ -347,7 +375,7 @@ export default function WalletScreen({ navigation }) {
                             isRejected && styles.statusTextRejected,
                           ]}
                         >
-                          {isApproved ? '✅ Paid & Verified' : isPending ? '⏳ Awaiting Admin' : '❌ Declined'}
+                          {isApproved ? '✅ Paid & Completed' : isPending ? '⏳ Pending Admin Approval' : '❌ Declined'}
                         </Text>
                       </View>
                     </View>
@@ -410,13 +438,19 @@ export default function WalletScreen({ navigation }) {
               const totalCredits = allTxs
                 .filter((t) => t.type === 'credit')
                 .reduce((sum, t) => sum + (t.amount || 0), 0);
-              const totalDebits = allTxs
-                .filter((t) => t.type === 'debit')
+              const totalCompletedDebits = allTxs
+                .filter((t) => t.type === 'debit' && t.status !== 'pending' && t.status !== 'rejected')
                 .reduce((sum, t) => sum + (t.amount || 0), 0);
+              const totalPendingDebits = allTxs
+                .filter((t) => t.type === 'debit' && t.status === 'pending')
+                .reduce((sum, t) => sum + (t.amount || 0), 0);
+
+              const pendingCount = allTxs.filter((t) => t.status === 'pending').length;
 
               const filteredTxs = allTxs.filter((t) => {
                 if (ledgerFilter === 'credit') return t.type === 'credit';
-                if (ledgerFilter === 'debit') return t.type === 'debit';
+                if (ledgerFilter === 'debit') return t.type === 'debit' && t.status !== 'pending';
+                if (ledgerFilter === 'pending') return t.status === 'pending';
                 return true;
               });
 
@@ -434,9 +468,11 @@ export default function WalletScreen({ navigation }) {
                     <View style={[styles.ledgerSummaryBox, { borderColor: '#ef444440' }]}>
                       <Text style={[styles.ledgerSummaryLabel, { color: '#f87171' }]}>🔴 Total Debited</Text>
                       <Text style={[styles.ledgerSummaryVal, { color: '#ef4444' }]}>
-                        -₹{totalDebits.toFixed(2)}
+                        -₹{totalCompletedDebits.toFixed(2)}
                       </Text>
-                      <Text style={styles.ledgerSummarySub}>Reversals & Withdrawals</Text>
+                      <Text style={styles.ledgerSummarySub}>
+                        {totalPendingDebits > 0 ? `Reversals & Paid (₹${totalPendingDebits.toFixed(2)} Pending)` : 'Reversals & Withdrawals'}
+                      </Text>
                     </View>
                   </View>
 
@@ -463,9 +499,19 @@ export default function WalletScreen({ navigation }) {
                       onPress={() => setLedgerFilter('debit')}
                     >
                       <Text style={[styles.ledgerPillTxt, ledgerFilter === 'debit' && styles.ledgerPillTxtActive]}>
-                        🔴 Debits & Reversals ({allTxs.filter((t) => t.type === 'debit').length})
+                        🔴 Debited ({allTxs.filter((t) => t.type === 'debit' && t.status !== 'pending').length})
                       </Text>
                     </TouchableOpacity>
+                    {pendingCount > 0 ? (
+                      <TouchableOpacity
+                        style={[styles.ledgerPill, ledgerFilter === 'pending' && styles.ledgerPillActive]}
+                        onPress={() => setLedgerFilter('pending')}
+                      >
+                        <Text style={[styles.ledgerPillTxt, ledgerFilter === 'pending' && styles.ledgerPillTxtActive]}>
+                          ⏳ Pending ({pendingCount})
+                        </Text>
+                      </TouchableOpacity>
+                    ) : null}
                   </View>
 
                   {filteredTxs.length === 0 ? (
@@ -481,6 +527,8 @@ export default function WalletScreen({ navigation }) {
                   ) : (
                     filteredTxs.map((tx, idx) => {
                       const isCredit = tx.type === 'credit';
+                      const isPending = tx.status === 'pending';
+                      const isRejected = tx.status === 'rejected';
                       const desc = (tx.description || '').toLowerCase();
                       const isCancellation = desc.includes('cancel') || desc.includes('reversed') || desc.includes('refund');
                       const isExtension = desc.includes('extension');
@@ -504,17 +552,37 @@ export default function WalletScreen({ navigation }) {
                         badgeBorder = '#3b82f650';
                         badgeColor = '#60a5fa';
                         icon = '⏳';
-                      } else if (!isCredit || isWithdrawal) {
-                        badgeText = '💸 WITHDRAWAL DEBIT';
-                        badgeBg = '#f59e0b20';
-                        badgeBorder = '#f59e0b50';
-                        badgeColor = '#fbbf24';
-                        icon = '🏦';
+                      } else if (isWithdrawal) {
+                        if (isPending) {
+                          badgeText = '⏳ WITHDRAWAL PENDING';
+                          badgeBg = '#f59e0b20';
+                          badgeBorder = '#f59e0b50';
+                          badgeColor = '#fbbf24';
+                          icon = '⏳';
+                        } else if (isRejected) {
+                          badgeText = '❌ WITHDRAWAL DECLINED';
+                          badgeBg = '#ef444420';
+                          badgeBorder = '#ef444450';
+                          badgeColor = '#f87171';
+                          icon = '❌';
+                        } else {
+                          badgeText = '💸 WITHDRAWAL DEBIT (PAID)';
+                          badgeBg = '#8b5cf620';
+                          badgeBorder = '#8b5cf650';
+                          badgeColor = '#a78bfa';
+                          icon = '🏦';
+                        }
+                      } else if (!isCredit) {
+                        badgeText = isPending ? '⏳ DEBIT PENDING' : '💸 DEBIT';
+                        badgeBg = isPending ? '#f59e0b20' : '#ef444420';
+                        badgeBorder = isPending ? '#f59e0b50' : '#ef444450';
+                        badgeColor = isPending ? '#fbbf24' : '#f87171';
+                        icon = isPending ? '⏳' : '🏦';
                       }
 
                       return (
                         <View key={tx._id || idx} style={styles.txCard}>
-                          <View style={[styles.txIconBox, isCancellation && { backgroundColor: '#ef444415' }]}>
+                          <View style={[styles.txIconBox, isCancellation && { backgroundColor: '#ef444415' }, isPending && { backgroundColor: '#f59e0b15' }]}>
                             <Text style={styles.txIcon}>{icon}</Text>
                           </View>
                           <View style={styles.txInfo}>
@@ -522,6 +590,15 @@ export default function WalletScreen({ navigation }) {
                               <Text style={[styles.txBadgeTxt, { color: badgeColor }]}>{badgeText}</Text>
                             </View>
                             <Text style={styles.txDescription}>{tx.description || (isCredit ? 'Booking Credit' : 'Debit')}</Text>
+                            {isPending ? (
+                              <Text style={{ color: '#fbbf24', fontSize: 11, marginTop: 2, fontWeight: '600' }}>
+                                ⏳ Awaiting Admin Approval & Transfer
+                              </Text>
+                            ) : isRejected ? (
+                              <Text style={{ color: '#f87171', fontSize: 11, marginTop: 2 }}>
+                                Declined by Admin
+                              </Text>
+                            ) : null}
                             <Text style={styles.txDate}>
                               {new Date(tx.date || Date.now()).toLocaleDateString('en-IN', {
                                 month: 'short',
@@ -532,8 +609,19 @@ export default function WalletScreen({ navigation }) {
                               })}
                             </Text>
                           </View>
-                          <Text style={[styles.txAmount, isCredit ? styles.txAmountCredit : styles.txAmountDebit]}>
-                            {isCredit ? '+' : '-'}₹{Number(tx.amount || 0).toFixed(2)}
+                          <Text
+                            style={[
+                              styles.txAmount,
+                              isPending
+                                ? { color: '#fbbf24' }
+                                : isRejected
+                                ? { color: '#94a3b8', textDecorationLine: 'line-through' }
+                                : isCredit
+                                ? styles.txAmountCredit
+                                : styles.txAmountDebit,
+                            ]}
+                          >
+                            {isPending ? '⏳ ₹' : isRejected ? '₹' : isCredit ? '+₹' : '-₹'}{Number(tx.amount || 0).toFixed(2)}
                           </Text>
                         </View>
                       );

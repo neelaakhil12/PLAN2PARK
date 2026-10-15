@@ -1007,9 +1007,8 @@ const AdminDashboard = () => {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (res.ok) {
-        alert('User account deleted successfully.');
-        setUsers(prev => prev.filter(u => u._id !== userId));
-        setSpaces(prev => prev.filter(s => (s.ownerId?._id || s.ownerId) !== userId));
+        alert('User account deleted and Unique IDs re-sequenced successfully.');
+        fetchData();
         if (selectedOwnerForDetail?._id === userId) setSelectedOwnerForDetail(null);
         if (selectedStorageOwnerForDetail?._id === userId) setSelectedStorageOwnerForDetail(null);
         if (selectedSeekerForDetail?._id === userId) setSelectedSeekerForDetail(null);

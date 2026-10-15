@@ -105,10 +105,12 @@ const userSchema = new mongoose.Schema(
     walletTransactions: [
       {
         type: { type: String, enum: ['credit', 'debit'], default: 'credit' },
+        status: { type: String, enum: ['pending', 'completed', 'rejected'], default: 'completed' },
         amount: { type: Number, required: true },
         description: { type: String, default: 'Refund' },
         date: { type: Date, default: Date.now },
         bookingId: { type: mongoose.Schema.Types.ObjectId, ref: 'Booking' },
+        payoutRequestId: { type: mongoose.Schema.Types.ObjectId, ref: 'PayoutRequest' },
       }
     ],
     resetPasswordOtp: {

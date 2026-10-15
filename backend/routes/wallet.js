@@ -95,16 +95,42 @@ router.get('/owner', protect, ownerOnly, async (req, res) => {
       .filter((r) => r.status === 'approved')
       .reduce((sum, r) => sum + r.amount, 0);
 
-    const transactions = (user.walletTransactions || []).slice().reverse();
+    const availableBalance = Math.max(0, Number(((user.walletBalance || 0) - pendingWithdrawal).toFixed(2)));
+    const totalGrossEarned = Number(((user.walletBalance || 0) + totalWithdrawn).toFixed(2));
+
+    // Lookup map for decorating transactions with their latest payout request status
+    const payoutMap = new Map();
+    payoutRequests.forEach((pr) => {
+      const fullId = pr._id.toString();
+      const shortId = fullId.slice(-6).toUpperCase();
+      payoutMap.set(fullId, pr);
+      payoutMap.set(shortId, pr);
+    });
+
+    const transactions = (user.walletTransactions || []).map((t) => {
+      const tx = t.toObject ? t.toObject() : { ...t };
+      if (tx.payoutRequestId) {
+        const pr = payoutMap.get(tx.payoutRequestId.toString());
+        if (pr) tx.status = pr.status;
+      } else if (tx.description && /withdrawal/i.test(tx.description)) {
+        const match = tx.description.match(/#([A-Z0-9]{6})/i);
+        if (match && match[1]) {
+          const pr = payoutMap.get(match[1].toUpperCase());
+          if (pr) tx.status = pr.status;
+        }
+      }
+      return tx;
+    }).reverse();
 
     const commissionRate = await getCommissionRate();
     const minWithdrawalAmount = await getMinWithdrawalAmount();
 
     res.json({
       walletBalance: Number((user.walletBalance || 0).toFixed(2)),
+      availableBalance,
       pendingWithdrawal: Number(pendingWithdrawal.toFixed(2)),
       totalWithdrawn: Number(totalWithdrawn.toFixed(2)),
-      totalGrossEarned: Number(((user.walletBalance || 0) + totalWithdrawn + pendingWithdrawal).toFixed(2)),
+      totalGrossEarned,
       platformCommissionRate: commissionRate,
       minWithdrawalAmount,
       bankAccountDetails: user.bankAccountDetails || {},
@@ -140,10 +166,16 @@ router.post('/withdraw', protect, ownerOnly, upload.single('qrImage'), async (re
     const user = await User.findById(req.user._id);
     if (!user) return res.status(404).json({ message: 'User not found' });
 
-    const currentBalance = user.walletBalance || 0;
-    if (withdrawAmount > currentBalance) {
+    // Calculate existing pending withdrawal amount
+    const pendingRequests = await PayoutRequest.find({ ownerId: user._id, status: 'pending' });
+    const pendingAmount = pendingRequests.reduce((sum, r) => sum + r.amount, 0);
+    const availableBalance = Math.max(0, (user.walletBalance || 0) - pendingAmount);
+
+    if (withdrawAmount > availableBalance) {
       return res.status(400).json({
-        message: `Insufficient funds. Your available balance is ₹${currentBalance.toFixed(2)}.`,
+        message: `Insufficient withdrawable balance. Your wallet balance is ₹${(user.walletBalance || 0).toFixed(2)}${
+          pendingAmount > 0 ? ` (₹${pendingAmount.toFixed(2)} is pending in other requests)` : ''
+        }. Available to withdraw: ₹${availableBalance.toFixed(2)}.`,
       });
     }
 
@@ -173,10 +205,6 @@ router.post('/withdraw', protect, ownerOnly, upload.single('qrImage'), async (re
       ownerQrCodeImage = req.body.ownerQrCodeImage;
     }
 
-    // Deduct from wallet balance
-    user.walletBalance = Number((currentBalance - withdrawAmount).toFixed(2));
-    if (!user.walletTransactions) user.walletTransactions = [];
-
     const payoutDetails = {
       upiId: upiId ? upiId.trim() : (user.bankAccountDetails?.upiId || ''),
       accountName: accountName ? accountName.trim() : (user.bankAccountDetails?.accountName || ''),
@@ -195,10 +223,16 @@ router.post('/withdraw', protect, ownerOnly, upload.single('qrImage'), async (re
       requestedAt: new Date(),
     });
 
+    // NOTE: Money is NOT debited from user.walletBalance yet!
+    // It remains in user.walletBalance until admin approves and transfers the payout.
+    if (!user.walletTransactions) user.walletTransactions = [];
+
     user.walletTransactions.push({
       type: 'debit',
+      status: 'pending',
       amount: withdrawAmount,
       description: `Withdrawal request #${payoutRequest._id.toString().slice(-6).toUpperCase()} (${(payoutMethod || 'UPI').toUpperCase()})`,
+      payoutRequestId: payoutRequest._id,
       date: new Date(),
     });
 
@@ -229,6 +263,7 @@ router.post('/withdraw', protect, ownerOnly, upload.single('qrImage'), async (re
       message: `Withdrawal request for ₹${withdrawAmount} submitted successfully. Admin will process and send receipt proof.`,
       payoutRequest,
       newBalance: user.walletBalance,
+      availableBalance: Math.max(0, (user.walletBalance || 0) - (pendingAmount + withdrawAmount)),
     });
   } catch (error) {
     console.error('Withdrawal submission error:', error);
@@ -311,10 +346,41 @@ router.post('/admin/approve/:id', protect, adminOnly, upload.single('receiptImag
 
     await request.save();
 
-    // Increment owner paid revenue metric
+    // NOW debit funds from owner's walletBalance upon approval
     const owner = await User.findById(request.ownerId);
     if (owner) {
+      owner.walletBalance = Math.max(0, Number(((owner.walletBalance || 0) - request.amount).toFixed(2)));
       owner.ownerPaidRevenue = (owner.ownerPaidRevenue || 0) + request.amount;
+
+      // Update corresponding transaction in owner's wallet history to 'completed'
+      const shortId = request._id.toString().slice(-6).toUpperCase();
+      let foundTx = false;
+      if (owner.walletTransactions && owner.walletTransactions.length > 0) {
+        for (let i = owner.walletTransactions.length - 1; i >= 0; i--) {
+          const t = owner.walletTransactions[i];
+          const isMatch =
+            (t.payoutRequestId && t.payoutRequestId.toString() === request._id.toString()) ||
+            (t.description && t.description.includes(shortId));
+          if (isMatch) {
+            t.status = 'completed';
+            foundTx = true;
+            break;
+          }
+        }
+      }
+
+      if (!foundTx) {
+        if (!owner.walletTransactions) owner.walletTransactions = [];
+        owner.walletTransactions.push({
+          type: 'debit',
+          status: 'completed',
+          amount: request.amount,
+          description: `Withdrawal payout #${shortId} (${(request.payoutMethod || 'UPI').toUpperCase()})`,
+          payoutRequestId: request._id,
+          date: new Date(),
+        });
+      }
+
       await owner.save();
 
       // Send Real-Time Notification with Payment Proof to Owner
@@ -349,8 +415,8 @@ router.post('/admin/approve/:id', protect, adminOnly, upload.single('receiptImag
   }
 });
 
-// ─── 5. ADMIN: REJECT PAYOUT REQUEST & REFUND WALLET ──────────────────────────
-// @desc    Reject payout request and refund amount to owner's wallet
+// ─── 5. ADMIN: REJECT PAYOUT REQUEST ──────────────────────────────────────────
+// @desc    Reject payout request and update owner's transaction status
 // @route   POST /api/wallet/admin/reject/:id
 // @access  Private (Admin)
 router.post('/admin/reject/:id', protect, adminOnly, async (req, res) => {
@@ -370,27 +436,52 @@ router.post('/admin/reject/:id', protect, adminOnly, async (req, res) => {
     request.processedAt = new Date();
     await request.save();
 
-    // Refund funds back to owner wallet
     const owner = await User.findById(request.ownerId);
     if (owner) {
-      owner.walletBalance = Number(((owner.walletBalance || 0) + request.amount).toFixed(2));
-      if (!owner.walletTransactions) owner.walletTransactions = [];
-      owner.walletTransactions.push({
-        type: 'credit',
-        amount: request.amount,
-        description: `Refund for rejected withdrawal #${request._id.toString().slice(-6).toUpperCase()} (${rejectReason})`,
-        date: new Date(),
-      });
+      const shortId = request._id.toString().slice(-6).toUpperCase();
+      let matchedTx = null;
+      if (owner.walletTransactions && owner.walletTransactions.length > 0) {
+        for (let i = owner.walletTransactions.length - 1; i >= 0; i--) {
+          const t = owner.walletTransactions[i];
+          const isMatch =
+            (t.payoutRequestId && t.payoutRequestId.toString() === request._id.toString()) ||
+            (t.description && t.description.includes(shortId));
+          if (isMatch) {
+            matchedTx = t;
+            break;
+          }
+        }
+      }
+
+      // If the transaction was pending (under the new system, funds were not debited yet),
+      // so we simply mark it rejected.
+      // If it was already debited under the legacy system (status !== 'pending'), we refund it.
+      if (matchedTx && matchedTx.status === 'pending') {
+        matchedTx.status = 'rejected';
+        matchedTx.description = `${matchedTx.description} [DECLINED: ${rejectReason}]`;
+      } else {
+        // Legacy fallback refund
+        owner.walletBalance = Number(((owner.walletBalance || 0) + request.amount).toFixed(2));
+        if (!owner.walletTransactions) owner.walletTransactions = [];
+        owner.walletTransactions.push({
+          type: 'credit',
+          status: 'completed',
+          amount: request.amount,
+          description: `Refund for rejected withdrawal #${shortId} (${rejectReason})`,
+          date: new Date(),
+        });
+      }
+
       await owner.save();
 
-      // Notify Owner of Rejection & Refund
+      // Notify Owner of Rejection
       try {
         await Notification.create({
           userId: owner._id,
           targetRole: 'owner',
           type: 'payout_rejected',
           title: '⚠️ Withdrawal Request Declined',
-          message: `Your withdrawal of ₹${request.amount} was rejected: "${rejectReason}". The funds have been refunded to your wallet balance.`,
+          message: `Your withdrawal of ₹${request.amount} was rejected: "${rejectReason}". Funds remain in your wallet balance.`,
           data: {
             payoutRequestId: request._id,
             amount: request.amount,
@@ -403,7 +494,7 @@ router.post('/admin/reject/:id', protect, adminOnly, async (req, res) => {
     }
 
     res.json({
-      message: `Payout request rejected and ₹${request.amount} refunded back to owner wallet.`,
+      message: `Payout request rejected. Funds retained in owner wallet.`,
       payoutRequest: request,
     });
   } catch (error) {
