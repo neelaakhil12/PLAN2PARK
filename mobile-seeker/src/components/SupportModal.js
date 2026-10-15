@@ -38,7 +38,7 @@ export default function SupportModal({ visible, onClose, isBankFinance = false }
 
   const fetchSupportData = async () => {
     try {
-      const res = await fetch(`${API_URL}/settings/support`);
+      const res = await fetch(`${API_URL}/settings/support?t=${Date.now()}`);
       if (res.ok) {
         const data = await res.json();
         setSupportData(prev => ({ ...prev, ...data }));
@@ -48,9 +48,10 @@ export default function SupportModal({ visible, onClose, isBankFinance = false }
     }
   };
 
-  const activeEmail = isBankFinance
-    ? (supportData.bankFinanceSupportEmail || supportData.supportEmail)
-    : (supportData.seekerSupportEmail || supportData.supportEmail);
+  const activeEmail = supportData.supportEmail ||
+    (isBankFinance
+      ? (supportData.bankFinanceSupportEmail || supportData.supportEmail)
+      : (supportData.seekerSupportEmail || supportData.supportEmail));
 
   const handleEmail = () => {
     const subject = isBankFinance

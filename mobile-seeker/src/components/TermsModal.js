@@ -101,7 +101,7 @@ export default function TermsModal({ visible, onClose, type = 'seeker' }) {
   const fetchTerms = async (targetType) => {
     setLoading(true);
     try {
-      const res = await fetch(endpoints.getTerms(targetType));
+      const res = await fetch(`${endpoints.getTerms(targetType)}?t=${Date.now()}`);
       if (res.ok) {
         const data = await res.json();
         if (Array.isArray(data) && data.length > 0) {
@@ -188,8 +188,8 @@ export default function TermsModal({ visible, onClose, type = 'seeker' }) {
             <View style={[styles.introCard, isBank && { borderColor: '#06b6d444' }]}>
               <Text style={styles.introTxt}>
                 {isBank
-                  ? '⚖️ These 30 legal clauses govern financial institutions, auto finance recovery agencies, commercial vehicle staging bay allotments, bailee storage custody, and release authorization.'
-                  : '⚖️ These 30 legal clauses govern driver bookings, parking bay occupancy rules, vehicle roadworthiness, overstay penalty tariffs, and platform liability disclaimers.'}
+                  ? `⚖️ These ${terms.length} legal clauses govern financial institutions, auto finance recovery agencies, commercial vehicle staging bay allotments, bailee storage custody, and release authorization.`
+                  : `⚖️ These ${terms.length} legal clauses govern driver bookings, parking bay occupancy rules, vehicle roadworthiness, overstay penalty tariffs, and platform liability disclaimers.`}
               </Text>
             </View>
 

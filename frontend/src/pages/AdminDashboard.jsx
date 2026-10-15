@@ -187,7 +187,17 @@ const AdminDashboard = () => {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`
         },
-        body: JSON.stringify(supportSettings),
+        body: JSON.stringify({
+          ...supportSettings,
+          ownerSupportEmail: supportSettings.supportEmail,
+          seekerSupportEmail: supportSettings.supportEmail,
+          storageYardSupportEmail: supportSettings.supportEmail,
+          bankFinanceSupportEmail: supportSettings.supportEmail,
+          ownerSupportPhone: supportSettings.supportPhone,
+          seekerSupportPhone: supportSettings.supportPhone,
+          storageYardSupportPhone: supportSettings.supportPhone,
+          bankFinanceSupportPhone: supportSettings.supportPhone,
+        }),
       });
       if (res.ok) {
         setSupportSettingsSuccess(true);

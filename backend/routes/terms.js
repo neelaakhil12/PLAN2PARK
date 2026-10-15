@@ -37,6 +37,7 @@ const ensureDefaultTerms = async (type) => {
 // @route   GET /api/terms/:type
 // @access  Public
 router.get('/:type', async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
   const type = normalizeType(req.params.type);
   const validTypes = ['owner', 'storage_owner', 'seeker', 'bank_finance'];
   if (!validTypes.includes(type)) {
@@ -56,6 +57,7 @@ router.get('/:type', async (req, res) => {
 // @route   GET /api/terms/admin/all
 // @access  Private (Admin)
 router.get('/admin/all', protect, adminOnly, async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
   try {
     await Promise.all([
       ensureDefaultTerms('owner'),

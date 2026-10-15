@@ -24,6 +24,7 @@ const DEFAULT_SUPPORT_SETTINGS = {
 // @route   GET /api/settings/support
 // @access  Public
 router.get('/support', async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
   try {
     let setting = await SystemSetting.findOne({ key: 'support_contacts' });
     if (!setting) {
@@ -34,7 +35,23 @@ router.get('/support', async (req, res) => {
       });
     }
     // Merge any missing keys with defaults
-    const merged = { ...DEFAULT_SUPPORT_SETTINGS, ...(setting.value || {}) };
+    const val = setting.value || {};
+    const merged = { ...DEFAULT_SUPPORT_SETTINGS, ...val };
+
+    // If supportEmail is configured, ensure it propagates to all role aliases
+    if (merged.supportEmail) {
+      merged.ownerSupportEmail = merged.supportEmail;
+      merged.seekerSupportEmail = merged.supportEmail;
+      merged.storageYardSupportEmail = merged.supportEmail;
+      merged.bankFinanceSupportEmail = merged.supportEmail;
+    }
+    if (merged.supportPhone) {
+      merged.ownerSupportPhone = merged.supportPhone;
+      merged.seekerSupportPhone = merged.supportPhone;
+      merged.storageYardSupportPhone = merged.supportPhone;
+      merged.bankFinanceSupportPhone = merged.supportPhone;
+    }
+
     res.json(merged);
   } catch (err) {
     res.status(500).json({ message: err.message, fallback: DEFAULT_SUPPORT_SETTINGS });
@@ -52,6 +69,23 @@ router.put('/support', protect, adminOnly, async (req, res) => {
       ...currentValue,
       ...req.body,
     };
+
+    // If supportEmail was updated, keep all role email aliases in sync
+    if (req.body.supportEmail) {
+      updatedValue.supportEmail = req.body.supportEmail.trim();
+      updatedValue.ownerSupportEmail = req.body.supportEmail.trim();
+      updatedValue.seekerSupportEmail = req.body.supportEmail.trim();
+      updatedValue.storageYardSupportEmail = req.body.supportEmail.trim();
+      updatedValue.bankFinanceSupportEmail = req.body.supportEmail.trim();
+    }
+    // If supportPhone was updated, keep all role phone aliases in sync
+    if (req.body.supportPhone) {
+      updatedValue.supportPhone = req.body.supportPhone.trim();
+      updatedValue.ownerSupportPhone = req.body.supportPhone.trim();
+      updatedValue.seekerSupportPhone = req.body.supportPhone.trim();
+      updatedValue.storageYardSupportPhone = req.body.supportPhone.trim();
+      updatedValue.bankFinanceSupportPhone = req.body.supportPhone.trim();
+    }
 
     setting = await SystemSetting.findOneAndUpdate(
       { key: 'support_contacts' },

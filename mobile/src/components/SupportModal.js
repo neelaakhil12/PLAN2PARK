@@ -48,13 +48,15 @@ export default function SupportModal({ visible, onClose, isStorageYard = false }
     }
   };
 
-  const activePhone = isStorageYard
-    ? (supportData.storageYardSupportPhone || supportData.supportPhone)
-    : (supportData.ownerSupportPhone || supportData.supportPhone);
+  const activePhone = supportData.supportPhone ||
+    (isStorageYard
+      ? (supportData.storageYardSupportPhone || supportData.supportPhone)
+      : (supportData.ownerSupportPhone || supportData.supportPhone));
 
-  const activeEmail = isStorageYard
-    ? (supportData.storageYardSupportEmail || supportData.supportEmail)
-    : (supportData.ownerSupportEmail || supportData.supportEmail);
+  const activeEmail = supportData.supportEmail ||
+    (isStorageYard
+      ? (supportData.storageYardSupportEmail || supportData.supportEmail)
+      : (supportData.ownerSupportEmail || supportData.supportEmail));
 
   const activeWhatsapp = supportData.supportWhatsapp || activePhone;
 

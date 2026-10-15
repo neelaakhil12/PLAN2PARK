@@ -38,7 +38,7 @@ export default function SupportModal({ visible, onClose, isStorageYard = false }
 
   const fetchSupportData = async () => {
     try {
-      const res = await fetch(`${API_URL}/settings/support`);
+      const res = await fetch(`${API_URL}/settings/support?t=${Date.now()}`);
       if (res.ok) {
         const data = await res.json();
         setSupportData(prev => ({ ...prev, ...data }));
@@ -48,13 +48,15 @@ export default function SupportModal({ visible, onClose, isStorageYard = false }
     }
   };
 
-  const activePhone = isStorageYard
-    ? (supportData.storageYardSupportPhone || supportData.supportPhone)
-    : (supportData.ownerSupportPhone || supportData.supportPhone);
+  const activePhone = supportData.supportPhone ||
+    (isStorageYard
+      ? (supportData.storageYardSupportPhone || supportData.supportPhone)
+      : (supportData.ownerSupportPhone || supportData.supportPhone));
 
-  const activeEmail = isStorageYard
-    ? (supportData.storageYardSupportEmail || supportData.supportEmail)
-    : (supportData.ownerSupportEmail || supportData.supportEmail);
+  const activeEmail = supportData.supportEmail ||
+    (isStorageYard
+      ? (supportData.storageYardSupportEmail || supportData.supportEmail)
+      : (supportData.ownerSupportEmail || supportData.supportEmail));
 
   const activeWhatsapp = supportData.supportWhatsapp || activePhone;
 

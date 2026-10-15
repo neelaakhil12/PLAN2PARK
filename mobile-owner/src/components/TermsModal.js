@@ -101,7 +101,7 @@ export default function TermsModal({ visible, onClose, type = 'storage_owner' })
   const fetchTerms = async (targetType) => {
     setLoading(true);
     try {
-      const res = await fetch(endpoints.getTerms(targetType));
+      const res = await fetch(`${endpoints.getTerms(targetType)}?t=${Date.now()}`);
       if (res.ok) {
         const data = await res.json();
         if (Array.isArray(data) && data.length > 0) {
@@ -188,8 +188,8 @@ export default function TermsModal({ visible, onClose, type = 'storage_owner' })
             <View style={[styles.introCard, isStorage && { borderColor: '#f59e0b44' }]}>
               <Text style={styles.introTxt}>
                 {isStorage
-                  ? '⚖️ These 30 legal clauses govern all 1+ Acre vehicle storage yards, staging bay allocations, repossession fleet custody, security standards, and payouts.'
-                  : '⚖️ These 30 legal clauses govern parking space listings, driver reservations, vehicle bailment guidelines, host earnings, and cancellation policies.'}
+                  ? `⚖️ These ${terms.length} legal clauses govern all 1+ Acre vehicle storage yards, staging bay allocations, repossession fleet custody, security standards, and payouts.`
+                  : `⚖️ These ${terms.length} legal clauses govern parking space listings, driver reservations, vehicle bailment guidelines, host earnings, and cancellation policies.`}
               </Text>
             </View>
 
