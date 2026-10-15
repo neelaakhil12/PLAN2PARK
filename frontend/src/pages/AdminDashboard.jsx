@@ -1781,8 +1781,8 @@ const AdminDashboard = () => {
                       : users.filter(u => u.role === 'owner').map(o => {
                           const ownerSpaces = spaces.filter(s => (s.ownerId?._id || s.ownerId)?.toString() === o._id.toString());
                           const ownerBookings = bookings.filter(b => (b.spaceId?.ownerId?._id || b.spaceId?.ownerId || b.ownerId)?.toString() === o._id.toString() && b.paymentStatus === 'paid');
-                          const gross = ownerBookings.reduce((sum, b) => sum + (b.totalAmount || 0), 0);
-                          const comm = ownerBookings.reduce((sum, b) => sum + (b.adminCommission || (b.totalAmount * (commissionRate / 100)) || 0), 0);
+                          const gross = ownerBookings.reduce((sum, b) => sum + ((b.totalAmount || 0) + (b.walletAmountUsed || 0)), 0);
+                          const comm = ownerBookings.reduce((sum, b) => sum + (b.adminCommission || (((b.totalAmount || 0) + (b.walletAmountUsed || 0)) * (commissionRate / 100)) || 0), 0);
                           const net = Math.max(0, gross - comm);
                           return {
                             ownerId: o._id,
@@ -2046,14 +2046,28 @@ const AdminDashboard = () => {
                               <td className="px-6 py-4 text-slate-500 truncate max-w-[150px]">{b.spaceId?.address || 'Deleted Space'}</td>
                               <td className="px-6 py-4 text-slate-500">{b.hours} hrs</td>
                               <td className="px-6 py-4 font-bold text-slate-900">
-                                {b.status === 'cancelled' ? (
-                                  <div className="flex flex-col">
-                                    <span className="line-through text-slate-400">₹{b.totalAmount}</span>
-                                    <span className="text-[10px] text-rose-500 font-extrabold uppercase tracking-wider">Refunded</span>
-                                  </div>
-                                ) : (
-                                  `₹${b.totalAmount}`
-                                )}
+                                {(() => {
+                                  const gross = Number(((b.totalAmount || 0) + (b.walletAmountUsed || 0)).toFixed(2));
+                                  const isWallet = (b.walletAmountUsed || 0) > 0;
+                                  if (b.status === 'cancelled') {
+                                    return (
+                                      <div className="flex flex-col">
+                                        <span className="line-through text-slate-400">₹{gross}</span>
+                                        <span className="text-[10px] text-rose-500 font-extrabold uppercase tracking-wider">Refunded</span>
+                                      </div>
+                                    );
+                                  }
+                                  return (
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                      <span>₹{gross}</span>
+                                      {isWallet && (
+                                        <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-purple-50 text-purple-700 border border-purple-200">
+                                          WALLET {b.totalAmount > 0 ? `(₹${b.walletAmountUsed})` : ''}
+                                        </span>
+                                      )}
+                                    </div>
+                                  );
+                                })()}
                               </td>
                               <td className="px-6 py-4 font-bold">
                                 {b.status === 'cancelled' ? (
@@ -4546,7 +4560,14 @@ const AdminDashboard = () => {
                                         </div>
                                       </td>
                                       <td className="px-6 py-4 font-black text-slate-900">
-                                        ₹{b.totalAmount || 0}
+                                        <div className="flex items-center gap-1.5 flex-wrap">
+                                          <span>₹{Number(((b.totalAmount || 0) + (b.walletAmountUsed || 0)).toFixed(2))}</span>
+                                          {(b.walletAmountUsed || 0) > 0 && (
+                                            <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-purple-50 text-purple-700 border border-purple-200">
+                                              WALLET {b.totalAmount > 0 ? `(₹${b.walletAmountUsed})` : ''}
+                                            </span>
+                                          )}
+                                        </div>
                                       </td>
                                       <td className="px-6 py-4">
                                         <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
@@ -4999,7 +5020,7 @@ const AdminDashboard = () => {
                 const uniqueSpaces = Array.from(new Map(bookings.filter(b => b.spaceId).map(b => [b.spaceId._id, b.spaceId])).values());
 
                 // KPI Summaries based on filtered bookings
-                const totalGrossPaid = filteredBookings.reduce((sum, b) => sum + (b.totalAmount || 0), 0);
+                const totalGrossPaid = filteredBookings.reduce((sum, b) => sum + ((b.totalAmount || 0) + (b.walletAmountUsed || 0)), 0);
                 const totalAdminCommission = filteredBookings.reduce((sum, b) => sum + (b.adminCommission || 0), 0);
                 const totalHostPayout = filteredBookings.reduce((sum, b) => sum + (b.ownerEarnings || 0), 0);
                 const totalRefundsGiven = filteredBookings.reduce((sum, b) => sum + (b.refundAmount || 0), 0);
