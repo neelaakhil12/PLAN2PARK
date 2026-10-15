@@ -2405,7 +2405,7 @@ const AdminDashboard = () => {
                           <table className="w-full text-sm text-left">
                             <thead className="bg-slate-50 text-slate-400 text-xs uppercase font-semibold">
                               <tr>
-                                <th className="px-6 py-3.5">Seeker / Driver</th>
+                                <th className="px-6 py-3.5">Parking Seeker</th>
                                 <th className="px-6 py-3.5">Unique ID</th>
                                 <th className="px-6 py-3.5">Phone</th>
                                 <th className="px-6 py-3.5">Wallet Balance</th>
@@ -3590,7 +3590,6 @@ const AdminDashboard = () => {
                               <th className="px-6 py-3.5">Unique ID</th>
                               <th className="px-6 py-3.5">Phone</th>
                               <th className="px-6 py-3.5">System Role</th>
-                              <th className="px-6 py-3.5">Mail Status</th>
                               <th className="px-6 py-3.5">Account Status</th>
                               <th className="px-6 py-3.5">Registered</th>
                               <th className="px-6 py-3.5 text-right">Actions</th>
@@ -3599,7 +3598,7 @@ const AdminDashboard = () => {
                           <tbody className="divide-y divide-slate-100 font-medium">
                             {filteredUsers.length === 0 ? (
                               <tr>
-                                <td colSpan="8" className="text-center py-12 text-slate-400 font-bold">
+                                <td colSpan="7" className="text-center py-12 text-slate-400 font-bold">
                                   No users match the selected criteria.
                                 </td>
                               </tr>
@@ -3642,15 +3641,8 @@ const AdminDashboard = () => {
                                     <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold uppercase ${
                                       u.role === 'owner' ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-blue-50 text-blue-700 border border-blue-200'
                                     }`}>
-                                      {u.role === 'owner' ? '🏢 Owner (Host)' : '🚗 Seeker (Driver)'}
+                                      {u.role === 'owner' ? '🏢 Owner (Host)' : '🚗 Parking Seeker'}
                                     </span>
-                                  </td>
-                                  <td className="px-6 py-4">
-                                    {u.isEmailVerified ? (
-                                      <span className="text-emerald-600 text-xs font-bold flex items-center gap-1"><CheckCircle className="h-3.5 w-3.5" />Verified</span>
-                                    ) : (
-                                      <span className="text-amber-500 text-xs font-bold">Pending OTP</span>
-                                    )}
                                   </td>
                                   <td className="px-6 py-4"><StatusBadge status={u.status} /></td>
                                   <td className="px-6 py-4 text-slate-400 text-xs">{new Date(u.createdAt).toLocaleDateString()}</td>
@@ -4672,7 +4664,6 @@ const AdminDashboard = () => {
                               <th className="px-6 py-3.5">Phone Contact</th>
                               <th className="px-6 py-3.5">Wallet Balance</th>
                               <th className="px-6 py-3.5">Total Bookings</th>
-                              <th className="px-6 py-3.5">Email Status</th>
                               <th className="px-6 py-3.5">Profile Status</th>
                               <th className="px-6 py-3.5 text-right">Actions</th>
                             </tr>
@@ -4680,7 +4671,7 @@ const AdminDashboard = () => {
                           <tbody className="divide-y divide-slate-100 font-medium">
                             {filteredSeekers.length === 0 ? (
                               <tr>
-                                <td colSpan="8" className="text-center py-12 text-slate-400 font-bold">
+                                <td colSpan="7" className="text-center py-12 text-slate-400 font-bold">
                                   No parking seekers found matching search.
                                 </td>
                               </tr>
@@ -4724,15 +4715,6 @@ const AdminDashboard = () => {
                                         {seekerBookings.length}
                                       </span>{' '}
                                       <span className="text-xs text-slate-400">trips</span>
-                                    </td>
-                                    <td className="px-6 py-4">
-                                      {seeker.isEmailVerified ? (
-                                        <span className="text-emerald-600 text-xs font-bold flex items-center gap-1">
-                                          <CheckCircle className="h-3.5 w-3.5" /> Verified
-                                        </span>
-                                      ) : (
-                                        <span className="text-amber-500 text-xs font-bold">Pending OTP</span>
-                                      )}
                                     </td>
                                     <td className="px-6 py-4">
                                       <StatusBadge status={seeker.status} />
@@ -5848,7 +5830,7 @@ const AdminDashboard = () => {
                                       <div className="text-xs space-y-0.5">
                                         <p><span className="text-slate-400 font-bold">A/C:</span> <span className="font-mono font-bold text-slate-800">{payout.payoutDetails?.accountNumber || '—'}</span></p>
                                         <p><span className="text-slate-400 font-bold">IFSC:</span> <span className="font-mono font-bold text-slate-800">{payout.payoutDetails?.ifscCode || '—'}</span></p>
-                                        <p><span className="text-slate-400 font-bold">Name:</span> {payout.payoutDetails?.accountHolderName || '—'}</p>
+                                        <p><span className="text-slate-400 font-bold">Name:</span> <span className="font-semibold text-slate-800">{payout.payoutDetails?.accountName || payout.payoutDetails?.accountHolderName || payout.ownerId?.name || '—'}</span></p>
                                         {payout.payoutDetails?.bankName && (
                                           <p><span className="text-slate-400 font-bold">Bank:</span> {payout.payoutDetails.bankName}</p>
                                         )}
@@ -6074,7 +6056,7 @@ const AdminDashboard = () => {
                   <div className="bg-white p-2.5 rounded-xl border border-slate-200 text-xs space-y-0.5">
                     <p><span className="text-slate-400">A/C:</span> <strong className="font-mono">{approvingPayout.payoutDetails?.accountNumber}</strong></p>
                     <p><span className="text-slate-400">IFSC:</span> <strong className="font-mono">{approvingPayout.payoutDetails?.ifscCode}</strong></p>
-                    <p><span className="text-slate-400">Holder:</span> <strong>{approvingPayout.payoutDetails?.accountHolderName}</strong></p>
+                    <p><span className="text-slate-400">Holder:</span> <strong className="text-slate-800">{approvingPayout.payoutDetails?.accountName || approvingPayout.payoutDetails?.accountHolderName || approvingPayout.ownerId?.name || '—'}</strong></p>
                   </div>
                 )}
               </div>
