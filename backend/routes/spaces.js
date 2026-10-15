@@ -264,7 +264,10 @@ router.post('/parse-maps-link', async (req, res) => {
 // ─── POST /api/spaces  (Owner) ───────────────────────────────────────────────
 // @desc    Add a new parking space with image upload
 // @access  Private (Owner only)
-router.post('/', protect, ownerOnly, upload.single('imageFile'), async (req, res) => {
+router.post('/', protect, ownerOnly, upload.any(), async (req, res) => {
+  if (!req.file && Array.isArray(req.files) && req.files.length > 0) {
+    req.file = req.files.find((f) => f.fieldname === 'imageFile' || f.fieldname === 'image') || req.files[0];
+  }
   const {
     title,
     address,
@@ -315,6 +318,15 @@ router.post('/', protect, ownerOnly, upload.single('imageFile'), async (req, res
       if (Array.isArray(rawImages)) {
         finalImages = rawImages.map((img) => formatImageUrl(req, null, img)).filter(Boolean);
       }
+    }
+
+    if (Array.isArray(req.files) && req.files.length > 0) {
+      req.files.forEach((f) => {
+        const u = `/uploads/${f.filename}`;
+        if (!finalImages.includes(u)) {
+          finalImages.push(u);
+        }
+      });
     }
 
     const finalImageUrl = formatImageUrl(req, req.file, image || imageUrl || (finalImages.length > 0 ? finalImages[0] : ''));
@@ -678,8 +690,11 @@ router.get('/:id', async (req, res) => {
 });
 
 // ─── PUT /api/spaces/:id  (Owner or Admin update — supports image file replace) ──
-router.put('/:id', protect, upload.single('imageFile'), async (req, res) => {
+router.put('/:id', protect, upload.any(), async (req, res) => {
   try {
+    if (!req.file && Array.isArray(req.files) && req.files.length > 0) {
+      req.file = req.files.find((f) => f.fieldname === 'imageFile' || f.fieldname === 'image') || req.files[0];
+    }
     const space = await ParkingSpace.findById(req.params.id);
     if (!space) return res.status(404).json({ message: 'Parking space not found' });
 
@@ -715,6 +730,19 @@ router.put('/:id', protect, upload.single('imageFile'), async (req, res) => {
         if (space.images.length > 0 && !space.image) {
           space.image = space.images[0];
         }
+      }
+    }
+
+    if (Array.isArray(req.files) && req.files.length > 0) {
+      if (!Array.isArray(space.images)) space.images = [];
+      req.files.forEach((f) => {
+        const u = `/uploads/${f.filename}`;
+        if (!space.images.includes(u)) {
+          space.images.push(u);
+        }
+      });
+      if (!space.image && space.images.length > 0) {
+        space.image = space.images[0];
       }
     }
 

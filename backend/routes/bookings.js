@@ -104,9 +104,13 @@ const processBookingPaymentAndCreditOwner = async (booking) => {
 // @desc    Create a parking booking request (Seeker)
 // @route   POST /api/bookings
 // @access  Private (Seeker only)
-router.post('/', protect, seekerOnly, upload.single('driverImageFile'), async (req, res) => {
+router.post('/', protect, seekerOnly, upload.any(), async (req, res) => {
   const { spaceId, slotId, vehicleNumber, seekerName, seekerContact, hours, startTime, bookingType = 'hourly' } = req.body;
   let finalDriverImage = req.body.driverImage || '';
+
+  if (!req.file && Array.isArray(req.files) && req.files.length > 0) {
+    req.file = req.files.find((f) => f.fieldname === 'driverImageFile' || f.fieldname === 'driverImage') || req.files[0];
+  }
 
   if (req.file) {
     if (isCloudinaryConfigured) {

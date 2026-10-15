@@ -764,7 +764,7 @@ const OwnerDashboard = () => {
         fd.append('imageUrl', spotForm.imageUrl);
       }
       if (spotForm.imageFile) {
-        fd.append('image', spotForm.imageFile);
+        fd.append('imageFile', spotForm.imageFile);
       }
 
       const url = editingSpot ? `${API_URL}/spaces/${editingSpot._id}` : `${API_URL}/spaces`;

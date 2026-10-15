@@ -109,6 +109,12 @@ setInterval(autoCompleteExpiredBookings, 60000);
 
 // Global error handler
 app.use((err, req, res, next) => {
+  if (err && err.name === 'MulterError') {
+    console.error('Multer upload error:', err.message, err.field);
+    return res.status(400).json({
+      message: `Upload error: ${err.message}${err.field ? ` (${err.field})` : ''}`,
+    });
+  }
   const statusCode = res.statusCode === 200 ? 500 : res.statusCode;
   res.status(statusCode).json({
     message: err.message,
