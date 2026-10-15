@@ -91,6 +91,7 @@ const OwnerDashboard = () => {
     isCovered: false,
     imageUrl: '',
     imageFile: null,
+    images: [],
     lat: 17.313,
     lng: 78.545,
     suitableVehicles: ['hatchback', 'sedan', 'suv', '2-wheeler'],
@@ -105,6 +106,71 @@ const OwnerDashboard = () => {
   const [locatingGps, setLocatingGps] = useState(false);
   const [parsingMapsLink, setParsingMapsLink] = useState(false);
   const [mapsSuccessMsg, setMapsSuccessMsg] = useState('');
+  const spotFileInputRef = useRef(null);
+
+  const handleSpotImageUpload = (e) => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+
+    const currentImages = spotForm.images || [];
+    const remainingSlots = Math.max(0, 8 - currentImages.length);
+    if (remainingSlots <= 0) {
+      alert('You have reached the maximum limit of 8 photos.');
+      return;
+    }
+
+    const filesToProcess = files.slice(0, remainingSlots);
+
+    Promise.all(
+      filesToProcess.map(file => {
+        return new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onload = (event) => resolve(event.target.result);
+          reader.onerror = () => resolve(null);
+          reader.readAsDataURL(file);
+        });
+      })
+    ).then(newBase64Images => {
+      const validImages = newBase64Images.filter(Boolean);
+      setSpotForm(prev => {
+        const updated = [...(prev.images || []), ...validImages].slice(0, 8);
+        return {
+          ...prev,
+          images: updated,
+          imageUrl: updated[0] || prev.imageUrl,
+          imageFile: filesToProcess[0] || prev.imageFile,
+        };
+      });
+    });
+
+    if (e.target) e.target.value = '';
+  };
+
+  const handleRemoveSpotImage = (indexToRemove) => {
+    setSpotForm(prev => {
+      const updated = (prev.images || []).filter((_, idx) => idx !== indexToRemove);
+      return {
+        ...prev,
+        images: updated,
+        imageUrl: updated[0] || '',
+        imageFile: updated.length === 0 ? null : prev.imageFile,
+      };
+    });
+  };
+
+  const handleSetPrimaryCover = (index) => {
+    setSpotForm(prev => {
+      const current = prev.images || [];
+      const selected = current[index];
+      const rest = current.filter((_, idx) => idx !== index);
+      const reordered = [selected, ...rest];
+      return {
+        ...prev,
+        images: reordered,
+        imageUrl: selected,
+      };
+    });
+  };
 
   const toggleVehicleFit = (vehicleId) => {
     setSpotForm(prev => {
@@ -420,8 +486,9 @@ const OwnerDashboard = () => {
       hasEvCharger: !!spot.hasEvCharger,
       hasCctv: !!spot.hasCctv,
       isCovered: !!spot.isCovered,
-      imageUrl: spot.image || '',
+      imageUrl: spot.image || (Array.isArray(spot.images) && spot.images.length > 0 ? spot.images[0] : ''),
       imageFile: null,
+      images: Array.isArray(spot.images) && spot.images.length > 0 ? spot.images : (spot.image ? [spot.image] : []),
       lat: spot.coordinates?.lat || spot.lat || 17.313,
       lng: spot.coordinates?.lng || spot.lng || 78.545,
       suitableVehicles: (spot.suitableVehicles && spot.suitableVehicles.length > 0) ? spot.suitableVehicles : ['hatchback', 'sedan', 'suv'],
@@ -690,10 +757,14 @@ const OwnerDashboard = () => {
       fd.append('locationLink', spotForm.googleMapsLink || '');
       fd.append('suitableVehicles', JSON.stringify(spotForm.suitableVehicles));
       
-      if (spotForm.imageFile) {
-        fd.append('image', spotForm.imageFile);
+      if (spotForm.images && spotForm.images.length > 0) {
+        fd.append('images', JSON.stringify(spotForm.images));
+        fd.append('imageUrl', spotForm.images[0]);
       } else if (spotForm.imageUrl) {
         fd.append('imageUrl', spotForm.imageUrl);
+      }
+      if (spotForm.imageFile) {
+        fd.append('image', spotForm.imageFile);
       }
 
       const url = editingSpot ? `${API_URL}/spaces/${editingSpot._id}` : `${API_URL}/spaces`;
@@ -713,7 +784,7 @@ const OwnerDashboard = () => {
           title: '', address: '', city: 'Hyderabad', location: 'Hyderabad', pincode: '500097', googleMapsLink: '',
           totalSlots: '5', pricePerHour: '50', pricePerDay: '400', pricePerWeek: '2000', pricePerMonth: '6000',
           maxWalletDiscount: '10', cancellationPolicy: 'full', hasEvCharger: false, hasCctv: false, isCovered: false,
-          imageUrl: '', imageFile: null, lat: 17.313, lng: 78.545, suitableVehicles: ['hatchback', 'sedan', 'suv', '2-wheeler']
+          imageUrl: '', imageFile: null, images: [], lat: 17.313, lng: 78.545, suitableVehicles: ['hatchback', 'sedan', 'suv', '2-wheeler']
         });
         await fetchOwnerData();
         setCurrentView('dashboard');
@@ -1970,6 +2041,143 @@ const OwnerDashboard = () => {
                   </div>
                 </div>
               )}
+
+              {/* 10. Multi-Photo Upload Section (Matching Mobile App Experience) */}
+              <div className="space-y-3 pt-4 border-t border-slate-200/80 md:col-span-2">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xl">📸</span>
+                    <div>
+                      <h4 className="text-sm font-black text-slate-800 uppercase tracking-wider">
+                        {spotForm.spaceCategory === 'commercial_vehicle_storage' ? '1+ Acre Land & Yard Photos' : 'Parking Spot Photos & Cover Image'}
+                      </h4>
+                      <p className="text-xs text-slate-500">
+                        Upload clear photos of your parking space, gate, entrance, and driveway (up to 8 photos).
+                      </p>
+                    </div>
+                  </div>
+                  {(spotForm.images || []).length > 0 ? (
+                    <span className="text-xs font-black px-3 py-1 bg-emerald-100 text-emerald-800 rounded-full border border-emerald-300">
+                      ✓ {(spotForm.images || []).length} Photo{(spotForm.images || []).length > 1 ? 's' : ''} Added
+                    </span>
+                  ) : (
+                    <span className="text-xs font-bold text-slate-400">Up to 8 photos</span>
+                  )}
+                </div>
+
+                {/* Hidden file input */}
+                <input
+                  type="file"
+                  ref={spotFileInputRef}
+                  multiple
+                  accept="image/*"
+                  onChange={handleSpotImageUpload}
+                  className="hidden"
+                />
+
+                {/* Upload Drop Zone / Button */}
+                <div
+                  onClick={() => spotFileInputRef.current?.click()}
+                  className="border-2 border-dashed border-slate-300 hover:border-emerald-500 bg-slate-50 hover:bg-emerald-50/40 rounded-2xl p-6 text-center transition-all cursor-pointer group"
+                >
+                  <div className="w-12 h-12 mx-auto rounded-2xl bg-white shadow-xs border border-slate-200 group-hover:border-emerald-300 flex items-center justify-center text-slate-500 group-hover:text-emerald-600 transition-colors">
+                    <Camera className="w-6 h-6" />
+                  </div>
+                  <p className="mt-3 text-sm font-bold text-slate-800 group-hover:text-emerald-700">
+                    Click to Browse Photos or Drag &amp; Drop here
+                  </p>
+                  <p className="text-xs text-slate-400 mt-1">
+                    Supports PNG, JPG, JPEG, WEBP (Select multiple photos at once)
+                  </p>
+                </div>
+
+                {/* Photos Preview Gallery */}
+                {(spotForm.images || []).length > 0 && (
+                  <div className="space-y-2 pt-2">
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs font-extrabold text-slate-600 uppercase tracking-wider">
+                        Uploaded Photos (First photo is Primary Cover):
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setSpotForm(p => ({ ...p, images: [], imageUrl: '', imageFile: null }))}
+                        className="text-xs font-bold text-rose-500 hover:text-rose-700 transition-colors cursor-pointer"
+                      >
+                        Remove All
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3.5">
+                      {(spotForm.images || []).map((imgUri, idx) => {
+                        const displayUrl = typeof imgUri === 'string' && imgUri.startsWith('data:')
+                          ? imgUri
+                          : (getImageUrl ? getImageUrl(imgUri) : imgUri);
+
+                        return (
+                          <div
+                            key={idx}
+                            className={`relative rounded-2xl overflow-hidden aspect-4/3 border-2 bg-slate-900 group shadow-sm transition-all ${
+                              idx === 0 ? 'border-emerald-500 ring-2 ring-emerald-500/20' : 'border-slate-200 hover:border-slate-400'
+                            }`}
+                          >
+                            <img
+                              src={displayUrl}
+                              alt={`Spot ${idx + 1}`}
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                e.target.onerror = null;
+                                e.target.src = 'https://images.unsplash.com/photo-1506521781263-d8422e82f27a?auto=format&fit=crop&q=80&w=800';
+                              }}
+                            />
+
+                            {/* Cover Badge or Make Cover Action */}
+                            {idx === 0 ? (
+                              <div className="absolute bottom-2 left-2 bg-emerald-600 text-white text-[10px] font-black px-2 py-0.5 rounded-md shadow-md flex items-center gap-1">
+                                ⭐ Primary Cover
+                              </div>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleSetPrimaryCover(idx);
+                                }}
+                                className="absolute bottom-2 left-2 bg-slate-900/85 hover:bg-emerald-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-md shadow transition-colors cursor-pointer"
+                              >
+                                Set as Cover
+                              </button>
+                            )}
+
+                            {/* Delete Button */}
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleRemoveSpotImage(idx);
+                              }}
+                              className="absolute top-2 right-2 w-6 h-6 rounded-full bg-rose-600 hover:bg-rose-700 text-white flex items-center justify-center text-xs font-black shadow transition-transform hover:scale-110 cursor-pointer"
+                              title="Remove photo"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        );
+                      })}
+
+                      {/* Add more slot button if under 8 photos */}
+                      {(spotForm.images || []).length < 8 && (
+                        <div
+                          onClick={() => spotFileInputRef.current?.click()}
+                          className="rounded-2xl border-2 border-dashed border-slate-300 hover:border-emerald-500 bg-slate-50 hover:bg-emerald-50/50 aspect-4/3 flex flex-col items-center justify-center gap-1 text-slate-400 hover:text-emerald-600 transition-all cursor-pointer group"
+                        >
+                          <Plus className="w-6 h-6 group-hover:scale-110 transition-transform" />
+                          <span className="text-xs font-bold">Add More</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
 
               {/* Submit Button matching Website Colors */}
               <div className="md:col-span-2">
