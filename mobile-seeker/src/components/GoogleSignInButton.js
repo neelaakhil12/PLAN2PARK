@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { TouchableOpacity, Text, StyleSheet, ActivityIndicator, View } from 'react-native';
+import { TouchableOpacity, Text, StyleSheet, ActivityIndicator, View, Platform } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
+import * as Google from 'expo-auth-session/providers/google';
 import * as AuthSession from 'expo-auth-session';
 
 try {
@@ -10,12 +11,7 @@ try {
 }
 
 const GOOGLE_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID || '908977180-dkg2d8h9109b4tvsnaf51scbmi4l09or.apps.googleusercontent.com';
-
-const discovery = {
-  authorizationEndpoint: 'https://accounts.google.com/o/oauth2/v2/auth',
-  tokenEndpoint: 'https://oauth2.googleapis.com/token',
-  revocationEndpoint: 'https://oauth2.googleapis.com/revoke',
-};
+const GOOGLE_ANDROID_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID || '908977180-sei0dnkqlig3ljr093imk5s0n3jalu0e.apps.googleusercontent.com';
 
 class GoogleErrorBoundary extends React.Component {
   state = { hasError: false };
@@ -43,21 +39,25 @@ function GoogleSignInButtonInner({ onAuthSuccess, text = 'Sign in with Google', 
     redirectUri = 'plantopark-seeker://';
   }
 
-  const [request, response, promptAsync] = AuthSession.useAuthRequest(
-    {
-      clientId: GOOGLE_CLIENT_ID,
-      scopes: ['openid', 'profile', 'email'],
-      responseType: AuthSession.ResponseType.Token,
-      usePKCE: false,
-      redirectUri,
+  const [request, response, promptAsync] = Google.useAuthRequest({
+    androidClientId: GOOGLE_ANDROID_CLIENT_ID,
+    webClientId: GOOGLE_CLIENT_ID,
+    clientId: Platform.OS === 'android' ? GOOGLE_ANDROID_CLIENT_ID : GOOGLE_CLIENT_ID,
+    scopes: ['openid', 'profile', 'email'],
+    selectAccount: true,
+    extraParams: {
+      prompt: 'select_account',
     },
-    discovery
-  );
+    redirectUri,
+  });
 
   useEffect(() => {
     if (response?.type === 'success') {
-      const { access_token, id_token } = response.params;
-      const token = id_token || access_token;
+      const token =
+        response.authentication?.idToken ||
+        response.authentication?.accessToken ||
+        response.params?.id_token ||
+        response.params?.access_token;
       if (token) {
         onAuthSuccess(token);
       }
