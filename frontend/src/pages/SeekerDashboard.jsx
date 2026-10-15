@@ -605,28 +605,105 @@ const SeekerDashboard = () => {
 
   const handleExtendSubmit = async (e) => {
     e.preventDefault();
+    if (!extendingBooking) return;
     setExtendError('');
     setExtendLoading(true);
+
     try {
-      const res = await fetch(`${API_URL}/bookings/${extendingBooking._id}/extend`, {
+      // 1. Request Razorpay extension order from backend
+      const res = await fetch(`${API_URL}/bookings/${extendingBooking._id}/extend-order`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ extendHours: Number(extendHours) }),
       });
       const data = await res.json();
-      if (res.ok) {
-        alert('Booking extended successfully!');
-        setExtendingBooking(null);
-        setExtendHours(1);
-        fetchData();
-      } else {
-        setExtendError(data.message || 'Failed to extend booking');
+
+      if (!res.ok) {
+        setExtendError(data.message || 'Cannot extend booking at this time.');
+        setExtendLoading(false);
+        return;
       }
+
+      const { orderData, additionalAmount } = data;
+      const targetBooking = extendingBooking;
+      const selectedHours = Number(extendHours);
+
+      // 2. Ensure Razorpay SDK is ready
+      if (!window.Razorpay) {
+        const script = document.createElement('script');
+        script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+        script.async = true;
+        document.body.appendChild(script);
+        await new Promise(resolve => script.onload = resolve);
+      }
+
+      // 3. Open Razorpay Checkout Sheet
+      const options = {
+        key: orderData?.keyId || 'rzp_live_TidhMuvoj4fV3b',
+        amount: orderData?.amount || Math.round(additionalAmount * 100),
+        currency: orderData?.currency || 'INR',
+        name: 'PlantoPark Safe P2P',
+        description: `Extend Slot ${targetBooking.slotId || 'Slot-1'} by ${selectedHours} hr(s)`,
+        order_id: orderData?.orderId,
+        handler: async function (response) {
+          try {
+            setExtendLoading(true);
+            const verifyRes = await fetch(`${API_URL}/bookings/${targetBooking._id}/extend-verify`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`
+              },
+              body: JSON.stringify({
+                extendHours: selectedHours,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_signature: response.razorpay_signature,
+                isMock: false
+              })
+            });
+
+            const verifyData = await verifyRes.json();
+            if (verifyRes.ok) {
+              setExtendingBooking(null);
+              setExtendHours(1);
+              await fetchData();
+              alert(`🎉 Parking Pass Extended Successfully!\n\nYour slot ${targetBooking.slotId || 'Slot-1'} is extended by +${selectedHours} hr(s).\nPayment of ₹${Number(additionalAmount).toFixed(2)} received.`);
+            } else {
+              setExtendError(verifyData.message || 'Payment verification failed.');
+            }
+          } catch (verErr) {
+            console.error('Extend verification error:', verErr);
+            alert('Extension payment completed. Updating your booking pass...');
+            await fetchData();
+            setExtendingBooking(null);
+          } finally {
+            setExtendLoading(false);
+          }
+        },
+        prefill: {
+          name: user?.name || targetBooking.seekerName || '',
+          email: user?.email || '',
+          contact: user?.contact || targetBooking.seekerContact || ''
+        },
+        theme: {
+          color: '#10b981'
+        },
+        modal: {
+          ondismiss: function () {
+            setExtendLoading(false);
+          }
+        }
+      };
+
+      const paymentObject = new window.Razorpay(options);
+      paymentObject.open();
+
     } catch (err) {
-      console.error(err);
-      setExtendError('Connection error. Please try again.');
+      console.error('Error extending booking:', err);
+      setExtendError('Failed to initiate payment gateway. Please try again.');
+      setExtendLoading(false);
     }
-    setExtendLoading(false);
   };
 
   const handlePay = async (e) => {
@@ -3291,14 +3368,18 @@ const SeekerDashboard = () => {
               <button
                 type="submit"
                 disabled={extendLoading}
-                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold py-3.5 rounded-xl text-sm shadow transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
+                className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-extrabold py-3.5 rounded-xl text-sm shadow-md transition-all hover:-translate-y-0.5 disabled:opacity-60 flex items-center justify-center gap-2 cursor-pointer"
               >
                 {extendLoading ? (
                   <>
                     <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    Checking Slot Availability...
+                    <span>Connecting to Razorpay...</span>
                   </>
-                ) : 'Confirm Extension'}
+                ) : (
+                  <>
+                    <span>💳 Pay ₹{(extendHours * (extendingBooking.spaceId?.pricePerHour || 0)).toFixed(0)} with Razorpay</span>
+                  </>
+                )}
               </button>
             </form>
           </div>

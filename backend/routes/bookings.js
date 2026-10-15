@@ -1391,9 +1391,12 @@ router.post('/:id/extend-verify', protect, seekerOnly, async (req, res) => {
   }
 });
 
-// Fallback legacy extend route
+// Fallback legacy extend route - strictly require payment credentials
 router.post('/:id/extend', protect, seekerOnly, async (req, res) => {
-  const { extendHours } = req.body;
+  const { extendHours, razorpay_payment_id, razorpay_order_id } = req.body;
+  if (!razorpay_payment_id && !razorpay_order_id) {
+    return res.status(400).json({ message: 'Payment required: Please complete Razorpay payment to extend your booking duration.' });
+  }
   try {
     const booking = await Booking.findById(req.params.id);
     if (!booking) return res.status(404).json({ message: 'Booking not found' });
