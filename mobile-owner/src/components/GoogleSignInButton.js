@@ -5,47 +5,16 @@ import {
   StyleSheet,
   ActivityIndicator,
   View,
-  Linking,
+  Alert,
 } from 'react-native';
-import * as WebBrowser from 'expo-web-browser';
+import {
+  GoogleSignin,
+  statusCodes,
+} from '@react-native-google-signin/google-signin';
 
-try {
-  WebBrowser.maybeCompleteAuthSession();
-} catch (e) {
-  // Ignore in case environment does not support it
-}
-
-const GOOGLE_CLIENT_ID =
+const GOOGLE_WEB_CLIENT_ID =
   process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID ||
   '908977180-dkg2d8h9109b4tvsnaf51scbmi4l09or.apps.googleusercontent.com';
-const BRIDGE_REDIRECT_URI = 'https://plantopark.com/google-auth-bridge';
-const APP_SCHEME = 'plantopark-owner';
-
-function extractTokenFromUrl(url) {
-  if (!url) return null;
-  try {
-    // 1. Search params (?id_token=... or ?access_token=...)
-    const queryIdx = url.indexOf('?');
-    if (queryIdx !== -1) {
-      const qs = url.substring(queryIdx + 1).split('#')[0];
-      const params = new URLSearchParams(qs);
-      const token = params.get('id_token') || params.get('access_token');
-      if (token) return token;
-    }
-
-    // 2. Hash params (#id_token=... or #access_token=...)
-    const hashIdx = url.indexOf('#');
-    if (hashIdx !== -1) {
-      const hs = url.substring(hashIdx + 1);
-      const params = new URLSearchParams(hs);
-      const token = params.get('id_token') || params.get('access_token');
-      if (token) return token;
-    }
-  } catch (e) {
-    console.warn('Error extracting token from URL:', e);
-  }
-  return null;
-}
 
 class GoogleErrorBoundary extends React.Component {
   state = { hasError: false };
@@ -67,59 +36,39 @@ function GoogleSignInButtonInner({ onAuthSuccess, text = 'Sign in with Google', 
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    const handleDeepLink = (event) => {
-      if (event?.url && event.url.startsWith(`${APP_SCHEME}://`)) {
-        try {
-          WebBrowser.dismissBrowser();
-        } catch (e) {}
-        const token = extractTokenFromUrl(event.url);
-        if (token) {
-          onAuthSuccess(token);
-        }
-      }
-    };
-
-    const subscription = Linking.addEventListener('url', handleDeepLink);
-
-    // Check if app was opened via cold-start deep link
-    Linking.getInitialURL().then((initialUrl) => {
-      if (initialUrl && initialUrl.startsWith(`${APP_SCHEME}://`)) {
-        const token = extractTokenFromUrl(initialUrl);
-        if (token) {
-          onAuthSuccess(token);
-        }
-      }
-    }).catch(() => {});
-
-    return () => {
-      subscription.remove();
-    };
-  }, [onAuthSuccess]);
+    try {
+      GoogleSignin.configure({
+        webClientId: GOOGLE_WEB_CLIENT_ID,
+        offlineAccess: false,
+        scopes: ['profile', 'email'],
+      });
+    } catch (e) {
+      console.warn('GoogleSignin configure error:', e);
+    }
+  }, []);
 
   const handlePress = async () => {
     try {
       setLoading(true);
-
-      const authUrl =
-        `https://accounts.google.com/o/oauth2/v2/auth` +
-        `?client_id=${encodeURIComponent(GOOGLE_CLIENT_ID)}` +
-        `&redirect_uri=${encodeURIComponent(BRIDGE_REDIRECT_URI)}` +
-        `&response_type=token%20id_token` +
-        `&scope=${encodeURIComponent('openid email profile')}` +
-        `&nonce=${Date.now()}` +
-        `&prompt=select_account` +
-        `&state=${encodeURIComponent(APP_SCHEME)}`;
-
-      const result = await WebBrowser.openAuthSessionAsync(authUrl, `${APP_SCHEME}://`);
-
-      if (result.type === 'success' && result.url) {
-        const token = extractTokenFromUrl(result.url);
-        if (token) {
-          onAuthSuccess(token);
-        }
+      await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+      const userInfo = await GoogleSignin.signIn();
+      const token = userInfo.data?.idToken || userInfo.idToken;
+      if (token) {
+        onAuthSuccess(token);
+      } else {
+        Alert.alert('Google Sign-In', 'Could not obtain Google authentication token.');
       }
-    } catch (e) {
-      console.warn('Google auth bridge error:', e);
+    } catch (error) {
+      if (error.code === statusCodes.SIGN_IN_CANCELLED) {
+        // User cancelled, do nothing
+      } else if (error.code === statusCodes.IN_PROGRESS) {
+        // Operation already in progress
+      } else if (error.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
+        Alert.alert('Google Play Services', 'Google Play Services is not available or outdated on this device.');
+      } else {
+        console.warn('Google native sign-in error:', error);
+        Alert.alert('Google Sign-In Failed', error.message || 'Failed to sign in with Google');
+      }
     } finally {
       setLoading(false);
     }
