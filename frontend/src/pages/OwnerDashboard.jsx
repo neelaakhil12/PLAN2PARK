@@ -2273,13 +2273,6 @@ const OwnerDashboard = () => {
                   to="/terms"
                   className="bg-white hover:bg-slate-50 border border-slate-200 rounded-2xl p-4 flex items-center justify-between text-slate-800 font-extrabold text-sm transition-colors block"
                 >
-                  <span className="flex items-center gap-2">🚜 Terms &amp; Conditions for Storage Yard Owner</span>
-                  <span className="text-amber-600 text-xs font-bold">30 Clauses →</span>
-                </Link>
-                <Link
-                  to="/terms"
-                  className="bg-white hover:bg-slate-50 border border-slate-200 rounded-2xl p-4 flex items-center justify-between text-slate-800 font-extrabold text-sm transition-colors block"
-                >
                   <span className="flex items-center gap-2">🏢 Terms &amp; Conditions for Space Owner</span>
                   <span className="text-indigo-600 text-xs font-bold">30 Clauses →</span>
                 </Link>
