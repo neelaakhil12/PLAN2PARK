@@ -141,6 +141,7 @@ const AdminDashboard = () => {
   const [inlineFaqAnswer, setInlineFaqAnswer] = useState('');
   const [showInlineAddFaq, setShowInlineAddFaq] = useState(false);
   const [newFaqCategory, setNewFaqCategory] = useState('');
+  const [isCustomFaqCategory, setIsCustomFaqCategory] = useState(false);
   const [newFaqQuestion, setNewFaqQuestion] = useState('');
   const [newFaqAnswer, setNewFaqAnswer] = useState('');
   const [newFaqOrder, setNewFaqOrder] = useState(1);
@@ -3041,7 +3042,9 @@ const AdminDashboard = () => {
                                 setInlineEditingFaqId(null);
                                 setNewFaqQuestion('');
                                 setNewFaqAnswer('');
-                                setNewFaqCategory('General');
+                                const cats = uniqueCategories.filter(c => c !== 'all');
+                                setNewFaqCategory(cats[0] || 'General');
+                                setIsCustomFaqCategory(false);
                                 setNewFaqOrder((audienceFaqs.length || 0) + 1);
                                 setShowInlineAddFaq(prev => !prev);
                               }}
@@ -3215,14 +3218,51 @@ const AdminDashboard = () => {
 
                             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                               <div>
-                                <label className="block text-[10px] font-bold text-slate-500 mb-1">Topic / Category *</label>
-                                <input
-                                  type="text"
-                                  value={newFaqCategory}
-                                  onChange={(e) => setNewFaqCategory(e.target.value)}
-                                  placeholder="e.g. Booking & Cancellations"
-                                  className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:border-cyan-500"
-                                />
+                                <div className="flex items-center justify-between mb-1">
+                                  <label className="block text-[10px] font-bold text-slate-500">Topic / Category *</label>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setIsCustomFaqCategory(!isCustomFaqCategory);
+                                      if (!isCustomFaqCategory) setNewFaqCategory('');
+                                    }}
+                                    className="text-[10px] text-cyan-700 hover:text-cyan-900 font-extrabold underline cursor-pointer"
+                                  >
+                                    {isCustomFaqCategory ? '‹ Pick Existing Category' : '+ Create New Category'}
+                                  </button>
+                                </div>
+                                {isCustomFaqCategory ? (
+                                  <input
+                                    type="text"
+                                    required
+                                    value={newFaqCategory}
+                                    onChange={(e) => setNewFaqCategory(e.target.value)}
+                                    placeholder="Enter new category name..."
+                                    className="w-full px-3 py-2 bg-white border border-cyan-400 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-cyan-200"
+                                    autoFocus
+                                  />
+                                ) : (
+                                  <select
+                                    value={newFaqCategory}
+                                    onChange={(e) => {
+                                      if (e.target.value === '__new__') {
+                                        setIsCustomFaqCategory(true);
+                                        setNewFaqCategory('');
+                                      } else {
+                                        setNewFaqCategory(e.target.value);
+                                      }
+                                    }}
+                                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:border-cyan-500 cursor-pointer"
+                                  >
+                                    <option value="" disabled>-- Select Existing Category --</option>
+                                    {uniqueCategories.filter(c => c !== 'all').map(cat => (
+                                      <option key={cat} value={cat}>
+                                        {cat} ({audienceFaqs.filter(f => f.category === cat).length} FAQs)
+                                      </option>
+                                    ))}
+                                    <option value="__new__">➕ + Create New Category...</option>
+                                  </select>
+                                )}
                               </div>
                               <div>
                                 <label className="block text-[10px] font-bold text-slate-500 mb-1">Display Order</label>
@@ -3322,13 +3362,29 @@ const AdminDashboard = () => {
                                         </td>
                                         <td className="px-5 py-4 align-top">
                                           {isInlineEditing ? (
-                                            <input
-                                              type="text"
-                                              value={inlineFaqCategory}
-                                              onChange={(e) => setInlineFaqCategory(e.target.value)}
-                                              placeholder="Category"
-                                              className="w-full px-2.5 py-1.5 bg-white border border-cyan-300 rounded-lg text-xs font-semibold text-slate-800 focus:outline-none focus:ring-1 focus:ring-cyan-500"
-                                            />
+                                            <div className="space-y-1">
+                                              <select
+                                                value={uniqueCategories.includes(inlineFaqCategory) ? inlineFaqCategory : '__custom__'}
+                                                onChange={(e) => {
+                                                  if (e.target.value !== '__custom__') {
+                                                    setInlineFaqCategory(e.target.value);
+                                                  }
+                                                }}
+                                                className="w-full px-2 py-1 bg-white border border-cyan-300 rounded-lg text-xs font-semibold text-slate-800 focus:outline-none cursor-pointer"
+                                              >
+                                                {uniqueCategories.filter(c => c !== 'all').map(cat => (
+                                                  <option key={cat} value={cat}>{cat}</option>
+                                                ))}
+                                                <option value="__custom__">Custom / Type Other...</option>
+                                              </select>
+                                              <input
+                                                type="text"
+                                                value={inlineFaqCategory}
+                                                onChange={(e) => setInlineFaqCategory(e.target.value)}
+                                                placeholder="Category name"
+                                                className="w-full px-2.5 py-1 bg-white border border-cyan-300 rounded-lg text-xs font-semibold text-slate-800 focus:outline-none focus:ring-1 focus:ring-cyan-500"
+                                              />
+                                            </div>
                                           ) : (
                                             <span className="inline-block px-2.5 py-1 rounded-lg text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
                                               {faq.category || 'General'}
@@ -5237,7 +5293,8 @@ const AdminDashboard = () => {
                               </tr>
                             ) : filteredBookings.map(b => {
                               const isCancelled = b.status === 'cancelled';
-                              const grossAmount = b.totalAmount || 0;
+                              const grossAmount = Number(((b.totalAmount || 0) + (b.walletAmountUsed || 0)).toFixed(2));
+                              const isWalletPaid = (b.walletAmountUsed || 0) > 0;
                               const refundAmount = b.refundAmount || 0;
                               const retainedGross = Math.max(0, grossAmount - refundAmount);
 
@@ -5303,12 +5360,22 @@ const AdminDashboard = () => {
                                   {/* Seeker Paid (Gross & Duration) */}
                                   <td className="px-6 py-4">
                                     <div>
-                                      <div className="flex items-baseline gap-1.5">
+                                      <div className="flex items-baseline gap-1.5 flex-wrap">
                                         <span className={`text-sm font-black ${isCancelled ? 'line-through text-slate-400' : 'text-slate-900'}`}>
                                           ₹{grossAmount}
                                         </span>
                                         <span className="text-[11px] text-slate-400 font-medium">({b.hours} hrs)</span>
                                       </div>
+
+                                      {/* Wallet Payment Indicator Badge */}
+                                      {isWalletPaid && (
+                                        <div className="mt-1">
+                                          <span className="inline-flex items-center gap-1 text-[10px] font-black px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 border border-purple-200 shadow-xs">
+                                            <span>💳 WALLET</span>
+                                            {b.totalAmount > 0 && <span className="font-semibold text-purple-600 text-[9px]">(₹{b.walletAmountUsed})</span>}
+                                          </span>
+                                        </div>
+                                      )}
 
                                       {/* Refund Details for Cancelled Bookings */}
                                       {isCancelled && (
@@ -5578,10 +5645,19 @@ const AdminDashboard = () => {
                                   <p className="font-bold text-slate-800 truncate max-w-[160px]">{b.spaceId?.address || 'Address Deleted'}</p>
                                   <p className="text-[10px] text-slate-400">{b.spaceId?.location || 'Location'}</p>
                                 </td>
-                                <td className="px-6 py-4 font-black text-slate-900">₹{b.totalAmount}</td>
-                                <td className="px-6 py-4 text-emerald-650 font-bold">₹{b.adminCommission || (b.totalAmount * 0.1).toFixed(2)}</td>
-                                <td className="px-6 py-4 text-slate-650 font-bold">₹{b.ownerEarnings || (b.totalAmount * 0.9).toFixed(2)}</td>
-                                <td className="px-6 py-4 font-mono text-[10px] text-slate-400 uppercase truncate max-w-[100px]">{b.transactionReference || 'simulated_cash'}</td>
+                                <td className="px-6 py-4 font-black text-slate-900">
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <span>₹{Number(((b.totalAmount || 0) + (b.walletAmountUsed || 0)).toFixed(2))}</span>
+                                    {(b.walletAmountUsed || 0) > 0 && (
+                                      <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-purple-50 text-purple-700 border border-purple-200">
+                                        WALLET {b.totalAmount > 0 ? `(₹${b.walletAmountUsed})` : ''}
+                                      </span>
+                                    )}
+                                  </div>
+                                </td>
+                                <td className="px-6 py-4 text-emerald-650 font-bold">₹{b.adminCommission !== undefined ? b.adminCommission : (((b.totalAmount || 0) + (b.walletAmountUsed || 0)) * 0.1).toFixed(2)}</td>
+                                <td className="px-6 py-4 text-slate-650 font-bold">₹{b.ownerEarnings !== undefined ? b.ownerEarnings : (((b.totalAmount || 0) + (b.walletAmountUsed || 0)) * 0.9).toFixed(2)}</td>
+                                <td className="px-6 py-4 font-mono text-[10px] text-slate-400 uppercase truncate max-w-[100px]">{b.transactionReference || ((b.walletAmountUsed || 0) > 0 && b.totalAmount === 0 ? 'wallet_balance' : 'simulated_cash')}</td>
                                 <td className="px-6 py-4 text-slate-400 text-xs">{new Date(b.createdAt).toLocaleString()}</td>
                                 <td className="px-6 py-4 text-right">
                                   <button onClick={() => setViewingInvoiceId(b._id)} className="text-blue-600 hover:underline font-bold text-xs bg-blue-50 px-3 py-1.5 rounded-lg border border-blue-100">
@@ -5783,8 +5859,8 @@ const AdminDashboard = () => {
                                       <div className="mt-2">
                                         <button
                                           type="button"
-                                          onClick={() => setViewingReceiptUrl(payout.ownerQrCodeImage.startsWith('http') ? payout.ownerQrCodeImage : `${API_URL}${payout.ownerQrCodeImage}`)}
-                                          className="inline-flex items-center gap-1 text-[11px] font-bold text-purple-700 bg-purple-50 hover:bg-purple-100 px-2 py-0.5 rounded border border-purple-200 transition"
+                                          onClick={() => setViewingReceiptUrl(getImageUrl(payout.ownerQrCodeImage))}
+                                          className="inline-flex items-center gap-1 text-[11px] font-bold text-purple-700 bg-purple-50 hover:bg-purple-100 px-2 py-0.5 rounded border border-purple-200 transition cursor-pointer"
                                         >
                                           <QrCode className="h-3 w-3 text-purple-600" />
                                           View Owner QR
@@ -5840,8 +5916,8 @@ const AdminDashboard = () => {
                                         {payout.adminReceiptImage ? (
                                           <button
                                             type="button"
-                                            onClick={() => setViewingReceiptUrl(payout.adminReceiptImage.startsWith('http') ? payout.adminReceiptImage : `${API_URL}${payout.adminReceiptImage}`)}
-                                            className="inline-flex items-center gap-1 text-[11px] font-bold text-indigo-600 hover:text-indigo-800 hover:underline bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-200"
+                                            onClick={() => setViewingReceiptUrl(getImageUrl(payout.adminReceiptImage))}
+                                            className="inline-flex items-center gap-1 text-[11px] font-bold text-indigo-600 hover:text-indigo-800 hover:underline bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-200 cursor-pointer"
                                           >
                                             <Eye className="h-3 w-3" /> View Receipt
                                           </button>
@@ -6153,15 +6229,14 @@ const AdminDashboard = () => {
           <div className="relative max-w-2xl w-full bg-slate-900 rounded-3xl overflow-hidden shadow-2xl p-4 flex flex-col items-center">
             <div className="w-full flex items-center justify-between pb-3 px-2 border-b border-slate-800">
               <span className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
-                <Eye className="h-4 w-4 text-emerald-400" /> Payment Proof Receipt Screenshot
+                <Eye className="h-4 w-4 text-emerald-400" /> Payment Proof Receipt / QR Screenshot
               </span>
               <div className="flex items-center gap-2">
                 <a
-                  href={viewingReceiptUrl}
+                  href={getImageUrl ? getImageUrl(viewingReceiptUrl) : viewingReceiptUrl}
                   target="_blank"
                   rel="noreferrer"
-                  download
-                  className="text-xs text-indigo-400 hover:underline flex items-center gap-1"
+                  className="text-xs text-indigo-400 hover:underline flex items-center gap-1 cursor-pointer"
                 >
                   <ExternalLink className="h-3.5 w-3.5" /> Open original
                 </a>
@@ -6173,11 +6248,22 @@ const AdminDashboard = () => {
                 </button>
               </div>
             </div>
-            <div className="p-4 flex items-center justify-center max-h-[75vh] overflow-auto">
+            <div className="p-4 flex items-center justify-center max-h-[75vh] w-full overflow-auto">
               <img
                 src={getImageUrl ? getImageUrl(viewingReceiptUrl) : viewingReceiptUrl}
                 alt="Receipt screenshot"
-                className="max-h-[70vh] w-auto rounded-xl object-contain shadow-lg"
+                className="max-h-[70vh] w-auto max-w-full rounded-xl object-contain shadow-lg bg-white/5"
+                onError={(e) => {
+                  if (!e.target.dataset.tried) {
+                    e.target.dataset.tried = 'true';
+                    const cur = e.target.src;
+                    if (cur.includes('/api/uploads/')) {
+                      e.target.src = cur.replace('/api/uploads/', '/uploads/');
+                    } else if (cur.includes('/uploads/')) {
+                      e.target.src = cur.replace('/uploads/', '/api/uploads/');
+                    }
+                  }
+                }}
               />
             </div>
           </div>

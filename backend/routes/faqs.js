@@ -42,6 +42,7 @@ const ensureDefaultFaqs = async (audience) => {
 // @route   GET /api/faqs
 // @access  Public
 router.get('/', async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
   const { q, category, audience } = req.query;
   const targetAudience = normalizeAudience(audience);
 
@@ -92,6 +93,7 @@ router.get('/', async (req, res) => {
 // @route   GET /api/faqs/categories
 // @access  Public
 router.get('/categories', async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
   const { audience } = req.query;
   const targetAudience = normalizeAudience(audience);
 
