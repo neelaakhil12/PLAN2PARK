@@ -81,6 +81,7 @@ const getMinWithdrawalAmount = async () => {
 // @route   GET /api/wallet/owner
 // @access  Private (Owner)
 router.get('/owner', protect, ownerOnly, async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
   try {
     const user = await User.findById(req.user._id);
     if (!user) return res.status(404).json({ message: 'User not found' });

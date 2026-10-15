@@ -16,7 +16,6 @@ import { AuthContext } from '../../context/AuthContext';
 import { COLORS } from '../../theme/colors';
 import Button from '../../components/Button';
 import Header from '../../components/Header';
-import GoogleSignInButton from '../../components/GoogleSignInButton';
 
 export default function RegisterScreen({ route, navigation }) {
   const { signupForRole, googleRegister } = useContext(AuthContext);
@@ -157,13 +156,6 @@ export default function RegisterScreen({ route, navigation }) {
           onPress={handleRegister}
           disabled={loading}
           style={[styles.submitBtn, { backgroundColor: themeColor }]}
-        />
-
-        {/* Google Sign Up */}
-        <GoogleSignInButton
-          onAuthSuccess={handleGoogleSuccess}
-          text="Sign up with Google"
-          disabled={loading}
         />
 
         <View style={styles.footerRow}>

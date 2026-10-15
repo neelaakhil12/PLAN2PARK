@@ -45,6 +45,7 @@ export default function WalletScreen({ navigation }) {
   const [ledgerFilter, setLedgerFilter] = useState('all'); // 'all' | 'credit' | 'debit'
   const [withdrawModalVisible, setWithdrawModalVisible] = useState(false);
   const [submittingWithdraw, setSubmittingWithdraw] = useState(false);
+  const [btnRefreshing, setBtnRefreshing] = useState(false);
 
   // Withdrawal form fields
   const [withdrawAmount, setWithdrawAmount] = useState('');
@@ -68,8 +69,12 @@ export default function WalletScreen({ navigation }) {
   const fetchWalletData = async () => {
     try {
       const baseUrl = await getBaseApiUrl();
-      const res = await fetch(`${baseUrl}/wallet/owner`, {
-        headers: { Authorization: `Bearer ${token}` },
+      const res = await fetch(`${baseUrl}/wallet/owner?t=${Date.now()}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          Pragma: 'no-cache',
+        },
       });
       if (res.ok) {
         const data = await res.json();
@@ -89,6 +94,7 @@ export default function WalletScreen({ navigation }) {
     } finally {
       setLoading(false);
       setRefreshing(false);
+      setBtnRefreshing(false);
     }
   };
 
@@ -255,8 +261,20 @@ export default function WalletScreen({ navigation }) {
               : 'Host Parking Space Partner'}
           </Text>
         </View>
-        <TouchableOpacity style={styles.refreshBtn} onPress={fetchWalletData}>
-          <Text style={styles.refreshText}>🔄</Text>
+        <TouchableOpacity
+          style={styles.refreshBtn}
+          onPress={async () => {
+            setBtnRefreshing(true);
+            await fetchWalletData();
+          }}
+          disabled={btnRefreshing}
+          activeOpacity={0.7}
+        >
+          {btnRefreshing ? (
+            <ActivityIndicator size="small" color="#c4b5fd" />
+          ) : (
+            <Text style={styles.refreshText}>🔄</Text>
+          )}
         </TouchableOpacity>
       </View>
 
