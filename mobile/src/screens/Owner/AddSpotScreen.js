@@ -38,35 +38,55 @@ export default function AddSpotScreen({ route, navigation }) {
   const [colonyArea, setColonyArea] = useState('');
   const [landmark, setLandmark] = useState('');
   const [address, setAddress] = useState(editingSpot?.address || '');
-  const [city, setCity] = useState(editingSpot?.city || 'Hyderabad');
-  const [pincode, setPincode] = useState('500097');
+  const [city, setCity] = useState(editingSpot?.city || '');
+  const [pincode, setPincode] = useState(editingSpot?.pincode || '');
   const [googleMapsLink, setGoogleMapsLink] = useState(editingSpot?.locationLink || editingSpot?.googleMapsLink || '');
   const [lat, setLat] = useState(editingSpot?.coordinates?.lat || editingSpot?.lat || null);
   const [lng, setLng] = useState(editingSpot?.coordinates?.lng || editingSpot?.lng || null);
-  const [hourlyRate, setHourlyRate] = useState(String(editingSpot?.pricePerHour || editingSpot?.hourlyRate || '50'));
+  const [hourlyRate, setHourlyRate] = useState(
+    editingSpot?.pricePerHour !== undefined && editingSpot?.pricePerHour !== null
+      ? String(editingSpot.pricePerHour)
+      : (editingSpot?.hourlyRate !== undefined && editingSpot?.hourlyRate !== null ? String(editingSpot.hourlyRate) : '')
+  );
   const [dailyRate, setDailyRate] = useState(
-    String(editingSpot?.pricePerDay || (editingSpot?.pricePerHour ? editingSpot.pricePerHour * 8 : '400'))
+    editingSpot?.pricePerDay !== undefined && editingSpot?.pricePerDay !== null
+      ? String(editingSpot.pricePerDay)
+      : ''
   );
   const [monthlyRate, setMonthlyRate] = useState(
-    String(editingSpot?.pricePerMonth || (editingSpot?.pricePerHour ? editingSpot.pricePerHour * 8 * 25 : '6000'))
+    editingSpot?.pricePerMonth !== undefined && editingSpot?.pricePerMonth !== null
+      ? String(editingSpot.pricePerMonth)
+      : ''
   );
-  const [totalSpots, setTotalSpots] = useState(String(editingSpot?.totalSlots || (editingSpot?.slots ? editingSpot.slots.length : null) || editingSpot?.totalSpots || '5'));
+  const [totalSpots, setTotalSpots] = useState(
+    editingSpot?.totalSlots !== undefined && editingSpot?.totalSlots !== null
+      ? String(editingSpot.totalSlots)
+      : (editingSpot?.totalSpots !== undefined && editingSpot?.totalSpots !== null ? String(editingSpot.totalSpots) : '')
+  );
   const [hasEvCharger, setHasEvCharger] = useState(Boolean(editingSpot?.hasEvCharger));
   const [isActive, setIsActive] = useState(editingSpot?.isActive !== false);
   const [cancellationPolicy, setCancellationPolicy] = useState(editingSpot?.cancellationPolicy || 'full');
-  const [maxWalletDiscount, setMaxWalletDiscount] = useState(String(editingSpot?.maxWalletDiscount !== undefined ? editingSpot.maxWalletDiscount : '10'));
+  const [maxWalletDiscount, setMaxWalletDiscount] = useState(
+    editingSpot?.maxWalletDiscount !== undefined && editingSpot?.maxWalletDiscount !== null
+      ? String(editingSpot.maxWalletDiscount)
+      : ''
+  );
   const [suitableVehicles, setSuitableVehicles] = useState(
     editingSpot?.suitableVehicles && editingSpot.suitableVehicles.length > 0
       ? editingSpot.suitableVehicles
-      : ['hatchback', 'sedan', 'suv', '2-wheeler']
+      : []
   );
 
   // Commercial Vehicle Storage Yard (Banks & Auto Finance) fields
   const [isVehicleStorageYard, setIsVehicleStorageYard] = useState(
     editingSpot?.spaceCategory === 'commercial_vehicle_storage' || user?.accountCategory === 'vehicle_storage_owner'
   );
-  const [landAcres, setLandAcres] = useState(String(editingSpot?.landAcres || user?.landAcres || '1.0'));
-  const [monthlyStorageRate, setMonthlyStorageRate] = useState(String(editingSpot?.monthlyStorageRate || '1500'));
+  const [landAcres, setLandAcres] = useState(
+    editingSpot?.landAcres ? String(editingSpot.landAcres) : ''
+  );
+  const [monthlyStorageRate, setMonthlyStorageRate] = useState(
+    editingSpot?.monthlyStorageRate ? String(editingSpot.monthlyStorageRate) : ''
+  );
   const [hasCompoundWall, setHasCompoundWall] = useState(editingSpot?.securityFacilities?.hasCompoundWall !== false);
   const [has24x7Guards, setHas24x7Guards] = useState(editingSpot?.securityFacilities?.has24x7Guards !== false);
   const [hasCctv, setHasCctv] = useState(editingSpot?.securityFacilities?.hasCctv !== false);
@@ -82,28 +102,40 @@ export default function AddSpotScreen({ route, navigation }) {
     if (s) {
       setTitle(s.title || '');
       setAddress(s.address || '');
-      setCity(s.city || 'Hyderabad');
+      setCity(s.city || '');
+      setPincode(s.pincode || '');
       setGoogleMapsLink(s.locationLink || s.googleMapsLink || '');
       setLat(s.coordinates?.lat || s.lat || null);
       setLng(s.coordinates?.lng || s.lng || null);
-      setHourlyRate(String(s.pricePerHour !== undefined ? s.pricePerHour : (s.hourlyRate || '50')));
+      setHourlyRate(
+        s.pricePerHour !== undefined && s.pricePerHour !== null
+          ? String(s.pricePerHour)
+          : (s.hourlyRate !== undefined && s.hourlyRate !== null ? String(s.hourlyRate) : '')
+      );
       if (s.pricePerDay !== undefined && s.pricePerDay !== null) {
         setDailyRate(String(s.pricePerDay));
-      } else if (s.pricePerHour) {
-        setDailyRate(String(s.pricePerHour * 8));
+      } else {
+        setDailyRate('');
       }
       if (s.pricePerMonth !== undefined && s.pricePerMonth !== null) {
         setMonthlyRate(String(s.pricePerMonth));
-      } else if (s.pricePerHour) {
-        setMonthlyRate(String(s.pricePerHour * 8 * 25));
+      } else {
+        setMonthlyRate('');
       }
-      setTotalSpots(String(s.totalSlots || (s.slots ? s.slots.length : null) || s.totalSpots || '5'));
+      setTotalSpots(
+        s.totalSlots !== undefined && s.totalSlots !== null
+          ? String(s.totalSlots)
+          : (s.totalSpots !== undefined && s.totalSpots !== null ? String(s.totalSpots) : '')
+      );
       setHasEvCharger(Boolean(s.hasEvCharger));
       setIsActive(s.isActive !== false);
       setCancellationPolicy(s.cancellationPolicy || 'full');
       if (s.landAcres) setLandAcres(String(s.landAcres));
       if (s.monthlyStorageRate !== undefined && s.monthlyStorageRate !== null) {
         setMonthlyStorageRate(String(s.monthlyStorageRate));
+      }
+      if (s.maxWalletDiscount !== undefined && s.maxWalletDiscount !== null) {
+        setMaxWalletDiscount(String(s.maxWalletDiscount));
       }
       if (s.securityFacilities) {
         if (s.securityFacilities.hasCompoundWall !== undefined) setHasCompoundWall(Boolean(s.securityFacilities.hasCompoundWall));
@@ -496,7 +528,7 @@ export default function AddSpotScreen({ route, navigation }) {
       plotNo: '',
       colonyArea: '',
       landmark: '',
-      city: 'Hyderabad',
+      city: city || '',
       address: `GPS: ${latitude.toFixed(6)}, ${longitude.toFixed(6)}`,
       googleMapsLink: mapsLink,
     });
@@ -506,8 +538,8 @@ export default function AddSpotScreen({ route, navigation }) {
     let detectedPlot = '';
     let detectedArea = '';
     let detectedLandmark = '';
-    let detectedCity = 'Hyderabad';
-    let detectedPin = pincode || '500001';
+    let detectedCity = city || '';
+    let detectedPin = pincode || '';
     let formattedAddr = '';
     let foundPlaces = [];
 
@@ -1058,7 +1090,7 @@ export default function AddSpotScreen({ route, navigation }) {
               <Text style={styles.label}>City</Text>
               <TextInput
                 style={styles.input}
-                placeholder="Hyderabad"
+                placeholder="e.g. Hyderabad"
                 placeholderTextColor={COLORS.textMuted}
                 value={city}
                 onChangeText={setCity}
@@ -1068,7 +1100,7 @@ export default function AddSpotScreen({ route, navigation }) {
               <Text style={styles.label}>Pincode</Text>
               <TextInput
                 style={styles.input}
-                placeholder="500097"
+                placeholder="e.g. 500001"
                 placeholderTextColor={COLORS.textMuted}
                 keyboardType="numeric"
                 value={pincode}
@@ -1131,14 +1163,14 @@ export default function AddSpotScreen({ route, navigation }) {
                     <Text style={{ fontSize: 11, color: '#fbbf24', fontWeight: '800' }}>Min 1.0 Ac</Text>
                   </View>
                   <TextInput
-                    style={[styles.input, parseFloat(landAcres) < 1.0 && { borderColor: '#ef4444', borderWidth: 2 }]}
-                    placeholder="1.0"
+                    style={[styles.input, !!landAcres && parseFloat(landAcres) < 1.0 && { borderColor: '#ef4444', borderWidth: 2 }]}
+                    placeholder="e.g. 1.0"
                     placeholderTextColor={COLORS.textMuted}
                     keyboardType="numeric"
                     value={landAcres}
                     onChangeText={setLandAcres}
                   />
-                  {parseFloat(landAcres) < 1.0 && (
+                  {!!landAcres && parseFloat(landAcres) < 1.0 && (
                     <Text style={{ color: '#ef4444', fontSize: 11, marginTop: -4, marginBottom: 8, fontWeight: '700' }}>
                       Minimum 1.0 Acre required!
                     </Text>
@@ -1149,7 +1181,7 @@ export default function AddSpotScreen({ route, navigation }) {
                   <Text style={styles.label}>Monthly Fee (₹/car/mo)</Text>
                   <TextInput
                     style={[styles.input, { borderColor: '#fbbf24', borderWidth: 1.5 }]}
-                    placeholder="1500"
+                    placeholder="e.g. 1500"
                     placeholderTextColor={COLORS.textMuted}
                     keyboardType="numeric"
                     value={monthlyStorageRate}
@@ -1163,7 +1195,7 @@ export default function AddSpotScreen({ route, navigation }) {
                 <Text style={styles.label}>Total Holding Capacity (Cars / Slots)</Text>
                 <TextInput
                   style={styles.input}
-                  placeholder={String(Math.round(Math.max(1, parseFloat(landAcres) || 1) * 80))}
+                  placeholder="e.g. 100"
                   placeholderTextColor={COLORS.textMuted}
                   keyboardType="numeric"
                   value={totalSpots}
@@ -1224,7 +1256,7 @@ export default function AddSpotScreen({ route, navigation }) {
                   <Text style={styles.label}>Hourly Rate (₹)</Text>
                   <TextInput
                     style={styles.input}
-                    placeholder="50"
+                    placeholder="e.g. 50"
                     placeholderTextColor={COLORS.textMuted}
                     keyboardType="numeric"
                     value={hourlyRate}
@@ -1235,7 +1267,7 @@ export default function AddSpotScreen({ route, navigation }) {
                   <Text style={styles.label}>Total Capacity (Slots)</Text>
                   <TextInput
                     style={styles.input}
-                    placeholder="5"
+                    placeholder="e.g. 5"
                     placeholderTextColor={COLORS.textMuted}
                     keyboardType="numeric"
                     value={totalSpots}
@@ -1250,7 +1282,7 @@ export default function AddSpotScreen({ route, navigation }) {
                   <Text style={styles.label}>Daily Rate (₹/day)</Text>
                   <TextInput
                     style={styles.input}
-                    placeholder="400"
+                    placeholder="e.g. 400"
                     placeholderTextColor={COLORS.textMuted}
                     keyboardType="numeric"
                     value={dailyRate}
@@ -1262,7 +1294,7 @@ export default function AddSpotScreen({ route, navigation }) {
                   <Text style={styles.label}>Monthly Rate (₹/mo)</Text>
                   <TextInput
                     style={styles.input}
-                    placeholder="6000"
+                    placeholder="e.g. 6000"
                     placeholderTextColor={COLORS.textMuted}
                     keyboardType="numeric"
                     value={monthlyRate}
@@ -1380,7 +1412,7 @@ export default function AddSpotScreen({ route, navigation }) {
             <Text style={styles.label}>⚡ Max Wallet Money Usable per Booking (₹)</Text>
             <TextInput
               style={styles.input}
-              placeholder="10"
+              placeholder="e.g. 10"
               placeholderTextColor={COLORS.textMuted}
               keyboardType="numeric"
               value={maxWalletDiscount}
