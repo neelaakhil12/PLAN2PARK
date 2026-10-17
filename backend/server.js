@@ -80,22 +80,75 @@ const seedAdmin = async () => {
   }
 };
 
-// Auto-complete expired bookings every 60 seconds
+// Auto-complete expired bookings every 60 seconds and release slots
 const autoCompleteExpiredBookings = async () => {
   try {
     const Booking = require('./models/Booking');
+    const ParkingSpace = require('./models/ParkingSpace');
+    const User = require('./models/User');
+    const { sendPushNotification } = require('./utils/pushNotifications');
+
     const now = new Date();
-    const result = await Booking.updateMany(
-      {
-        status: 'paid',
-        endTime: { $lt: now }
-      },
-      {
-        $set: { status: 'completed' }
+    // Find all active/checked-in/paid bookings that reached or exceeded their booked endTime
+    const expiredBookings = await Booking.find({
+      status: { $in: ['paid', 'checked_in'] },
+      endTime: { $lte: now }
+    });
+
+    if (expiredBookings.length > 0) {
+      for (const booking of expiredBookings) {
+        booking.status = 'completed';
+        if (!booking.checkOutTime) {
+          booking.checkOutTime = booking.endTime || now;
+        }
+        await booking.save();
+
+        // Release the slot in the parking space so it becomes available for new drivers
+        if (booking.spaceId && booking.slotId) {
+          try {
+            const space = await ParkingSpace.findById(booking.spaceId);
+            if (space && space.slots) {
+              const slot = space.slots.find(s => s.slotId === booking.slotId);
+              if (slot) {
+                slot.isAvailable = true;
+                await space.save();
+              }
+            }
+          } catch (spaceErr) {
+            console.error(`[Auto-Complete] Error releasing slot ${booking.slotId}:`, spaceErr.message);
+          }
+        }
+
+        // Notify Seeker and Space Owner
+        try {
+          const seeker = await User.findById(booking.seekerId);
+          if (seeker && seeker.pushToken) {
+            sendPushNotification(
+              seeker.pushToken,
+              '⏱️ Parking Session Completed',
+              `Your ${booking.hours || 1}-hour booking for slot ${booking.slotId || ''} has ended. Thank you for parking with PlanToPark!`,
+              { screen: 'Bookings', bookingId: booking._id }
+            );
+          }
+
+          const space = await ParkingSpace.findById(booking.spaceId);
+          if (space && space.ownerId) {
+            const owner = await User.findById(space.ownerId);
+            if (owner && owner.pushToken) {
+              sendPushNotification(
+                owner.pushToken,
+                '🅿️ Slot Released',
+                `Booking duration for slot ${booking.slotId || ''} at ${space.title || 'your spot'} has ended. Slot is now available for new bookings.`,
+                { screen: 'Orders', bookingId: booking._id }
+              );
+            }
+          }
+        } catch (notifErr) {
+          // non-critical notification error
+        }
       }
-    );
-    if (result.modifiedCount > 0) {
-      console.log(`[Auto-Complete] Automatically completed ${result.modifiedCount} expired parking sessions.`);
+
+      console.log(`[Auto-Complete] Automatically completed ${expiredBookings.length} expired parking sessions and released their slots.`);
     }
   } catch (err) {
     console.error('[Auto-Complete Error]:', err.message);
