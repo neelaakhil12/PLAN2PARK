@@ -8,7 +8,7 @@ import {
   AlertTriangle, ShieldAlert, Heart, ClipboardList, HelpCircle, Star, MessageSquare,
   Menu, X, Send, Tag, Sparkles, Megaphone, FileText, Edit2, Trash2, Plus,
   Percent, Upload, Eye, Landmark, Smartphone, Check, Save, ExternalLink, QrCode,
-  ArrowDownLeft, ArrowUpRight
+  ArrowDownLeft, ArrowUpRight, RefreshCw
 } from 'lucide-react';
 import Invoice from './Invoice';
 
@@ -914,6 +914,9 @@ const AdminDashboard = () => {
   useEffect(() => {
     if (currentView === 'revenue' && token) {
       fetchRevenueData();
+    }
+    if (currentView === 'wallet' && token) {
+      fetchData();
     }
     if (currentView === 'promotions' && token) {
       fetchPromotions();
@@ -5986,9 +5989,13 @@ const AdminDashboard = () => {
 
                   if (!isPaid && grossAmount <= 0) return;
 
-                  const commissionAmount = b.adminCommission !== undefined && b.adminCommission !== null
+                  const commissionAmount = (b.adminCommission !== undefined && b.adminCommission !== null && !isNaN(b.adminCommission) && Number(b.adminCommission) > 0)
                     ? Number(b.adminCommission)
-                    : Math.round(grossAmount * 0.1);
+                    : (grossAmount > 0 ? (grossAmount * (commissionRate || 15)) / 100 : 0);
+
+                  const commPercent = grossAmount > 0 && commissionAmount > 0
+                    ? Math.round((commissionAmount / grossAmount) * 100)
+                    : (commissionRate || 15);
 
                   // Credit event (when booking was confirmed/paid)
                   if (commissionAmount > 0) {
@@ -5998,7 +6005,8 @@ const AdminDashboard = () => {
                       bookingId: b._id,
                       bookingCode: b._id.toString().slice(-6).toUpperCase(),
                       type: 'credit',
-                      title: 'Platform Commission Credit (10%)',
+                      title: `Platform Commission Credit (${commPercent}%)`,
+                      commPercent,
                       grossAmount,
                       amount: commissionAmount,
                       commuter: b.seekerName || b.seekerId?.name || 'Commuter',
@@ -6022,7 +6030,8 @@ const AdminDashboard = () => {
                         bookingId: b._id,
                         bookingCode: b._id.toString().slice(-6).toUpperCase(),
                         type: 'reversal',
-                        title: 'Cancellation Commission Reversal (100% Refund)',
+                        title: `Cancellation Commission Reversal (${commPercent}% Refund)`,
+                        commPercent,
                         grossAmount,
                         amount: reversedAmount,
                         commuter: b.seekerName || b.seekerId?.name || 'Commuter',
@@ -6055,12 +6064,22 @@ const AdminDashboard = () => {
                           Platform Wallet &amp; Treasury <span className="text-xl">💳</span>
                         </h2>
                         <p className="text-xs text-slate-500 font-medium mt-0.5">
-                          Direct overview of platform commissions, credits, cancellation reversals, and net earnings.
+                          Direct real-time overview of platform commissions, credits, cancellation reversals, and net treasury earnings.
                         </p>
                       </div>
-                      <div className="bg-purple-50 text-purple-700 border border-purple-200 px-4 py-2 rounded-2xl text-xs font-black flex items-center gap-2">
-                        <Landmark className="h-4 w-4 text-purple-600" />
-                        10% Auto Platform Commission
+                      <div className="flex items-center gap-3">
+                        <button
+                          type="button"
+                          onClick={fetchData}
+                          className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
+                          title="Refresh platform transactions"
+                        >
+                          <RefreshCw className="h-3.5 w-3.5 text-purple-600" /> Refresh Data
+                        </button>
+                        <div className="bg-purple-50 text-purple-700 border border-purple-200 px-4 py-2 rounded-2xl text-xs font-black flex items-center gap-2">
+                          <Landmark className="h-4 w-4 text-purple-600" />
+                          {commissionRate || 15}% Active Platform Commission
+                        </div>
                       </div>
                     </div>
 
@@ -6149,7 +6168,7 @@ const AdminDashboard = () => {
                               <th className="px-5 py-4">Booking &amp; Commuter</th>
                               <th className="px-5 py-4">Parking Space &amp; Host</th>
                               <th className="px-5 py-4">Gross Fee</th>
-                              <th className="px-5 py-4">Commission (10%)</th>
+                              <th className="px-5 py-4">Commission Rate</th>
                               <th className="px-5 py-4 text-right">Net Impact</th>
                             </tr>
                           </thead>
@@ -6203,7 +6222,7 @@ const AdminDashboard = () => {
                                     </td>
                                     <td className="px-5 py-4">
                                       <span className="bg-purple-50 text-purple-700 border border-purple-200 text-[10px] font-black px-2 py-0.5 rounded-md">
-                                        10% Platform Fee
+                                        {tx.commPercent}% Platform Fee
                                       </span>
                                     </td>
                                     <td className="px-5 py-4 text-right">
