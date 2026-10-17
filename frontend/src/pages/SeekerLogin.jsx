@@ -67,6 +67,15 @@ const SeekerLogin = () => {
         </div>
 
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 sm:p-8">
+          {/* Important Platform Notice / Disclaimer */}
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-3.5 mb-5 flex items-start gap-2.5 text-left">
+            <AlertCircle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+            <div className="text-xs text-amber-900 leading-relaxed">
+              <span className="font-bold text-amber-950 uppercase tracking-wide text-[10.5px] block mb-0.5">⚠️ Important Platform Notice</span>
+              Plan To Park acts only as a technology platform connecting parking providers and vehicle owners. Plan to park is not responsible for any kind of disturbances like theft, dent, fight between space owner and vehicle owner. Both should coordinate each other.
+            </div>
+          </div>
+
           {error && (
             <div className="flex items-start gap-2 bg-rose-50 border border-rose-200 text-rose-600 p-3.5 rounded-xl mb-5 text-sm">
               <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />

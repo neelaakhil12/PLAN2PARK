@@ -99,6 +99,17 @@ export default function LoginScreen({ route, navigation }) {
           Enter your credentials to search and reserve parking spots
         </Text>
 
+        {/* Mandatory Platform Disclaimer */}
+        <View style={styles.warningBox}>
+          <View style={styles.warningHeader}>
+            <Ionicons name="warning" size={15} color="#fbbf24" style={{ marginRight: 6 }} />
+            <Text style={styles.warningTitle}>IMPORTANT PLATFORM NOTICE</Text>
+          </View>
+          <Text style={styles.warningText}>
+            Plan To Park acts only as a technology platform connecting parking providers and vehicle owners. Plan to park is not responsible for any kind of disturbances like theft, dent, fight between space owner and vehicle owner. Both should coordinate each other.
+          </Text>
+        </View>
+
         {!!errorMsg && (
           <View style={styles.errorBox}>
             <Text style={styles.errorTitle}>⚠️ Login Failed</Text>
@@ -219,6 +230,31 @@ const styles = StyleSheet.create({
     color: COLORS.textMuted,
     marginBottom: 20,
     lineHeight: 19,
+  },
+  warningBox: {
+    backgroundColor: 'rgba(245, 158, 11, 0.12)',
+    borderWidth: 1,
+    borderColor: '#f59e0b',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 16,
+  },
+  warningHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  warningTitle: {
+    color: '#fbbf24',
+    fontWeight: '800',
+    fontSize: 11.5,
+    letterSpacing: 0.5,
+  },
+  warningText: {
+    color: '#fef3c7',
+    fontSize: 11.5,
+    lineHeight: 17,
+    fontWeight: '500',
   },
   errorBox: {
     backgroundColor: 'rgba(239, 68, 68, 0.12)',

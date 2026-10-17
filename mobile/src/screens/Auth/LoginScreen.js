@@ -172,6 +172,25 @@ export default function LoginScreen({ route, navigation }) {
           </View>
         )}
 
+        {/* ⚠️ Mandatory Platform Disclaimer for Parking Seeker */}
+        {role === 'seeker' && (
+          <View style={{
+            backgroundColor: 'rgba(245, 158, 11, 0.12)',
+            borderWidth: 1.5,
+            borderColor: '#f59e0b',
+            borderRadius: 14,
+            padding: 12,
+            marginBottom: 16,
+          }}>
+            <Text style={{ color: '#fbbf24', fontWeight: '900', fontSize: 12, marginBottom: 4 }}>
+              ⚠️ IMPORTANT PLATFORM NOTICE
+            </Text>
+            <Text style={{ color: '#fef3c7', fontSize: 11.5, lineHeight: 17, fontWeight: '500' }}>
+              Plan To Park acts only as a technology platform connecting parking providers and vehicle owners. Plan to park is not responsible for any kind of disturbances like theft, dent, fight between space owner and vehicle owner. Both should coordinate each other.
+            </Text>
+          </View>
+        )}
+
         {!!errorMsg && (
           <View style={styles.errorBox}>
             <Text style={styles.errorTitle}>⚠️ Login Failed</Text>
