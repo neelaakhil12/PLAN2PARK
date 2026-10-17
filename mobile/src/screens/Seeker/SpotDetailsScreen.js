@@ -245,7 +245,9 @@ export default function SpotDetailsScreen({ route, navigation }) {
 
   const [vehicleNumber, setVehicleNumber] = useState(getUserPlateNumber() || '');
   const [vehicleType, setVehicleType] = useState('4-wheeler');
-  const [durationHours, setDurationHours] = useState('2');
+  const [durationHours, setDurationHours] = useState(2);
+  const [durationDays, setDurationDays] = useState(1);
+  const [durationMonths, setDurationMonths] = useState(1);
   const [bookingMode, setBookingMode] = useState('hourly'); // 'hourly', 'daily', 'monthly'
   const [loading, setLoading] = useState(false);
   const [bookingSuccessModal, setBookingSuccessModal] = useState(null);
@@ -294,15 +296,27 @@ export default function SpotDetailsScreen({ route, navigation }) {
 
   let rawTotalPrice = hourlyRate;
   let effectiveHours = Number(durationHours || 1);
+  let baseRateCalculationText = '';
+  let durationDisplayLabel = '';
+
   if (bookingMode === 'hourly') {
-    effectiveHours = Number(durationHours || 1);
-    rawTotalPrice = effectiveHours * hourlyRate;
+    const hrs = Math.max(1, Number(durationHours || 1));
+    effectiveHours = hrs;
+    rawTotalPrice = hrs * hourlyRate;
+    baseRateCalculationText = `₹${hourlyRate} × ${hrs} hr${hrs > 1 ? 's' : ''} = ₹${rawTotalPrice}`;
+    durationDisplayLabel = `${hrs} Hour${hrs > 1 ? 's' : ''}`;
   } else if (bookingMode === 'daily') {
-    effectiveHours = 24;
-    rawTotalPrice = dailyRate;
+    const days = Math.max(1, Number(durationDays || 1));
+    effectiveHours = days * 24;
+    rawTotalPrice = days * dailyRate;
+    baseRateCalculationText = `₹${dailyRate} × ${days} day${days > 1 ? 's' : ''} = ₹${rawTotalPrice}`;
+    durationDisplayLabel = `${days} Day${days > 1 ? 's' : ''}`;
   } else if (bookingMode === 'monthly') {
-    effectiveHours = 24 * 30;
-    rawTotalPrice = monthlyRate;
+    const months = Math.max(1, Number(durationMonths || 1));
+    effectiveHours = months * 24 * 30;
+    rawTotalPrice = months * monthlyRate;
+    baseRateCalculationText = `₹${monthlyRate} × ${months} mo${months > 1 ? 's' : ''} = ₹${rawTotalPrice}`;
+    durationDisplayLabel = `${months} Month${months > 1 ? 's' : ''}`;
   }
 
   const maxWalletAllowed = space.maxWalletDiscount !== undefined && space.maxWalletDiscount !== null ? Number(space.maxWalletDiscount) : 10;
@@ -381,6 +395,7 @@ export default function SpotDetailsScreen({ route, navigation }) {
           spotTitle: space.title || 'Parking Spot',
           vehicleNumber: vehicleNumber.trim().toUpperCase(),
           hours: actualHours,
+          durationLabel: durationDisplayLabel,
           totalAmount: 0,
           walletUsed: walletDiscount,
         });
@@ -497,6 +512,7 @@ export default function SpotDetailsScreen({ route, navigation }) {
         booking: newBooking,
         orderData,
         actualHours,
+        durationLabel: durationDisplayLabel,
       });
     } catch (err) {
       showAlert('Error', err.message || 'Network error during booking');
@@ -542,6 +558,7 @@ export default function SpotDetailsScreen({ route, navigation }) {
         spotTitle: space.title || 'Parking Spot',
         vehicleNumber: vehicleNumber.trim().toUpperCase(),
         hours: actualHours,
+        durationLabel: razorpayModal.durationLabel || durationDisplayLabel,
         totalAmount: finalPayablePrice,
         walletUsed: walletDiscount,
         paymentId: paymentId,
@@ -561,6 +578,7 @@ export default function SpotDetailsScreen({ route, navigation }) {
         spotTitle: space.title || 'Parking Spot',
         vehicleNumber: vehicleNumber.trim().toUpperCase(),
         hours: actualHours,
+        durationLabel: razorpayModal.durationLabel || durationDisplayLabel,
         totalAmount: finalPayablePrice,
         walletUsed: walletDiscount,
       });
@@ -992,23 +1010,171 @@ export default function SpotDetailsScreen({ route, navigation }) {
             })}
           </View>
 
-          {/* If Hourly mode selected, show hour selection chips */}
+          {/* Interactive +/- Stepper Duration Control */}
           {bookingMode === 'hourly' && (
-            <View style={{ marginBottom: 14 }}>
-              <Text style={styles.label}>Select Parking Hours</Text>
-              <View style={styles.durationRow}>
-                {['1', '2', '4', '8', '12'].map((hr) => (
+            <View style={styles.stepperContainer}>
+              <View style={styles.stepperHeaderRow}>
+                <Text style={styles.stepperHeaderTitle}>⏱️ Parking Duration (Hours)</Text>
+                <Text style={styles.stepperHeaderRate}>₹{hourlyRate}/hr</Text>
+              </View>
+
+              <View style={styles.stepperControlsRow}>
+                <TouchableOpacity
+                  style={[styles.stepperBtn, durationHours <= 1 && styles.stepperBtnDisabled]}
+                  onPress={() => setDurationHours((prev) => Math.max(1, prev - 1))}
+                  disabled={durationHours <= 1}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.stepperBtnTxt}>−</Text>
+                </TouchableOpacity>
+
+                <View style={styles.stepperValueBadge}>
+                  <Text style={styles.stepperValueTxt}>
+                    {durationHours} {durationHours === 1 ? 'Hour' : 'Hours'}
+                  </Text>
+                  <Text style={styles.stepperValueSub}>
+                    ₹{hourlyRate * durationHours} Total Base
+                  </Text>
+                </View>
+
+                <TouchableOpacity
+                  style={[styles.stepperBtn, durationHours >= 24 && styles.stepperBtnDisabled]}
+                  onPress={() => setDurationHours((prev) => Math.min(24, prev + 1))}
+                  disabled={durationHours >= 24}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.stepperBtnTxt}>+</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Quick Hours Presets */}
+              <View style={styles.stepperQuickChipsRow}>
+                {[1, 2, 4, 8, 12, 24].map((hr) => (
                   <TouchableOpacity
                     key={hr}
-                    style={[styles.durBtn, durationHours === hr && styles.durBtnActive]}
+                    style={[styles.stepperChip, durationHours === hr && styles.stepperChipActive]}
                     onPress={() => setDurationHours(hr)}
                     activeOpacity={0.8}
                   >
                     <Text
                       numberOfLines={1}
-                      style={[styles.durTxt, durationHours === hr && styles.durTxtActive]}
+                      style={[styles.stepperChipTxt, durationHours === hr && styles.stepperChipTxtActive]}
                     >
-                      {hr} hr{hr !== '1' ? 's' : ''}
+                      {hr}h
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          )}
+
+          {bookingMode === 'daily' && (
+            <View style={styles.stepperContainer}>
+              <View style={styles.stepperHeaderRow}>
+                <Text style={styles.stepperHeaderTitle}>📅 Parking Duration (Days)</Text>
+                <Text style={styles.stepperHeaderRate}>₹{dailyRate}/day</Text>
+              </View>
+
+              <View style={styles.stepperControlsRow}>
+                <TouchableOpacity
+                  style={[styles.stepperBtn, durationDays <= 1 && styles.stepperBtnDisabled]}
+                  onPress={() => setDurationDays((prev) => Math.max(1, prev - 1))}
+                  disabled={durationDays <= 1}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.stepperBtnTxt}>−</Text>
+                </TouchableOpacity>
+
+                <View style={styles.stepperValueBadge}>
+                  <Text style={styles.stepperValueTxt}>
+                    {durationDays} {durationDays === 1 ? 'Day' : 'Days'}
+                  </Text>
+                  <Text style={styles.stepperValueSub}>
+                    ₹{dailyRate * durationDays} Total Base
+                  </Text>
+                </View>
+
+                <TouchableOpacity
+                  style={[styles.stepperBtn, durationDays >= 30 && styles.stepperBtnDisabled]}
+                  onPress={() => setDurationDays((prev) => Math.min(30, prev + 1))}
+                  disabled={durationDays >= 30}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.stepperBtnTxt}>+</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Quick Days Presets */}
+              <View style={styles.stepperQuickChipsRow}>
+                {[1, 2, 3, 5, 7, 15].map((d) => (
+                  <TouchableOpacity
+                    key={d}
+                    style={[styles.stepperChip, durationDays === d && styles.stepperChipActive]}
+                    onPress={() => setDurationDays(d)}
+                    activeOpacity={0.8}
+                  >
+                    <Text
+                      numberOfLines={1}
+                      style={[styles.stepperChipTxt, durationDays === d && styles.stepperChipTxtActive]}
+                    >
+                      {d}d
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          )}
+
+          {bookingMode === 'monthly' && (
+            <View style={styles.stepperContainer}>
+              <View style={styles.stepperHeaderRow}>
+                <Text style={styles.stepperHeaderTitle}>🗓️ Parking Duration (Months)</Text>
+                <Text style={styles.stepperHeaderRate}>₹{monthlyRate}/mo</Text>
+              </View>
+
+              <View style={styles.stepperControlsRow}>
+                <TouchableOpacity
+                  style={[styles.stepperBtn, durationMonths <= 1 && styles.stepperBtnDisabled]}
+                  onPress={() => setDurationMonths((prev) => Math.max(1, prev - 1))}
+                  disabled={durationMonths <= 1}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.stepperBtnTxt}>−</Text>
+                </TouchableOpacity>
+
+                <View style={styles.stepperValueBadge}>
+                  <Text style={styles.stepperValueTxt}>
+                    {durationMonths} {durationMonths === 1 ? 'Month' : 'Months'}
+                  </Text>
+                  <Text style={styles.stepperValueSub}>
+                    ₹{monthlyRate * durationMonths} Total Base
+                  </Text>
+                </View>
+
+                <TouchableOpacity
+                  style={[styles.stepperBtn, durationMonths >= 12 && styles.stepperBtnDisabled]}
+                  onPress={() => setDurationMonths((prev) => Math.min(12, prev + 1))}
+                  disabled={durationMonths >= 12}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.stepperBtnTxt}>+</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Quick Months Presets */}
+              <View style={styles.stepperQuickChipsRow}>
+                {[1, 2, 3, 6, 12].map((m) => (
+                  <TouchableOpacity
+                    key={m}
+                    style={[styles.stepperChip, durationMonths === m && styles.stepperChipActive]}
+                    onPress={() => setDurationMonths(m)}
+                    activeOpacity={0.8}
+                  >
+                    <Text
+                      numberOfLines={1}
+                      style={[styles.stepperChipTxt, durationMonths === m && styles.stepperChipTxtActive]}
+                    >
+                      {m} mo{m > 1 ? 's' : ''}
                     </Text>
                   </TouchableOpacity>
                 ))}
@@ -1049,7 +1215,7 @@ export default function SpotDetailsScreen({ route, navigation }) {
           <View style={styles.priceBox}>
             <View style={styles.priceRow}>
               <Text style={styles.priceLabel}>Base Rate</Text>
-              <Text style={styles.priceVal}>₹{hourlyRate} × {durationHours} hrs = ₹{rawTotalPrice}</Text>
+              <Text style={styles.priceVal}>{baseRateCalculationText}</Text>
             </View>
             {walletDiscount > 0 && (
               <View style={styles.priceRow}>
@@ -1178,6 +1344,7 @@ export default function SpotDetailsScreen({ route, navigation }) {
                       spotTitle: space.title || 'Parking Spot',
                       vehicleNumber: vehicleNumber.trim().toUpperCase(),
                       hours: actualHours,
+                      durationLabel: razorpayModal.durationLabel || durationDisplayLabel,
                       totalAmount: finalPayablePrice,
                       walletUsed: walletDiscount,
                       paymentId: paymentId,
@@ -1229,7 +1396,9 @@ export default function SpotDetailsScreen({ route, navigation }) {
               </View>
               <View style={styles.successDetailRow}>
                 <Text style={styles.successDetailLabel}>⏱️ Duration</Text>
-                <Text style={styles.successDetailVal}>{bookingSuccessModal.hours} Hour(s)</Text>
+                <Text style={styles.successDetailVal}>
+                  {bookingSuccessModal.durationLabel || `${bookingSuccessModal.hours} Hour(s)`}
+                </Text>
               </View>
               <View style={styles.successDetailRow}>
                 <Text style={styles.successDetailLabel}>💰 Total Paid</Text>
@@ -1840,31 +2009,109 @@ const styles = StyleSheet.create({
     color: '#38bdf8',
     fontWeight: '800',
   },
-  durationRow: {
+  stepperContainer: {
+    backgroundColor: '#0f172a',
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: '#334155',
+    padding: 12,
+    marginBottom: 14,
+  },
+  stepperHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  stepperHeaderTitle: {
+    color: '#e2e8f0',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  stepperHeaderRate: {
+    color: '#38bdf8',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  stepperControlsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginBottom: 10,
+  },
+  stepperBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: '#1e293b',
+    borderWidth: 1.5,
+    borderColor: '#3b82f6',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stepperBtnDisabled: {
+    opacity: 0.35,
+    borderColor: '#334155',
+    backgroundColor: '#0f172a',
+  },
+  stepperBtnTxt: {
+    color: '#ffffff',
+    fontSize: 22,
+    fontWeight: '900',
+    lineHeight: 24,
+    textAlign: 'center',
+  },
+  stepperValueBadge: {
+    flex: 1,
+    paddingVertical: 8,
+    paddingHorizontal: 8,
+    borderRadius: 12,
+    backgroundColor: '#064e3b30',
+    borderWidth: 1.5,
+    borderColor: '#10b981',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stepperValueTxt: {
+    color: '#ffffff',
+    fontSize: 15,
+    fontWeight: '800',
+    textAlign: 'center',
+  },
+  stepperValueSub: {
+    color: '#34d399',
+    fontSize: 11,
+    fontWeight: '700',
+    marginTop: 2,
+    textAlign: 'center',
+  },
+  stepperQuickChipsRow: {
     flexDirection: 'row',
     gap: 6,
-    marginBottom: 16,
+    marginTop: 4,
   },
-  durBtn: {
+  stepperChip: {
     flex: 1,
-    paddingVertical: 10,
-    borderRadius: 10,
-    backgroundColor: COLORS.darkBg,
-    alignItems: 'center',
+    paddingVertical: 7,
+    borderRadius: 8,
+    backgroundColor: '#1e293b',
     borderWidth: 1,
-    borderColor: COLORS.borderDark,
+    borderColor: '#334155',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  durBtnActive: {
-    borderColor: COLORS.primary,
-    backgroundColor: COLORS.primary,
+  stepperChipActive: {
+    backgroundColor: '#064e3b',
+    borderColor: '#10b981',
   },
-  durTxt: {
-    color: COLORS.textMuted,
-    fontSize: 12,
+  stepperChipTxt: {
+    color: '#94a3b8',
+    fontSize: 11,
     fontWeight: '600',
   },
-  durTxtActive: {
-    color: COLORS.white,
+  stepperChipTxtActive: {
+    color: '#ffffff',
     fontWeight: '800',
   },
   priceBox: {
