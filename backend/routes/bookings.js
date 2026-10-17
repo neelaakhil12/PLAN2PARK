@@ -1308,7 +1308,7 @@ router.get('/:id/available-slots', protect, async (req, res) => {
     // Find all bookings for the same space that overlap in time and are active
     const overlappingBookings = await Booking.find({
       spaceId: booking.spaceId,
-      status: { $in: ['allotted', 'paid'] },
+      status: { $in: ['allotted', 'paid', 'checked_in'] },
       _id: { $ne: booking._id },
       $or: [
         {
@@ -1376,21 +1376,24 @@ router.post('/:id/extend-order', protect, seekerOnly, async (req, res) => {
     const booking = await Booking.findById(req.params.id);
     if (!booking) return res.status(404).json({ message: 'Booking not found' });
 
-    if (!booking.slotId || !['allotted', 'paid'].includes(booking.status)) {
+    if (!booking.slotId || !['allotted', 'paid', 'checked_in'].includes(booking.status)) {
       return res.status(400).json({ message: 'Extension is only allowed for active bookings with allotted slots.' });
     }
 
     const space = await ParkingSpace.findById(booking.spaceId);
     if (!space) return res.status(404).json({ message: 'Parking space not found' });
 
-    const currentEndTime = new Date(booking.endTime || new Date(booking.startTime.getTime() + booking.hours * 60 * 60 * 1000));
+    const now = new Date();
+    const currentEndTime = booking.endTime && new Date(booking.endTime) > now
+      ? new Date(booking.endTime)
+      : (booking.startTime ? new Date(Math.max(now.getTime(), new Date(booking.startTime).getTime() + (booking.hours || 1) * 60 * 60 * 1000)) : now);
     const extensionEndTime = new Date(currentEndTime.getTime() + Number(extendHours) * 60 * 60 * 1000);
 
     // Check overlap for the exact same slot
     const overlappingBookings = await Booking.find({
       spaceId: booking.spaceId,
       slotId: booking.slotId,
-      status: { $in: ['allotted', 'paid'] },
+      status: { $in: ['allotted', 'paid', 'checked_in'] },
       _id: { $ne: booking._id },
       startTime: { $lt: extensionEndTime },
       endTime: { $gt: currentEndTime }
@@ -1466,7 +1469,10 @@ router.post('/:id/extend-verify', protect, seekerOnly, async (req, res) => {
     const space = await ParkingSpace.findById(booking.spaceId);
     if (!space) return res.status(404).json({ message: 'Parking space not found' });
 
-    const currentEndTime = new Date(booking.endTime || new Date(booking.startTime.getTime() + booking.hours * 60 * 60 * 1000));
+    const now = new Date();
+    const currentEndTime = booking.endTime && new Date(booking.endTime) > now
+      ? new Date(booking.endTime)
+      : (booking.startTime ? new Date(Math.max(now.getTime(), new Date(booking.startTime).getTime() + (booking.hours || 1) * 60 * 60 * 1000)) : now);
     const extensionEndTime = new Date(currentEndTime.getTime() + Number(extendHours) * 60 * 60 * 1000);
     const additionalAmount = Number(extendHours) * space.pricePerHour;
     
