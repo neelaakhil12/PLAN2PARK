@@ -702,7 +702,7 @@ const checkOutHandler = async (req, res) => {
 
     // Release the slot if allotted/paid
     if (space && booking.slotId) {
-      const slot = space.slots.find((s) => s.slotId === booking.slotId);
+      const slot = space.slots?.find((s) => s.slotId && s.slotId.toString().toLowerCase() === booking.slotId.toString().toLowerCase());
       if (slot) {
         slot.isAvailable = true;
         await space.save();
@@ -711,6 +711,7 @@ const checkOutHandler = async (req, res) => {
 
     booking.status = 'completed';
     booking.checkOutTime = new Date();
+    booking.checkedOutAt = new Date();
     await booking.save();
 
     // Notify owner
@@ -1336,33 +1337,7 @@ router.get('/:id/available-slots', protect, async (req, res) => {
   }
 });
 
-// @desc    Check out of parking spot (Seeker or Owner)
-// @route   POST /api/bookings/:id/checkout
-// @access  Private
-router.post('/:id/checkout', protect, async (req, res) => {
-  try {
-    const booking = await Booking.findById(req.params.id);
-    if (!booking) return res.status(404).json({ message: 'Booking not found' });
 
-    booking.status = 'completed';
-    booking.checkedOutAt = new Date();
-    await booking.save();
-
-    // Release slot
-    const space = await ParkingSpace.findById(booking.spaceId);
-    if (space && booking.slotId) {
-      const slot = space.slots?.find((s) => s.slotId === booking.slotId);
-      if (slot) {
-        slot.isAvailable = true;
-        await space.save();
-      }
-    }
-
-    res.json({ message: 'Checked out successfully! Spot has been released.', booking });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-});
 
 // @desc    Extend a booking duration (Seeker)
 // @route   POST /api/bookings/:id/extend

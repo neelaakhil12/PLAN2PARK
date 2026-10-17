@@ -41,16 +41,43 @@ const getShortVehicleTypeLabel = (type) => {
 
 const StatusBadge = ({ status }) => {
   switch (status) {
+    case 'checked_in':
+      return (
+        <span className="inline-flex items-center gap-1.5 bg-emerald-50 text-emerald-700 text-xs font-black px-2.5 py-1 rounded-full border border-emerald-300 shadow-sm">
+          <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
+          🟢 CHECKED-IN
+        </span>
+      );
     case 'paid':
-      return <span className="bg-emerald-100 text-emerald-800 text-xs font-bold px-2.5 py-1 rounded-full border border-emerald-200">✓ Paid</span>;
+      return (
+        <span className="inline-flex items-center bg-sky-50 text-sky-700 text-xs font-black px-2.5 py-1 rounded-full border border-sky-300 shadow-sm">
+          🎟️ RESERVED
+        </span>
+      );
     case 'allotted':
-      return <span className="bg-blue-100 text-blue-800 text-xs font-bold px-2.5 py-1 rounded-full border border-blue-200">🅿️ Allotted</span>;
+      return (
+        <span className="inline-flex items-center bg-blue-50 text-blue-700 text-xs font-black px-2.5 py-1 rounded-full border border-blue-300 shadow-sm">
+          🅿️ ALLOTTED
+        </span>
+      );
     case 'completed':
-      return <span className="bg-slate-100 text-slate-700 text-xs font-bold px-2.5 py-1 rounded-full border border-slate-200">Completed</span>;
+      return (
+        <span className="inline-flex items-center bg-slate-100 text-slate-700 text-xs font-bold px-2.5 py-1 rounded-full border border-slate-300">
+          ✓ COMPLETED
+        </span>
+      );
     case 'cancelled':
-      return <span className="bg-rose-100 text-rose-800 text-xs font-bold px-2.5 py-1 rounded-full border border-rose-200">Cancelled</span>;
+      return (
+        <span className="inline-flex items-center bg-rose-50 text-rose-700 text-xs font-bold px-2.5 py-1 rounded-full border border-rose-300">
+          🚫 CANCELLED
+        </span>
+      );
     default:
-      return <span className="bg-amber-100 text-amber-800 text-xs font-bold px-2.5 py-1 rounded-full border border-amber-200">{status || 'Pending'}</span>;
+      return (
+        <span className="inline-flex items-center bg-amber-50 text-amber-800 text-xs font-bold px-2.5 py-1 rounded-full border border-amber-300">
+          {status || 'Pending'}
+        </span>
+      );
   }
 };
 
@@ -94,6 +121,7 @@ const SeekerDashboard = () => {
   const [pinnedLocationName, setPinnedLocationName] = useState('Almasguda, Hyderabad');
   const [locatingGps, setLocatingGps] = useState(false);
   const [customAreaInput, setCustomAreaInput] = useState('');
+  const [bookingFilter, setBookingFilter] = useState('all'); // 'all', 'active', 'past'
 
   // Transient UI states (overlays)
   const [selectedSpace, setSelectedSpace] = useState(null);
@@ -364,7 +392,7 @@ const SeekerDashboard = () => {
 
   useEffect(() => {
     const checkExpiring = () => {
-      const activePaid = bookings.filter(b => b.status === 'paid' && b.endTime);
+      const activePaid = bookings.filter(b => ['paid', 'checked_in', 'allotted'].includes(b.status) && b.endTime);
       const now = new Date();
       const expiring = activePaid.filter(b => {
         const end = new Date(b.endTime);
@@ -735,7 +763,9 @@ const SeekerDashboard = () => {
   };
 
   const handleCheckIn = async (booking) => {
-    if (!window.confirm(`Check-in now for slot ${booking.slotId || 'assigned'}?\n\nYour dynamic parking timer will start counting from this moment.`)) return;
+    const spotTitle = booking.spaceId?.title || 'the parking spot';
+    const slot = booking.slotId || 'assigned slot';
+    if (!window.confirm(`🅿️ Check In to Parking Spot\n\nHave you arrived at ${spotTitle} (Slot: ${slot})?\n\nChecking in starts your dynamic parking timer and notifies the space owner that your vehicle is parked.\n\nClick OK to check in now.`)) return;
     try {
       const res = await fetch(`${API_URL}/bookings/${booking._id}/check-in`, {
         method: 'POST',
@@ -746,7 +776,7 @@ const SeekerDashboard = () => {
       });
       const data = await res.json();
       if (res.ok) {
-        alert('🅿️ Checked In Successfully! Your parking timer is now running.');
+        alert('🅿️ Checked In Successfully! Your dynamic parking timer is now running.');
         fetchData();
       } else {
         alert(data.message || 'Check-in failed');
@@ -759,17 +789,19 @@ const SeekerDashboard = () => {
   const handleCancel = async (bookingOrId) => {
     const booking = typeof bookingOrId === 'object' ? bookingOrId : bookings.find(b => b._id === bookingOrId);
     const bookingId = booking?._id || bookingOrId;
-    const isCheckedIn = booking?.isCheckedIn || booking?.status === 'checked_in';
-    const refundPct = isCheckedIn ? '20%' : '100%';
+    const isCheckedIn = Boolean(booking?.isCheckedIn) || booking?.status === 'checked_in';
+    const amount = Number(booking?.totalAmount || 0) + Number(booking?.walletAmountUsed || 0);
+    const refundPct = !isCheckedIn ? '100%' : '20%';
+    const refundEstimated = !isCheckedIn ? amount : Number((amount * 0.20).toFixed(2));
     const refundDetails = isCheckedIn 
-      ? 'Because you have already checked in, 20% of your booking fee will be refunded back to your PlanToPark wallet (80% retained for space owner/platform).'
-      : 'Before check-in, 100% full refund will be credited back to your PlanToPark wallet.';
+      ? `Because you have already checked in, 20% (₹${refundEstimated}) will be refunded back to your PlanToPark wallet (80% retained for space owner/platform).`
+      : `Before check-in, 100% full refund (₹${refundEstimated}) will be credited back to your PlanToPark wallet.`;
     
-    if (!window.confirm(`Cancel this booking?\n\nStandard Platform Refund: ${refundPct}\n${refundDetails}\n\nDo you want to confirm cancellation?`)) return;
+    if (!window.confirm(`Cancel Reservation\n\nStandard Platform Refund: ${refundPct}\n${refundDetails}\n\nDo you want to confirm cancellation?`)) return;
 
     try {
       const res = await fetch(`${API_URL}/bookings/${bookingId}/cancel`, {
-        method: 'PUT',
+        method: 'POST',
         headers: { Authorization: `Bearer ${token}` }
       });
       const data = await res.json().catch(() => ({}));
@@ -784,28 +816,23 @@ const SeekerDashboard = () => {
     }
   };
 
-  const handleComplete = async (id) => {
-    if (!window.confirm('Check out of this spot now and free your slot?')) return;
+  const handleComplete = async (bookingOrId) => {
+    const booking = typeof bookingOrId === 'object' ? bookingOrId : bookings.find(b => b._id === bookingOrId);
+    const bookingId = booking?._id || bookingOrId;
+    const spotTitle = booking?.spaceId?.title || 'this spot';
+    const slot = booking?.slotId || 'assigned slot';
+    if (!window.confirm(`🚪 Check Out of Parking Spot\n\nAre you ready to check out from ${spotTitle} (Slot: ${slot})?\n\nThis will release the spot for other parking seekers.\n\nClick OK to confirm check-out.`)) return;
     try {
-      const res = await fetch(`${API_URL}/bookings/${id}/checkout`, {
+      const res = await fetch(`${API_URL}/bookings/${bookingId}/checkout`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` }
       });
+      const data = await res.json().catch(() => ({}));
       if (res.ok) {
-        alert('Check-out completed. Slot is released. Thank you! 👋');
+        alert(data.message || 'Checked out successfully. Slot is now released! 👋');
         fetchData();
       } else {
-        const res2 = await fetch(`${API_URL}/bookings/${id}/complete`, {
-          method: 'PUT',
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        if (res2.ok) {
-          alert('Check-out completed. Thank you! 👋');
-          fetchData();
-        } else {
-          const data = await res.json().catch(() => ({}));
-          alert(data.message || 'Could not complete checkout');
-        }
+        alert(data.message || 'Could not complete checkout');
       }
     } catch (err) {
       alert('Network error during check-out');
@@ -1011,7 +1038,8 @@ const SeekerDashboard = () => {
     return 'Good evening';
   };
 
-  const activeBookings = bookings.filter(b => b.status === 'paid');
+  const activeBookings = bookings.filter(b => ['paid', 'checked_in', 'allotted'].includes(b.status));
+  const pastBookings = bookings.filter(b => ['completed', 'cancelled'].includes(b.status));
   const totalSpent = analytics?.totalSpent || 0;
 
   // Geocoding distance calculation helper (Haversine Formula)
@@ -2892,235 +2920,378 @@ const SeekerDashboard = () => {
 
         {/* ── VIEW: BOOKINGS ───────────────────────────────────────────────── */}
         {currentView === 'bookings' && (
-          <div className="space-y-5">
-            <div>
-              <h1 className="text-2xl font-extrabold text-slate-900">My Bookings</h1>
-              <p className="text-slate-500 text-sm mt-0.5">Active and upcoming parking reservations.</p>
-            </div>
-            <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
-              <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-                <h3 className="font-bold text-slate-800">Active Reservations</h3>
-                <span className="bg-emerald-100 text-emerald-700 text-xs font-bold px-2.5 py-0.5 rounded-full">{activeBookings.length} active</span>
+          <div className="space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div>
+                <h1 className="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
+                  <span>🎟️</span> My Reservations
+                </h1>
+                <p className="text-slate-500 text-sm mt-0.5">Active & past digital parking passes with live session controls.</p>
               </div>
-              <div className="bg-slate-50 border-t border-slate-100">
-                {activeBookings.length === 0 ? (
-                  <div className="text-center py-16 px-6 text-slate-400 bg-white">
-                    <p className="font-semibold text-sm">No active reservations found.</p>
-                    <button 
-                      onClick={() => setCurrentView('find_parking')} 
-                      className="mt-3 bg-emerald-500 hover:bg-emerald-600 text-white font-extrabold px-5 py-2.5 rounded-xl text-xs shadow-md transition-colors"
+
+              {/* Filter Tabs matching Seeker App */}
+              <div className="flex items-center gap-2 bg-slate-100 p-1.5 rounded-2xl border border-slate-200 shrink-0">
+                <button
+                  onClick={() => setBookingFilter('all')}
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-black transition-all ${
+                    bookingFilter === 'all'
+                      ? 'bg-white text-slate-900 shadow-sm'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  All ({bookings.length})
+                </button>
+                <button
+                  onClick={() => setBookingFilter('active')}
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 ${
+                    bookingFilter === 'active'
+                      ? 'bg-emerald-600 text-white shadow-sm'
+                      : 'text-slate-600 hover:text-emerald-700'
+                  }`}
+                >
+                  <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                  Active ({activeBookings.length})
+                </button>
+                <button
+                  onClick={() => setBookingFilter('past')}
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-black transition-all ${
+                    bookingFilter === 'past'
+                      ? 'bg-white text-slate-900 shadow-sm'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Past ({pastBookings.length})
+                </button>
+              </div>
+            </div>
+
+            {/* Passes Grid */}
+            {(() => {
+              const displayed = bookingFilter === 'active'
+                ? activeBookings
+                : bookingFilter === 'past'
+                ? pastBookings
+                : bookings;
+
+              if (displayed.length === 0) {
+                return (
+                  <div className="bg-white border border-slate-200 rounded-3xl p-12 text-center shadow-sm">
+                    <div className="h-16 w-16 mx-auto mb-4 rounded-2xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-3xl">
+                      🅿️
+                    </div>
+                    <h3 className="font-extrabold text-slate-800 text-lg">
+                      {bookingFilter === 'active' ? 'No Active Reservations' : 'No Parking Passes Found'}
+                    </h3>
+                    <p className="text-slate-400 text-sm max-w-md mx-auto mt-1">
+                      {bookingFilter === 'active'
+                        ? 'You do not have any active or parked sessions right now. Book a spot to start parking.'
+                        : 'You haven’t made any parking reservations yet. Find nearby spaces and reserve your spot.'}
+                    </p>
+                    <button
+                      onClick={() => setCurrentView('find_parking')}
+                      className="mt-5 bg-emerald-600 hover:bg-emerald-700 text-white font-black px-6 py-3 rounded-2xl text-xs shadow-lg shadow-emerald-600/20 transition-all hover:-translate-y-0.5 cursor-pointer"
                     >
-                      Find a Spot →
+                      Find a Spot Now →
                     </button>
                   </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6">
-                    {activeBookings.map(b => (
-                      <div key={b._id} className={`rounded-3xl border shadow-sm p-5 flex flex-col justify-between hover:shadow-md transition-all duration-300 relative overflow-hidden group ${
-                          b.bookingType === 'monthly' ? 'bg-blue-50/60 border-blue-200' :
-                          b.status === 'paid' ? 'bg-emerald-50/60 border-emerald-200' :
-                          'bg-slate-50 border-slate-200'
-                        }`}>
-                        
+                );
+              }
+
+              return (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {displayed.map((b) => {
+                    const isCancelled = b.status === 'cancelled';
+                    const isCompleted = b.status === 'completed';
+                    const isCheckedIn = !isCancelled && !isCompleted && (Boolean(b.isCheckedIn) || b.status === 'checked_in');
+                    const isPaid = !isCancelled && (b.paymentStatus === 'paid' || b.status === 'paid' || isCheckedIn || isCompleted);
+                    const slot = b.slotId || 'Slot-1';
+                    const refundAmt = b.refundAmount || 0;
+                    const space = b.spaceId;
+
+                    return (
+                      <div
+                        key={b._id}
+                        className={`bg-white rounded-3xl border shadow-sm p-6 flex flex-col justify-between hover:shadow-md transition-all duration-300 relative overflow-hidden group ${
+                          isCheckedIn
+                            ? 'border-emerald-300 ring-2 ring-emerald-400/20'
+                            : isPaid
+                            ? 'border-sky-200'
+                            : isCancelled
+                            ? 'border-slate-200 bg-slate-50/50 opacity-90'
+                            : 'border-slate-200'
+                        }`}
+                      >
                         <div className="space-y-4">
-                          {/* Header: Address & Status */}
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="min-w-0">
-                              <h4 className="font-extrabold text-slate-900 text-base tracking-tight truncate group-hover:text-emerald-600 transition-colors" title={b.spaceId?.title || b.spaceId?.address}>
-                                {b.spaceId?.title || b.spaceId?.address || 'Parking Property'}
-                              </h4>
-                              <p className="text-xs text-slate-400 font-medium flex items-center gap-1 mt-1 truncate">
-                                <MapPin className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-                                {b.spaceId?.address || b.spaceId?.location || 'Location Address'}
+                          {/* Header: Pass Tag & Status Badge */}
+                          <div className="flex items-center justify-between gap-3 border-b border-slate-100 pb-3">
+                            <span className="text-[11px] font-black uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                              <span>🎟️</span> DIGITAL PARKING PASS
+                            </span>
+                            <StatusBadge status={b.status} />
+                          </div>
+
+                          {/* Spot Title & Address */}
+                          <div>
+                            <h3
+                              className="font-black text-slate-900 text-lg tracking-tight group-hover:text-emerald-600 transition-colors truncate"
+                              title={space?.title || 'Parking Space'}
+                            >
+                              {space?.title || space?.address || 'Parking Property'}
+                            </h3>
+                            <p className="text-xs text-slate-400 font-medium flex items-center gap-1 mt-1 truncate">
+                              <MapPin className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                              {space?.address || 'Location Address'}, {space?.city || 'Hyderabad'}
+                            </p>
+                          </div>
+
+                          {/* Big Slot Highlight / Refund Box matching Seeker App */}
+                          <div
+                            className={`rounded-2xl p-3.5 border flex items-center justify-between ${
+                              isCancelled
+                                ? 'bg-slate-50 border-slate-200'
+                                : isCheckedIn
+                                ? 'bg-emerald-50/80 border-emerald-200'
+                                : isPaid
+                                ? 'bg-sky-50/80 border-sky-200'
+                                : 'bg-slate-50 border-slate-200'
+                            }`}
+                          >
+                            <div>
+                              <p
+                                className={`text-[10px] font-black uppercase tracking-wider ${
+                                  isCancelled
+                                    ? refundAmt > 0
+                                      ? 'text-emerald-700'
+                                      : 'text-slate-500'
+                                    : isCheckedIn
+                                    ? 'text-emerald-700'
+                                    : 'text-sky-700'
+                                }`}
+                              >
+                                {isPaid
+                                  ? 'ALLOTTED SLOT'
+                                  : isCancelled
+                                  ? refundAmt > 0
+                                    ? 'REFUND CREDITED TO WALLET'
+                                    : 'RESERVATION CANCELLED'
+                                  : 'RESERVATION STATUS'}
+                              </p>
+                              <p
+                                className={`text-xl font-black font-mono mt-0.5 ${
+                                  isCancelled
+                                    ? refundAmt > 0
+                                      ? 'text-emerald-700'
+                                      : 'text-slate-500'
+                                    : isCheckedIn
+                                    ? 'text-emerald-800'
+                                    : 'text-sky-800'
+                                }`}
+                              >
+                                {isPaid
+                                  ? `🅿️ ${slot}`
+                                  : isCancelled
+                                  ? refundAmt > 0
+                                    ? `💸 ₹${refundAmt} Refunded`
+                                    : 'Cancelled'
+                                  : 'Payment Incomplete'}
                               </p>
                             </div>
-                            <div className="shrink-0">
-                              <StatusBadge status={b.status} />
+                            <div className="text-right">
+                              <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Duration</span>
+                              <span className="text-sm font-extrabold text-slate-800">
+                                {b.bookingType === 'daily'
+                                  ? '1 Day Flat'
+                                  : b.bookingType === 'monthly'
+                                  ? '1 Month Pass'
+                                  : `${b.hours || 1} hr(s)`}
+                              </span>
                             </div>
                           </div>
 
-                          {/* Dynamic Check-in / Timer Banner */}
-                          {b.status === 'paid' && !b.isCheckedIn && (
-                            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3 text-xs flex items-center justify-between">
-                              <div>
-                                <p className="font-extrabold text-amber-900 flex items-center gap-1.5">
-                                  <span>📍</span> Arrived at Spot? Click Check-In
+                          {/* Pre-Check-in Arrival Notice Card with Check-In CTA */}
+                          {isPaid && !isCheckedIn && !isCompleted && !isCancelled && (
+                            <div className="bg-sky-50/90 border-2 border-sky-300 rounded-2xl p-3.5 flex items-center justify-between gap-3 shadow-sm">
+                              <div className="min-w-0">
+                                <p className="font-black text-sky-900 text-xs flex items-center gap-1.5">
+                                  <span>📍</span> Slot Reserved - No Timer Decay!
                                 </p>
-                                <p className="text-[11px] text-amber-700 mt-0.5">
-                                  Timer will start only when you or host click Check-In. 100% wallet refund available before check-in.
+                                <p className="text-[11px] text-sky-700 mt-0.5 leading-snug">
+                                  Travel without timer running. Click Check-In when you arrive at the spot.
                                 </p>
                               </div>
                               <button
                                 onClick={() => handleCheckIn(b)}
-                                className="bg-emerald-600 hover:bg-emerald-700 text-white font-black px-3.5 py-1.5 rounded-xl text-xs shadow-sm shrink-0 ml-2 cursor-pointer hover:-translate-y-0.5"
+                                className="bg-emerald-600 hover:bg-emerald-700 text-white font-black px-4 py-2 rounded-xl text-xs shadow-md shadow-emerald-600/20 shrink-0 cursor-pointer transition-all hover:-translate-y-0.5 active:translate-y-0"
                               >
                                 🅿️ Check-In
                               </button>
                             </div>
                           )}
 
-                          {(b.isCheckedIn || b.status === 'checked_in') && (
-                            <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-3 text-xs flex items-center justify-between">
-                              <div className="space-y-0.5">
-                                <p className="font-extrabold text-emerald-900 flex items-center gap-1.5">
-                                  <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                                  🚗 Parking Active • Dynamic Timer Running
+                          {/* Post-Check-in Active Parking Timer Banner matching Seeker App */}
+                          {isCheckedIn && !isCompleted && !isCancelled && (
+                            <div className="bg-emerald-50 border-2 border-emerald-400 rounded-2xl p-3.5 shadow-sm space-y-2">
+                              <div className="flex items-center justify-between flex-wrap gap-2">
+                                <p className="font-black text-emerald-900 text-xs flex items-center gap-1.5">
+                                  <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                                  🟢 Vehicle Parked • Dynamic Timer Running
                                 </p>
+                                <span className="bg-emerald-100 text-emerald-800 border border-emerald-300 text-[10px] font-black px-2 py-0.5 rounded-md">
+                                  Slot: {slot}
+                                </span>
+                              </div>
+                              <div className="flex items-center justify-between text-[11px] text-emerald-700 font-medium border-t border-emerald-200/80 pt-2">
+                                <span>
+                                  Checked In: <strong className="font-bold">{new Date(b.checkInTime || b.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</strong>
+                                </span>
                                 {b.endTime && (
-                                  <p className="text-[11px] text-emerald-700">
-                                    Valid Until: <span className="font-bold">{new Date(b.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span> ({new Date(b.endTime).toLocaleDateString([], { month: 'short', day: 'numeric' })})
-                                  </p>
+                                  <span>
+                                    Valid Until: <strong className="font-bold">{new Date(b.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</strong>
+                                  </span>
                                 )}
                               </div>
-                              <button
-                                onClick={() => handleComplete(b._id)}
-                                className="bg-slate-800 hover:bg-slate-900 text-white font-black px-3 py-1.5 rounded-xl text-xs shadow-sm shrink-0 ml-2 cursor-pointer"
-                              >
-                                🚪 Check Out
-                              </button>
                             </div>
                           )}
 
-                          {/* Info Grid details */}
-                          <div className="grid grid-cols-2 gap-3 bg-slate-50 rounded-2xl p-3 border border-slate-100/80 text-xs">
+                          {/* Cancelled Notice Card */}
+                          {isCancelled && (
+                            <div className="bg-rose-50 border border-rose-200 rounded-2xl p-3 text-xs flex items-center justify-between">
+                              <div>
+                                <p className="font-black text-rose-900 flex items-center gap-1.5">
+                                  <span>🚫</span> Reservation Cancelled
+                                </p>
+                                <p className="text-[11px] text-rose-700 mt-0.5">
+                                  {refundAmt > 0
+                                    ? `₹${refundAmt} refunded to your PlanToPark wallet. Slot released.`
+                                    : 'This slot reservation was cancelled and released.'}
+                                </p>
+                              </div>
+                              {refundAmt > 0 && (
+                                <span className="bg-emerald-100 text-emerald-800 font-black text-xs px-2.5 py-1 rounded-xl border border-emerald-200 shrink-0">
+                                  +₹{refundAmt}
+                                </span>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Meta Info 2x2 Grid */}
+                          <div className="grid grid-cols-2 gap-3 bg-slate-50/80 rounded-2xl p-3 border border-slate-100 text-xs">
                             <div>
-                              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Allotted Slot</p>
-                              <p className="mt-1 font-mono font-extrabold text-slate-800 text-sm">
-                                {b.slotId ? (
-                                  <span className="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-lg text-[11px] border border-emerald-200">
-                                    {b.slotId}
-                                  </span>
-                                ) : (
-                                  <span className="text-amber-600 italic">Pending Host</span>
+                              <p className="text-[10px] text-slate-400 font-black uppercase tracking-wider">🚗 VEHICLE</p>
+                              <p className="mt-1 font-mono font-black text-slate-800 text-sm uppercase">
+                                {b.vehicleNumber || 'TS07WJ2099'}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-[10px] text-slate-400 font-black uppercase tracking-wider">⏱️ PLAN / DURATION</p>
+                              <p className="mt-1 font-black text-slate-800 text-xs">
+                                {b.bookingType === 'daily'
+                                  ? '1 Day Flat'
+                                  : b.bookingType === 'monthly'
+                                  ? '1 Month Pass'
+                                  : `${b.hours || 1} hr(s)`}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-[10px] text-slate-400 font-black uppercase tracking-wider">💰 TOTAL FEE</p>
+                              <p className="mt-1 font-black text-emerald-600 text-sm">
+                                ₹{(b.totalAmount || 0) + (b.walletAmountUsed || 0)}
+                                {b.walletAmountUsed > 0 && (
+                                  <span className="ml-1 text-[10px] bg-emerald-100 text-emerald-800 px-1 py-0.5 rounded">WALLET</span>
                                 )}
                               </p>
                             </div>
                             <div>
-                              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Vehicle Plate</p>
-                              <p className="mt-1 font-mono font-extrabold text-slate-800 text-sm uppercase">
-                                {b.vehicleNumber}
-                              </p>
-                            </div>
-                            <div>
-                              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Duration</p>
-                              {b.bookingType === 'monthly' ? (
-                                <>
-                                  <p className="mt-1 font-extrabold text-purple-700">Monthly Pack</p>
-                                  <p className="text-[10px] text-purple-500 font-bold">
-                                    {Math.max(0, Math.ceil((new Date(b.startTime).getTime() + (b.hours || 720) * 3600000 - new Date().getTime()) / (1000 * 3600 * 24)))} Days left
-                                  </p>
-                                </>
-                              ) : (
-                                <p className="mt-1 font-extrabold text-slate-700">
-                                  {b.hours} hours
-                                </p>
-                              )}
-                            </div>
-                            <div>
-                              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Scheduled Start</p>
-                              <p className="mt-1 font-extrabold text-slate-700">
-                                {new Date(b.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              <p className="text-[10px] text-slate-400 font-black uppercase tracking-wider">🕒 SESSION START</p>
+                              <p className="mt-1 font-black text-slate-700 text-xs">
+                                {new Date(b.checkInTime || b.startTime || b.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                               </p>
                             </div>
                           </div>
                         </div>
 
-                        {/* Footer: Amount & Action buttons */}
-                        <div className="flex items-center justify-between border-t border-slate-100 mt-5 pt-4 gap-4">
-                          <div>
-                            <p className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider">Total Fee</p>
-                            <div className="flex items-center gap-1.5 mt-0.5">
-                              <p className="text-xl font-black text-slate-900">
-                                ₹{(b.totalAmount || 0) + (b.walletAmountUsed || 0)}
-                              </p>
-                              {b.walletAmountUsed > 0 && (
-                                <span className="bg-emerald-100 text-emerald-800 text-[10px] font-black px-1.5 py-0.5 rounded-md border border-emerald-200">
-                                  💳 WALLET
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                          
+                        {/* Action Buttons Row matching Seeker App */}
+                        <div className="border-t border-slate-100 mt-5 pt-4 flex flex-wrap items-center justify-between gap-2">
                           <div className="flex flex-wrap items-center gap-1.5">
-                            {b.status === 'allotted' && (
-                              <button 
-                                onClick={() => triggerRazorpayPayment(b)} 
-                                className="bg-emerald-500 hover:bg-emerald-600 text-white font-extrabold px-4 py-2.5 rounded-xl text-xs flex items-center gap-1.5 shadow-md shadow-emerald-500/20 transition-all hover:-translate-y-0.5 cursor-pointer"
+                            {/* Check In Button (if paid and not checked in) */}
+                            {isPaid && !isCheckedIn && !isCompleted && !isCancelled && (
+                              <button
+                                onClick={() => handleCheckIn(b)}
+                                className="bg-emerald-600 hover:bg-emerald-700 text-white font-black px-3.5 py-2 rounded-xl text-xs shadow-sm transition-all hover:-translate-y-0.5 cursor-pointer"
                               >
-                                <CreditCard className="h-3.5 w-3.5" /> Complete Payment (₹{b.totalAmount})
+                                🅿️ Check In
                               </button>
                             )}
 
-                            {(b.status === 'paid' || b.status === 'checked_in') && (
-                              <>
-                                <button 
-                                  onClick={() => navigate(`/invoice/${b._id}`)} 
-                                  className="bg-blue-50 border border-blue-200 text-blue-600 hover:bg-blue-100 font-bold px-3 py-2 rounded-xl text-xs transition-all hover:-translate-y-0.5"
-                                >
-                                  Invoice
-                                </button>
-                                {!b.isCheckedIn && b.status === 'paid' && (
-                                  <button 
-                                    onClick={() => handleCheckIn(b)} 
-                                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-black px-3 py-2 rounded-xl text-xs transition-all hover:-translate-y-0.5 shadow-sm"
-                                  >
-                                    🅿️ Check In
-                                  </button>
-                                )}
-                                {(b.isCheckedIn || b.status === 'checked_in') && b.bookingType !== 'monthly' && (
-                                  <button 
-                                    onClick={() => handleComplete(b._id)} 
-                                    className="bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 font-extrabold px-3 py-2 rounded-xl text-xs transition-all hover:-translate-y-0.5"
-                                  >
-                                    Check Out
-                                  </button>
-                                )}
-                                <button 
-                                  onClick={() => { setExtendingBooking(b); setExtendError(''); setExtendHours(1); }} 
-                                  className="bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 text-indigo-700 font-bold px-3 py-2 rounded-xl text-xs transition-all hover:-translate-y-0.5"
-                                >
-                                  Extend
-                                </button>
-                              </>
+                            {/* Check Out Button (if checked in) */}
+                            {isCheckedIn && !isCompleted && !isCancelled && (
+                              <button
+                                onClick={() => handleComplete(b)}
+                                className="bg-slate-900 hover:bg-slate-800 text-white font-black px-3.5 py-2 rounded-xl text-xs shadow-sm transition-all hover:-translate-y-0.5 cursor-pointer"
+                              >
+                                🚪 Check Out
+                              </button>
                             )}
 
-                            {['allotted', 'paid', 'checked_in', 'pending_approval'].includes(b.status) && (
-                              <button 
-                                onClick={() => handleCancel(b)} 
-                                className="bg-rose-50 border border-rose-200 text-rose-600 hover:bg-rose-100 font-bold px-3 py-2 rounded-xl text-xs transition-all hover:-translate-y-0.5 cursor-pointer"
+                            {/* Extend Button */}
+                            {isPaid && !isCompleted && !isCancelled && (
+                              <button
+                                onClick={() => { setExtendingBooking(b); setExtendError(''); setExtendHours(1); }}
+                                className="bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 text-indigo-700 font-black px-3 py-2 rounded-xl text-xs transition-all hover:-translate-y-0.5 cursor-pointer"
+                              >
+                                ⏳ Extend
+                              </button>
+                            )}
+
+                            {/* Invoice Button */}
+                            {isPaid && (
+                              <button
+                                onClick={() => navigate(`/invoice/${b._id}`)}
+                                className="bg-blue-50 border border-blue-200 text-blue-600 hover:bg-blue-100 font-black px-3 py-2 rounded-xl text-xs transition-all hover:-translate-y-0.5 cursor-pointer"
+                              >
+                                🧾 Invoice
+                              </button>
+                            )}
+
+                            {/* Cancel Button */}
+                            {isPaid && !isCancelled && !isCompleted && (
+                              <button
+                                onClick={() => handleCancel(b)}
+                                className="bg-rose-50 border border-rose-200 text-rose-600 hover:bg-rose-100 font-black px-3 py-2 rounded-xl text-xs transition-all hover:-translate-y-0.5 cursor-pointer"
                               >
                                 Cancel
                               </button>
                             )}
-
-                            {b.spaceId && (
-                              <>
-                                <button 
-                                  onClick={() => handleNavigate(b.spaceId)} 
-                                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold px-3.5 py-2 rounded-xl text-xs flex items-center gap-1.5 shadow-md shadow-indigo-500/10 transition-all hover:-translate-y-0.5"
-                                >
-                                  <Navigation className="h-3.5 w-3.5" /> In-App Nav
-                                </button>
-                                <button 
-                                  onClick={() => {
-                                    const c = b.spaceId.coordinates;
-                                    const dest = (c && c.lat && c.lng) ? `${c.lat},${c.lng}` : encodeURIComponent(b.spaceId.address);
-                                    window.open(`https://www.google.com/maps/dir/?api=1&destination=${dest}`, '_blank');
-                                  }}
-                                  className="bg-blue-600 hover:bg-blue-700 text-white font-extrabold px-3.5 py-2 rounded-xl text-xs flex items-center gap-1.5 shadow-md shadow-blue-500/10 transition-all hover:-translate-y-0.5"
-                                >
-                                  <Map className="h-3.5 w-3.5" /> Google Maps
-                                </button>
-                              </>
-                            )}
                           </div>
+
+                          {/* Navigation Buttons */}
+                          {space && (
+                            <div className="flex items-center gap-1.5 ml-auto">
+                              <button
+                                onClick={() => handleNavigate(space)}
+                                className="bg-indigo-600 hover:bg-indigo-700 text-white font-black px-3 py-2 rounded-xl text-xs flex items-center gap-1 shadow-sm transition-all hover:-translate-y-0.5 cursor-pointer"
+                              >
+                                <Navigation className="h-3.5 w-3.5" /> In-App Nav
+                              </button>
+                              <button
+                                onClick={() => {
+                                  const c = space.coordinates;
+                                  const dest = (c && c.lat && c.lng) ? `${c.lat},${c.lng}` : encodeURIComponent(space.address || 'Hyderabad');
+                                  window.open(`https://www.google.com/maps/dir/?api=1&destination=${dest}`, '_blank');
+                                }}
+                                className="bg-blue-600 hover:bg-blue-700 text-white font-black px-3 py-2 rounded-xl text-xs flex items-center gap-1 shadow-sm transition-all hover:-translate-y-0.5 cursor-pointer"
+                              >
+                                <Map className="h-3.5 w-3.5" /> Maps
+                              </button>
+                            </div>
+                          )}
                         </div>
                       </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
 
             {/* Past & Completed Bookings History Log */}
             <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">

@@ -86,7 +86,7 @@ const autoCompleteExpiredBookings = async () => {
     const Booking = require('./models/Booking');
     const ParkingSpace = require('./models/ParkingSpace');
     const User = require('./models/User');
-    const { sendPushNotification } = require('./utils/pushNotifications');
+    const { sendPushNotification } = require('./utils/pushNotifier');
 
     const now = new Date();
     // Find all active/checked-in/paid bookings that reached or exceeded their booked endTime
