@@ -86,7 +86,7 @@ export default function WalletScreen() {
         {/* Wallet Balance Banner */}
         <View style={styles.balanceCard}>
           <Text style={styles.balanceLabel}>Available Refund & Wallet Balance</Text>
-          <Text style={styles.balanceVal}>₹{Number(balance).toLocaleString('en-IN')}.00</Text>
+          <Text style={styles.balanceVal}>₹{Number(balance || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}</Text>
           <Text style={styles.balanceTag}>⚡ Auto-credited on cancellation & usable for parking</Text>
         </View>
 
@@ -117,7 +117,7 @@ export default function WalletScreen() {
                     <Text style={styles.txSub}>{new Date(tx.date || Date.now()).toLocaleString('en-IN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</Text>
                   </View>
                   <Text style={isCredit ? styles.txAmtPlus : styles.txAmtMinus}>
-                    {isCredit ? '+' : '-'} ₹{tx.amount || 0}.00
+                    {isCredit ? '+' : '−'} ₹{Number(tx.amount || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}
                   </Text>
                 </View>
               </View>
