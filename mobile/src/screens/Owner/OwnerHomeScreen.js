@@ -10,33 +10,84 @@ import {
   RefreshControl,
   Platform,
   StatusBar,
+  Alert,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AuthContext } from '../../context/AuthContext';
-import { endpoints } from '../../config/api';
+import { endpoints, getBaseApiUrl } from '../../config/api';
 import { COLORS } from '../../theme/colors';
+
+import { useIsFocused } from '@react-navigation/native';
 
 export default function OwnerHomeScreen({ navigation }) {
   const { user, token, logout } = useContext(AuthContext);
+  const isFocused = useIsFocused();
   const insets = useSafeAreaInsets();
-  const topPadding = Math.max(insets.top, Platform.OS === 'android' ? (StatusBar.currentHeight || 24) : 0);
+  const topPadding = Platform.OS === 'android' ? 12 : Math.max(insets.top, 12);
 
   const [spots, setSpots] = useState([]);
+  const [recentBookings, setRecentBookings] = useState([]);
+  const [totalEarnings, setTotalEarnings] = useState(0);
+  const [unreadNotifs, setUnreadNotifs] = useState(0);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
+  const fetchUnreadNotifications = async () => {
+    if (!token) return;
+    try {
+      const res = await fetch(endpoints.getNotifications, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setUnreadNotifs(data.unreadCount || 0);
+      }
+    } catch (e) {
+      // ignore
+    }
+  };
+
   useEffect(() => {
-    fetchOwnerSpots();
-  }, []);
+    if (isFocused && token) {
+      fetchOwnerSpots();
+      fetchUnreadNotifications();
+    }
+  }, [isFocused, token]);
 
   const fetchOwnerSpots = async () => {
     try {
-      const res = await fetch(endpoints.getSpaces, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setSpots(Array.isArray(data) ? data : data.spaces || []);
+      const baseUrl = await getBaseApiUrl();
+      const [spacesRes, analyticsRes, bookingsRes] = await Promise.all([
+        fetch(`${baseUrl}/spaces/owner/my-spaces`, { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(`${baseUrl}/analytics/owner`, { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(`${baseUrl}/bookings/owner-bookings`, { headers: { Authorization: `Bearer ${token}` } }),
+      ]);
+
+      if (spacesRes.ok) {
+        const spacesData = await spacesRes.json();
+        setSpots(Array.isArray(spacesData) ? spacesData : spacesData.spaces || []);
+      }
+
+      let calculatedEarnings = 0;
+      if (bookingsRes.ok) {
+        const bookingsData = await bookingsRes.json();
+        const bList = Array.isArray(bookingsData) ? bookingsData : [];
+        setRecentBookings(bList);
+        calculatedEarnings = bList
+          .reduce((sum, b) => {
+            const earn = b.ownerEarnings !== undefined && b.ownerEarnings !== null
+              ? Number(b.ownerEarnings)
+              : (b.paymentStatus === 'paid' ? Number(b.totalAmount || 0) * 0.9 : 0);
+            return sum + (isNaN(earn) ? 0 : earn);
+          }, 0);
+      }
+
+      if (analyticsRes.ok) {
+        const analyticsData = await analyticsRes.json();
+        const backendEarnings = Number(analyticsData.earnings || 0);
+        setTotalEarnings(calculatedEarnings > 0 ? calculatedEarnings : backendEarnings);
+      } else {
+        setTotalEarnings(calculatedEarnings);
       }
     } catch (err) {
       console.error(err);
@@ -46,17 +97,64 @@ export default function OwnerHomeScreen({ navigation }) {
     }
   };
 
-  const handleToggleStatus = async (spotId, currentStatus) => {
+  const handleToggleStatus = async (spotId, currentActiveState) => {
+    const newActiveState = !currentActiveState;
+
+    // Optimistic local state update
+    setSpots((prevSpots) =>
+      prevSpots.map((s) =>
+        s._id === spotId ? { ...s, isActive: newActiveState } : s
+      )
+    );
+
     try {
-      const res = await fetch(endpoints.toggleSpaceStatus(spotId), {
-        method: 'PATCH',
-        headers: { Authorization: `Bearer ${token}` },
+      const baseUrl = await getBaseApiUrl();
+      const res = await fetch(`${baseUrl}/spaces/${spotId}/toggle`, {
+        method: 'PUT',
+        headers: { 
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}` 
+        },
+        body: JSON.stringify({ isActive: newActiveState }),
       });
-      if (res.ok) {
-        fetchOwnerSpots();
+      if (!res.ok) {
+        fetchOwnerSpots(); // Revert if failed
       }
     } catch (err) {
-      console.error(err);
+      console.error('Error toggling spot status:', err);
+      fetchOwnerSpots();
+    }
+  };
+
+  const handleDeleteSpot = (spotId, spotTitle) => {
+    const doDelete = async () => {
+      try {
+        setSpots((prev) => prev.filter((s) => s._id !== spotId));
+        const baseUrl = await getBaseApiUrl();
+        const res = await fetch(`${baseUrl}/spaces/${spotId}`, {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          fetchOwnerSpots();
+        } else {
+          fetchOwnerSpots();
+        }
+      } catch (err) {
+        console.error('Error deleting spot:', err);
+        fetchOwnerSpots();
+      }
+    };
+
+    if (Platform.OS === 'web' && typeof window !== 'undefined' && window.confirm) {
+      if (window.confirm(`Are you sure you want to delete "${spotTitle || 'this spot'}"?`)) {
+        doDelete();
+      }
+    } else {
+      Alert.alert('Delete Spot', `Are you sure you want to delete "${spotTitle || 'this spot'}"?`, [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete', style: 'destructive', onPress: doDelete },
+      ]);
     }
   };
 
@@ -70,16 +168,33 @@ export default function OwnerHomeScreen({ navigation }) {
   return (
     <SafeAreaView style={styles.container} edges={['left', 'right']}>
       {/* Header with notch padding */}
-      <View style={[styles.header, { paddingTop: topPadding + 10 }]}>
-        <View>
+      <View style={[styles.header, { paddingTop: topPadding }]}>
+        <View style={{ flex: 1, marginRight: 8 }}>
           <Text style={[styles.headerTitle, isStorageOwner && { color: '#fbbf24' }]}>
             {isStorageOwner ? 'Storage Land Owner 🏢' : 'Owner Dashboard 🅿️'}
           </Text>
           <Text style={styles.headerSub}>Welcome, {user?.name || (isStorageOwner ? 'Land Owner' : 'Owner')}</Text>
         </View>
-        <TouchableOpacity onPress={logout} style={styles.logoutBtn}>
-          <Text style={styles.logoutTxt}>Sign Out</Text>
-        </TouchableOpacity>
+
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          {/* In-App Notifications Bell Icon */}
+          <TouchableOpacity
+            onPress={() => navigation.navigate('Notifications')}
+            style={styles.notifBellBtn}
+            activeOpacity={0.75}
+          >
+            <Text style={{ fontSize: 18 }}>🔔</Text>
+            {unreadNotifs > 0 && (
+              <View style={styles.notifBadge}>
+                <Text style={styles.notifBadgeTxt}>{unreadNotifs > 9 ? '9+' : unreadNotifs}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity onPress={logout} style={styles.logoutBtn} activeOpacity={0.8}>
+            <Text style={styles.logoutTxt}>Sign Out</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView
@@ -90,17 +205,32 @@ export default function OwnerHomeScreen({ navigation }) {
             onRefresh={() => {
               setRefreshing(true);
               fetchOwnerSpots();
+              fetchUnreadNotifications();
             }}
-            tintColor={COLORS.ownerAccent}
+            tintColor={isStorageOwner ? COLORS.storageAccent : COLORS.ownerAccent}
           />
         }
       >
         {/* Metric Cards */}
         <View style={styles.metricsRow}>
-          <View style={styles.metricCard}>
-            <Text style={styles.metricVal}>₹2,450</Text>
-            <Text style={styles.metricLabel}>Total Earnings</Text>
-          </View>
+          <TouchableOpacity
+            style={styles.metricCard}
+            onPress={() => navigation.navigate('Wallet')}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.metricVal}>
+              ₹{Number(totalEarnings).toFixed(2).replace(/\.00$/, '')}
+            </Text>
+            <Text style={styles.metricLabel}>Wallet & Payouts →</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.metricCard}
+            onPress={() => navigation.navigate('Orders')}
+            activeOpacity={0.8}
+          >
+            <Text style={[styles.metricVal, { color: '#10b981' }]}>{recentBookings.length}</Text>
+            <Text style={styles.metricLabel}>Total Orders →</Text>
+          </TouchableOpacity>
           <View style={styles.metricCard}>
             <Text style={[styles.metricVal, { color: isStorageOwner ? COLORS.storageAccent : COLORS.ownerAccent }]}>
               {visibleSpots.length}
@@ -109,36 +239,62 @@ export default function OwnerHomeScreen({ navigation }) {
           </View>
         </View>
 
-        {/* Add Spot Banner - Strictly Separated */}
-        {isStorageOwner ? (
+        {/* Live Booking Orders Preview Banner */}
+        {recentBookings.length > 0 && (
           <TouchableOpacity
-            style={[styles.addBanner, { backgroundColor: 'rgba(245, 158, 11, 0.15)', borderWidth: 1.5, borderColor: COLORS.storageAccent }]}
-            onPress={() => navigation.navigate('AddSpot', { category: 'commercial_vehicle_storage' })}
+            style={styles.ordersAlertBanner}
+            onPress={() => navigation.navigate('Orders')}
             activeOpacity={0.85}
           >
-            <View style={styles.addBannerCol}>
-              <Text style={[styles.addBannerTitle, { color: '#fbbf24' }]}>🏢 List Vehicle Storage Yard (1+ Acre)</Text>
-              <Text style={[styles.addBannerSub, { color: '#fef3c7' }]}>Monetize land for Banks & Repo vehicle holding yards</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.ordersAlertTitle}>📑 {recentBookings.length} Seeker Booking(s) Received</Text>
+              <Text style={styles.ordersAlertSub}>
+                Latest: {recentBookings[0]?.vehicleNumber || 'Vehicle'} • Slot {recentBookings[0]?.slotId || '1'} • ₹{recentBookings[0]?.totalAmount || 0}
+              </Text>
             </View>
-            <Text style={[styles.addBannerArrow, { color: '#fbbf24' }]}>→</Text>
-          </TouchableOpacity>
-        ) : (
-          <TouchableOpacity
-            style={styles.addBanner}
-            onPress={() => navigation.navigate('AddSpot', { category: 'standard' })}
-            activeOpacity={0.85}
-          >
-            <View style={styles.addBannerCol}>
-              <Text style={styles.addBannerTitle}>+ List New Parking Space</Text>
-              <Text style={styles.addBannerSub}>Turn your driveways into recurring income</Text>
-            </View>
-            <Text style={styles.addBannerArrow}>→</Text>
+            <Text style={styles.ordersAlertArrow}>View Orders →</Text>
           </TouchableOpacity>
         )}
 
+        {/* Add Spot Banner - Strictly Separated for Space Owner vs Storage Land Owner */}
+        <View style={{ marginBottom: 16 }}>
+          {isStorageOwner ? (
+            <TouchableOpacity
+              style={[styles.addBanner, { borderColor: '#f59e0b', backgroundColor: 'rgba(245, 158, 11, 0.12)' }]}
+              onPress={() => navigation.navigate('AddSpot', { category: 'commercial_vehicle_storage' })}
+              activeOpacity={0.85}
+            >
+              <View style={styles.addBannerCol}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+                  <Text style={[styles.addBannerTitle, { color: '#fbbf24' }]}>🏢 List Vehicle Storage Yard</Text>
+                  <View style={{ backgroundColor: '#f59e0b', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                    <Text style={{ color: '#000', fontSize: 9, fontWeight: '900' }}>MIN 1 ACRE</Text>
+                  </View>
+                </View>
+                <Text style={[styles.addBannerSub, { color: '#fef3c7' }]}>
+                  Monetize 1+ Acre land for Banks & Auto Finance repossession yards
+                </Text>
+              </View>
+              <Text style={[styles.addBannerArrow, { color: '#fbbf24' }]}>→</Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              style={styles.addBanner}
+              onPress={() => navigation.navigate('AddSpot', { category: 'standard' })}
+              activeOpacity={0.85}
+            >
+              <View style={styles.addBannerCol}>
+                <Text style={styles.addBannerTitle}>+ List New Parking Space</Text>
+                <Text style={styles.addBannerSub}>Turn your driveways into recurring income</Text>
+              </View>
+              <Text style={styles.addBannerArrow}>→</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
         {/* Manage Spots Section */}
         <Text style={styles.sectionTitle}>
-          {isStorageOwner ? 'My Storage Land Listings' : 'My Parking Spots'}
+          {isStorageOwner ? 'My Storage Land Listings' : 'My Parking Listings'}
         </Text>
 
         {loading ? (
@@ -150,27 +306,74 @@ export default function OwnerHomeScreen({ navigation }) {
             </Text>
           </View>
         ) : (
-          visibleSpots.map((spot) => (
-            <View key={spot._id} style={styles.spotItem}>
-              <View style={styles.spotInfo}>
-                <Text style={styles.spotTitle}>{spot.title}</Text>
-                <Text style={styles.spotAddress}>📍 {spot.address}, {spot.city}</Text>
-                <Text style={styles.spotPrice}>
-                  {spot.spaceCategory === 'commercial_vehicle_storage'
-                    ? `Holding Fee: ₹${spot.monthlyStorageRate || 1500}/car/mo • ${spot.landAcres || 1} Acres`
-                    : `Rate: ₹${spot.hourlyRate}/hr • ${spot.totalSpots} spots`}
-                </Text>
+          visibleSpots.map((spot) => {
+            const isActive = spot.isActive !== false;
+            const isCommercial = spot.spaceCategory === 'commercial_vehicle_storage';
+            const spotRate = spot.pricePerHour !== undefined ? spot.pricePerHour : (spot.hourlyRate || 40);
+            const spotSlots = spot.totalSlots || (spot.slots ? spot.slots.length : null) || spot.totalSpots || 1;
+
+            return (
+              <View key={spot._id} style={[styles.spotItem, isCommercial && { borderColor: 'rgba(245, 158, 11, 0.4)', borderWidth: 1.5 }]}>
+                {isCommercial && (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                    <View style={{ backgroundColor: '#f59e0b', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 4 }}>
+                      <Text style={{ color: '#000', fontSize: 10, fontWeight: '900' }}>🏢 1+ ACRE REPO STOCKYARD</Text>
+                    </View>
+                    <View style={{ backgroundColor: 'rgba(56, 189, 248, 0.15)', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 4 }}>
+                      <Text style={{ color: '#38bdf8', fontSize: 10, fontWeight: '800' }}>📐 {spot.landAcres || 1.0} Acres</Text>
+                    </View>
+                  </View>
+                )}
+                <View style={styles.spotHeaderRow}>
+                  <View style={styles.spotInfo}>
+                    <Text style={styles.spotTitle}>{spot.title || (isCommercial ? 'Vehicle Storage Yard' : 'Parking Spot')}</Text>
+                    <Text style={styles.spotAddress}>📍 {spot.address || 'Address'}, {spot.city || 'Hyderabad'}</Text>
+                    {isCommercial ? (
+                      <Text style={[styles.spotPrice, { color: '#fbbf24', fontWeight: '700' }]}>
+                        Monthly Fee: ₹{spot.monthlyStorageRate || 1500}/car • {spotSlots} slots
+                      </Text>
+                    ) : (
+                      <Text style={styles.spotPrice}>
+                        Rate: ₹{spotRate}/hr • {spotSlots} slots {spot.hasEvCharger ? '• ⚡ EV Available' : ''}
+                      </Text>
+                    )}
+                  </View>
+                  <TouchableOpacity
+                    style={styles.toggleCol}
+                    onPress={() => handleToggleStatus(spot._id, isActive)}
+                    onClick={() => handleToggleStatus(spot._id, isActive)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.toggleLabel, { color: isActive ? '#10b981' : '#94a3b8' }]}>
+                      {isActive ? 'Active' : 'Offline'}
+                    </Text>
+                    <View style={[styles.customToggleTrack, { backgroundColor: isActive ? '#10b981' : '#334155' }]}>
+                      <View style={[styles.customToggleThumb, { alignSelf: isActive ? 'flex-end' : 'flex-start' }]} />
+                    </View>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Edit & Delete Action Buttons */}
+                <View style={styles.spotActionsRow}>
+                  <TouchableOpacity
+                    style={styles.editBtn}
+                    onPress={() => navigation.navigate('AddSpot', { spot })}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.editBtnTxt}>✏️ Edit Spot</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.deleteBtn}
+                    onPress={() => handleDeleteSpot(spot._id, spot.title)}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.deleteBtnTxt}>🗑️ Delete</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
-              <View style={styles.toggleCol}>
-                <Text style={styles.toggleLabel}>{spot.isActive ? 'Active' : 'Offline'}</Text>
-                <Switch
-                  value={spot.isActive !== false}
-                  onValueChange={() => handleToggleStatus(spot._id, spot.isActive)}
-                  trackColor={{ false: COLORS.borderDark, true: isStorageOwner ? COLORS.storageAccent : COLORS.ownerAccent }}
-                />
-              </View>
-            </View>
-          ))
+            );
+          })
         )}
       </ScrollView>
     </SafeAreaView>
@@ -213,6 +416,37 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
   },
+  notifBellBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: COLORS.cardBg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.borderDark,
+    position: 'relative',
+    flexShrink: 0,
+  },
+  notifBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    backgroundColor: '#ef4444',
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 3,
+    borderWidth: 1.5,
+    borderColor: COLORS.darkBg,
+  },
+  notifBadgeTxt: {
+    color: '#ffffff',
+    fontSize: 9,
+    fontWeight: '900',
+  },
   content: {
     padding: 16,
   },
@@ -224,20 +458,49 @@ const styles = StyleSheet.create({
   metricCard: {
     flex: 1,
     backgroundColor: COLORS.cardBg,
-    borderRadius: 16,
-    padding: 18,
+    borderRadius: 14,
+    padding: 14,
     borderWidth: 1,
     borderColor: COLORS.borderDark,
+    alignItems: 'center',
   },
   metricVal: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: '900',
     color: COLORS.primary,
   },
   metricLabel: {
-    fontSize: 12,
+    fontSize: 11,
     color: COLORS.textMuted,
     marginTop: 4,
+    fontWeight: '600',
+  },
+  ordersAlertBanner: {
+    backgroundColor: '#10b98115',
+    borderWidth: 1,
+    borderColor: '#10b981',
+    borderRadius: 14,
+    padding: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  ordersAlertTitle: {
+    color: '#10b981',
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  ordersAlertSub: {
+    color: '#94a3b8',
+    fontSize: 12,
+    marginTop: 2,
+  },
+  ordersAlertArrow: {
+    color: '#10b981',
+    fontSize: 13,
+    fontWeight: '800',
+    marginLeft: 10,
   },
   addBanner: {
     backgroundColor: COLORS.ownerAccent,
@@ -277,14 +540,17 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     padding: 16,
     marginBottom: 12,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
     borderWidth: 1,
     borderColor: COLORS.borderDark,
   },
+  spotHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
   spotInfo: {
     flex: 1,
+    paddingRight: 10,
   },
   spotTitle: {
     color: COLORS.white,
@@ -301,13 +567,66 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
   },
+  spotActionsRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 14,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.borderDark,
+  },
+  editBtn: {
+    flex: 1,
+    backgroundColor: '#3b82f620',
+    borderWidth: 1,
+    borderColor: '#3b82f6',
+    borderRadius: 8,
+    paddingVertical: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  editBtnTxt: {
+    color: '#60a5fa',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  deleteBtn: {
+    backgroundColor: '#ef444420',
+    borderWidth: 1,
+    borderColor: '#ef4444',
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  deleteBtnTxt: {
+    color: '#f87171',
+    fontSize: 13,
+    fontWeight: '700',
+  },
   toggleCol: {
     alignItems: 'center',
+    padding: 6,
   },
   toggleLabel: {
     color: COLORS.textMuted,
     fontSize: 10,
     marginBottom: 4,
+    fontWeight: '700',
+  },
+  customToggleTrack: {
+    width: 44,
+    height: 24,
+    borderRadius: 12,
+    padding: 2,
+    justifyContent: 'center',
+  },
+  customToggleThumb: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#ffffff',
   },
   emptyCard: {
     alignItems: 'center',

@@ -23,7 +23,7 @@ export default function OwnerHomeScreen({ navigation }) {
   const { user, token, logout } = useContext(AuthContext);
   const isFocused = useIsFocused();
   const insets = useSafeAreaInsets();
-  const topPadding = Math.max(insets.top, Platform.OS === 'android' ? (StatusBar.currentHeight || 24) : 0);
+  const topPadding = Platform.OS === 'android' ? 12 : Math.max(insets.top, 12);
 
   const [spots, setSpots] = useState([]);
   const [recentBookings, setRecentBookings] = useState([]);
@@ -168,7 +168,7 @@ export default function OwnerHomeScreen({ navigation }) {
   return (
     <SafeAreaView style={styles.container} edges={['left', 'right']}>
       {/* Header with notch padding */}
-      <View style={[styles.header, { paddingTop: topPadding + 10 }]}>
+      <View style={[styles.header, { paddingTop: topPadding }]}>
         <View style={{ flex: 1, marginRight: 8 }}>
           <Text style={[styles.headerTitle, isStorageOwner && { color: '#fbbf24' }]}>
             {isStorageOwner ? 'Storage Land Owner 🏢' : 'Owner Dashboard 🅿️'}

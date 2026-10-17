@@ -956,28 +956,40 @@ export default function SpotDetailsScreen({ route, navigation }) {
 
           {/* Multi-Tier Booking Duration Plan */}
           <Text style={styles.label}>Select Booking Duration Mode</Text>
-          <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
+          <View style={styles.planModeRow}>
             {[
               { id: 'hourly', label: '⏱️ Hourly', rateText: `₹${hourlyRate}/hr` },
               { id: 'daily', label: '📅 1 Day Flat', rateText: `₹${dailyRate}` },
-              { id: 'monthly', label: '🗓️ 1 Month Pass', rateText: `₹${monthlyRate}` },
-            ].map((plan) => (
-              <TouchableOpacity
-                key={plan.id}
-                style={[
-                  styles.vTypeBtn,
-                  bookingMode === plan.id && styles.vTypeBtnActive,
-                ]}
-                onPress={() => setBookingMode(plan.id)}
-              >
-                <Text style={[styles.vTypeTxt, bookingMode === plan.id && styles.vTypeTxtActive]}>
-                  {plan.label}
-                </Text>
-                <Text style={{ fontSize: 10, color: bookingMode === plan.id ? '#38bdf8' : '#94a3b8', marginTop: 3, fontWeight: '700' }}>
-                  {plan.rateText}
-                </Text>
-              </TouchableOpacity>
-            ))}
+              { id: 'monthly', label: '🗓️ 1 Month', rateText: `₹${monthlyRate}` },
+            ].map((plan) => {
+              const isSelected = bookingMode === plan.id;
+              return (
+                <TouchableOpacity
+                  key={plan.id}
+                  style={[
+                    styles.planModeBtn,
+                    isSelected && styles.planModeBtnActive,
+                  ]}
+                  onPress={() => setBookingMode(plan.id)}
+                  activeOpacity={0.8}
+                >
+                  <Text
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    style={[styles.planModeTxt, isSelected && styles.planModeTxtActive]}
+                  >
+                    {plan.label}
+                  </Text>
+                  <Text
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    style={[styles.planModeRate, isSelected && styles.planModeRateActive]}
+                  >
+                    {plan.rateText}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
 
           {/* If Hourly mode selected, show hour selection chips */}
@@ -990,8 +1002,12 @@ export default function SpotDetailsScreen({ route, navigation }) {
                     key={hr}
                     style={[styles.durBtn, durationHours === hr && styles.durBtnActive]}
                     onPress={() => setDurationHours(hr)}
+                    activeOpacity={0.8}
                   >
-                    <Text style={[styles.durTxt, durationHours === hr && styles.durTxtActive]}>
+                    <Text
+                      numberOfLines={1}
+                      style={[styles.durTxt, durationHours === hr && styles.durTxtActive]}
+                    >
                       {hr} hr{hr !== '1' ? 's' : ''}
                     </Text>
                   </TouchableOpacity>
@@ -1782,9 +1798,51 @@ const styles = StyleSheet.create({
     color: COLORS.white,
     fontWeight: '700',
   },
+  planModeRow: {
+    flexDirection: 'row',
+    gap: 6,
+    marginBottom: 14,
+  },
+  planModeBtn: {
+    flex: 1,
+    minWidth: 0,
+    paddingVertical: 10,
+    paddingHorizontal: 4,
+    borderRadius: 10,
+    backgroundColor: COLORS.darkBg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: COLORS.borderDark,
+  },
+  planModeBtnActive: {
+    borderColor: COLORS.primary,
+    backgroundColor: '#064e3b',
+  },
+  planModeTxt: {
+    color: COLORS.textMuted,
+    fontSize: 11,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  planModeTxtActive: {
+    color: COLORS.white,
+    fontWeight: '800',
+  },
+  planModeRate: {
+    fontSize: 10,
+    color: '#94a3b8',
+    marginTop: 3,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  planModeRateActive: {
+    color: '#38bdf8',
+    fontWeight: '800',
+  },
   durationRow: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 6,
     marginBottom: 16,
   },
   durBtn: {

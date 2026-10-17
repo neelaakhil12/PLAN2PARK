@@ -6,10 +6,8 @@ import { COLORS } from '../theme/colors';
 export default function Header({ title, subtitle, rightElement, onBack }) {
   const insets = useSafeAreaInsets();
   
-  // Safe top padding accounting for Android status bar / notch / camera island
-  const androidBarHeight = StatusBar.currentHeight || 36;
-  const topInset = Math.max(insets.top, Platform.OS === 'android' ? androidBarHeight : 0);
-  const totalTopPadding = topInset + 20; // Generous 20px margin below status bar
+  // Clean, compact top padding compatible with all Android devices and iOS notches
+  const totalTopPadding = Platform.OS === 'android' ? 12 : Math.max(insets.top, 14);
 
   return (
     <View style={[styles.headerContainer, { paddingTop: totalTopPadding }]}>

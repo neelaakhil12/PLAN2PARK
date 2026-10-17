@@ -22,7 +22,7 @@ export default function OwnerBookingsScreen({ navigation }) {
   const { user, token } = useContext(AuthContext);
   const isFocused = useIsFocused();
   const insets = useSafeAreaInsets();
-  const topPadding = Math.max(insets.top, Platform.OS === 'android' ? (StatusBar.currentHeight || 24) : 0);
+  const topPadding = Platform.OS === 'android' ? 12 : Math.max(insets.top, 12);
 
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -203,7 +203,7 @@ export default function OwnerBookingsScreen({ navigation }) {
   return (
     <SafeAreaView style={styles.container} edges={['left', 'right']}>
       {/* Header */}
-      <View style={[styles.header, { paddingTop: topPadding + 10 }]}>
+      <View style={[styles.header, { paddingTop: topPadding }]}>
         <View>
           <Text style={styles.headerTitle}>Seeker Bookings & Orders 📑</Text>
           <Text style={styles.headerSub}>Manage reservations and earnings</Text>

@@ -1274,37 +1274,6 @@ export default function AddSpotScreen({ route, navigation }) {
             </>
           )}
 
-          {/* Standard Platform Cancellation & Refund Policy Card */}
-          <View style={{
-            marginTop: 14,
-            marginBottom: 16,
-            backgroundColor: 'rgba(56, 189, 248, 0.08)',
-            borderWidth: 1.5,
-            borderColor: 'rgba(56, 189, 248, 0.25)',
-            borderRadius: 14,
-            padding: 14,
-          }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-              <Text style={{ fontSize: 18 }}>🛡️</Text>
-              <Text style={{ color: COLORS.white, fontSize: 14, fontWeight: '800' }}>
-                Standard Platform Refund Policy
-              </Text>
-            </View>
-            <Text style={{ color: '#94a3b8', fontSize: 12, lineHeight: 18, marginBottom: 8 }}>
-              PlanToPark automatically applies standard platform terms to safeguard both parties:
-            </Text>
-            <View style={{ gap: 6 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6 }}>
-                <Text style={{ color: '#10b981', fontWeight: '800', fontSize: 12 }}>• Pre Check-In:</Text>
-                <Text style={{ color: '#cbd5e1', fontSize: 12, flex: 1 }}>100% Full Refund credited to commuter's wallet.</Text>
-              </View>
-              <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6 }}>
-                <Text style={{ color: '#f59e0b', fontWeight: '800', fontSize: 12 }}>• Post Check-In:</Text>
-                <Text style={{ color: '#cbd5e1', fontSize: 12, flex: 1 }}>20% Refund to commuter; 80% retained for space owner.</Text>
-              </View>
-            </View>
-          </View>
-
           {/* Supported Vehicle Sizes & Types (Standard Parking Space Owners Only - not needed for 1+ Acre Vehicle Storage Yards) */}
           {!isVehicleStorageYard && (
             <View style={{ marginBottom: 18 }}>

@@ -63,7 +63,7 @@ const VEHICLE_FILTER_OPTIONS = [
 export default function SeekerHomeScreen({ navigation }) {
   const { user, token, updateProfile, logout } = useContext(AuthContext);
   const insets = useSafeAreaInsets();
-  const topPadding = Math.max(insets.top, Platform.OS === 'android' ? (StatusBar.currentHeight || 24) : 0);
+  const topPadding = Platform.OS === 'android' ? 12 : Math.max(insets.top, 12);
 
   const [spaces, setSpaces] = useState([]);
   const [unreadNotifs, setUnreadNotifs] = useState(0);
@@ -685,7 +685,7 @@ export default function SeekerHomeScreen({ navigation }) {
   return (
     <SafeAreaView style={styles.container} edges={['left', 'right']}>
       {/* App Header */}
-      <View style={[styles.header, { paddingTop: topPadding + 10 }]}>
+      <View style={[styles.header, { paddingTop: topPadding }]}>
         <View style={{ flex: 1, marginRight: 8, justifyContent: 'center' }}>
           <Text style={styles.welcomeText} numberOfLines={1}>
             Hello, {user?.name || (isBankSeeker ? 'Bank Partner' : 'Seeker')} 👋
