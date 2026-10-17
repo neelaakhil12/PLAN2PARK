@@ -8,7 +8,7 @@ import {
   AlertTriangle, ShieldAlert, Heart, ClipboardList, HelpCircle, Star, MessageSquare,
   Menu, X, Send, Tag, Sparkles, Megaphone, FileText, Edit2, Trash2, Plus,
   Percent, Upload, Eye, Landmark, Smartphone, Check, Save, ExternalLink, QrCode,
-  ArrowDownLeft, ArrowUpRight, RefreshCw
+  ArrowDownLeft, ArrowUpRight, RefreshCw, Clock
 } from 'lucide-react';
 import Invoice from './Invoice';
 
