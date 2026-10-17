@@ -71,19 +71,19 @@ const OwnerDashboard = () => {
     supportHours: '24/7 Dedicated Support Desk',
   });
 
-  // Add / Edit Spot Form
-  const [spotForm, setSpotForm] = useState({
+  // Helper for pristine empty Add Spot form (matches Owner Mobile App 1:1)
+  const getEmptySpotForm = () => ({
     title: '',
     address: '',
-    city: 'Hyderabad',
-    location: 'Hyderabad',
-    pincode: '500097',
+    city: '',
+    location: '',
+    pincode: '',
     googleMapsLink: '',
-    totalSlots: '5',
-    pricePerHour: '50',
-    pricePerDay: '400',
-    pricePerWeek: '2000',
-    pricePerMonth: '6000',
+    totalSlots: '',
+    pricePerHour: '',
+    pricePerDay: '',
+    pricePerWeek: '',
+    pricePerMonth: '',
     maxWalletDiscount: '10',
     cancellationPolicy: 'full',
     hasEvCharger: false,
@@ -92,21 +92,30 @@ const OwnerDashboard = () => {
     imageUrl: '',
     imageFile: null,
     images: [],
-    lat: 17.313,
-    lng: 78.545,
+    lat: null,
+    lng: null,
     suitableVehicles: ['hatchback', 'sedan', 'suv', '2-wheeler'],
     spaceCategory: user?.accountCategory === 'vehicle_storage_owner' ? 'commercial_vehicle_storage' : 'standard',
-    landAcres: user?.landAcres ? String(user.landAcres) : '1.0',
-    monthlyStorageRate: '1500',
+    landAcres: '',
+    monthlyStorageRate: '',
     hasCompoundWall: true,
     has24x7Guards: true,
     hasFloodLights: true,
   });
+
+  // Add / Edit Spot Form
+  const [spotForm, setSpotForm] = useState(getEmptySpotForm());
   const [submittingSpot, setSubmittingSpot] = useState(false);
   const [locatingGps, setLocatingGps] = useState(false);
   const [parsingMapsLink, setParsingMapsLink] = useState(false);
   const [mapsSuccessMsg, setMapsSuccessMsg] = useState('');
   const spotFileInputRef = useRef(null);
+
+  const handleStartAddSpot = () => {
+    setEditingSpot(null);
+    setSpotForm(getEmptySpotForm());
+    setCurrentView('add_spot');
+  };
 
   const handleSpotImageUpload = (e) => {
     const files = Array.from(e.target.files || []);
@@ -560,8 +569,8 @@ const OwnerDashboard = () => {
             const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`);
             const data = await res.json();
             const addr = data.display_name || `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
-            const city = data.address?.city || data.address?.town || data.address?.state_district || 'Hyderabad';
-            const pincode = data.address?.postcode || '500097';
+            const city = data.address?.city || data.address?.town || data.address?.state_district || '';
+            const pincode = data.address?.postcode || '';
             setSpotForm(p => ({ ...p, lat, lng, address: addr, city, location: city, pincode }));
           } catch (e) {
             setSpotForm(p => ({ ...p, lat, lng, address: `GPS (${lat.toFixed(4)}, ${lng.toFixed(4)})` }));
@@ -612,8 +621,8 @@ const OwnerDashboard = () => {
 
       if (res.ok && data && (data.address || data.lat || data.fullUrl)) {
         let finalAddr = data.address || '';
-        let detectedCity = data.city || 'Hyderabad';
-        let detectedPin = data.pincode || spotForm.pincode || '500097';
+        let detectedCity = data.city || '';
+        let detectedPin = data.pincode || spotForm.pincode || '';
         let detectedLat = data.lat ? Number(data.lat) : null;
         let detectedLng = data.lng ? Number(data.lng) : null;
 
@@ -826,12 +835,7 @@ const OwnerDashboard = () => {
       if (res.ok) {
         alert(editingSpot ? '🎉 Parking space updated successfully!' : '🎉 Parking space listed successfully!');
         setEditingSpot(null);
-        setSpotForm({
-          title: '', address: '', city: 'Hyderabad', location: 'Hyderabad', pincode: '500097', googleMapsLink: '',
-          totalSlots: '5', pricePerHour: '50', pricePerDay: '400', pricePerWeek: '2000', pricePerMonth: '6000',
-          maxWalletDiscount: '10', cancellationPolicy: 'full', hasEvCharger: false, hasCctv: false, isCovered: false,
-          imageUrl: '', imageFile: null, images: [], lat: 17.313, lng: 78.545, suitableVehicles: ['hatchback', 'sedan', 'suv', '2-wheeler']
-        });
+        setSpotForm(getEmptySpotForm());
         await fetchOwnerData();
         setCurrentView('dashboard');
       } else {
@@ -932,7 +936,7 @@ const OwnerDashboard = () => {
                 <p className="text-slate-500 text-sm mt-0.5">Welcome back, <span className="font-bold text-slate-800 capitalize">{user?.name || 'Owner'}</span>. Manage your spots & earnings.</p>
               </div>
               <button
-                onClick={() => { setEditingSpot(null); setCurrentView('add_spot'); }}
+                onClick={handleStartAddSpot}
                 className="bg-emerald-500 hover:bg-emerald-600 text-white font-extrabold text-xs sm:text-sm px-5 py-3 rounded-2xl shadow-lg shadow-emerald-500/25 transition-all flex items-center justify-center gap-2 cursor-pointer shrink-0"
               >
                 <Plus className="h-4 w-4" /> List New Spot
@@ -1006,11 +1010,7 @@ const OwnerDashboard = () => {
             {/* Add Spot Promo Banner */}
             <div className="w-full">
               <div
-                onClick={() => {
-                  setEditingSpot(null);
-                  setSpotForm(p => ({ ...p, spaceCategory: 'standard' }));
-                  setCurrentView('add_spot');
-                }}
+                onClick={handleStartAddSpot}
                 className="bg-white border border-slate-200 hover:border-blue-400 rounded-3xl p-6 shadow-sm cursor-pointer flex items-center justify-between gap-4 transition-all hover:shadow-md group"
               >
                 <div>
@@ -1045,7 +1045,7 @@ const OwnerDashboard = () => {
                   <h3 className="font-extrabold text-slate-800 text-base">No listings added yet</h3>
                   <p className="text-xs text-slate-400 max-w-sm mx-auto">Start earning today by listing your available parking spaces or 1+ Acre vehicle storage yards.</p>
                   <button
-                    onClick={() => { setEditingSpot(null); setCurrentView('add_spot'); }}
+                    onClick={handleStartAddSpot}
                     className="mt-2 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs px-5 py-2.5 rounded-xl shadow-md transition-all cursor-pointer"
                   >
                     + Add Your First Spot
@@ -1804,7 +1804,7 @@ const OwnerDashboard = () => {
                     <input
                       type="text"
                       required
-                      placeholder="Hyderabad"
+                      placeholder="e.g. Hyderabad"
                       value={spotForm.city}
                       onChange={e => setSpotForm(p => ({ ...p, city: e.target.value, location: e.target.value }))}
                       className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:bg-white transition-colors"
@@ -1815,8 +1815,8 @@ const OwnerDashboard = () => {
                     <input
                       type="text"
                       required
-                      placeholder="500097"
-                      value={spotForm.pincode || '500097'}
+                      placeholder="e.g. 500097"
+                      value={spotForm.pincode}
                       onChange={e => setSpotForm(p => ({ ...p, pincode: e.target.value }))}
                       className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:bg-white transition-colors"
                     />
@@ -1959,7 +1959,7 @@ const OwnerDashboard = () => {
                       type="number"
                       required
                       min={5}
-                      placeholder="50"
+                      placeholder="e.g. 50"
                       value={spotForm.pricePerHour}
                       onChange={e => setSpotForm(p => ({ ...p, pricePerHour: e.target.value }))}
                       className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-black text-slate-800 focus:outline-none focus:border-blue-500 focus:bg-white transition-colors"
@@ -1972,7 +1972,7 @@ const OwnerDashboard = () => {
                       required
                       min={1}
                       max={50}
-                      placeholder="5"
+                      placeholder="e.g. 5"
                       value={spotForm.totalSlots}
                       onChange={e => setSpotForm(p => ({ ...p, totalSlots: e.target.value }))}
                       className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-black text-slate-800 focus:outline-none focus:border-blue-500 focus:bg-white transition-colors"

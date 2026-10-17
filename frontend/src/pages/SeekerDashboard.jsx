@@ -110,9 +110,12 @@ const SeekerDashboard = () => {
   // New Booking form (Autofilled with current user account details)
   const [form, setForm] = useState({ 
     vehicleNumber: user?.vehicles?.[0]?.plateNumber || '', 
+    vehicleType: user?.vehicles?.[0]?.vehicleType?.toLowerCase() || 'hatchback',
     seekerName: user?.name || '', 
     seekerContact: user?.contact || user?.phone || '', 
-    hours: '1', 
+    hours: '2', 
+    days: '1',
+    months: '1',
     startTime: '', 
     slotId: '', 
     bookingType: 'hourly' 
@@ -544,20 +547,22 @@ const SeekerDashboard = () => {
 
   const handleBookSubmit = async (e) => {
     e.preventDefault();
-    if (!form.slotId) {
-      alert('Please select an available parking slot to book.');
-      return;
-    }
     setLoading(true);
     try {
       const fd = new FormData();
       fd.append('spaceId', selectedSpace._id);
       fd.append('vehicleNumber', form.vehicleNumber || 'TS07WJ2099');
+      fd.append('vehicleType', form.vehicleType || 'hatchback');
       fd.append('seekerName', form.seekerName || user?.name || 'Seeker');
       fd.append('seekerContact', form.seekerContact || user?.contact || '9989551305');
-      fd.append('hours', Number(form.hours || 1));
+      
+      let actualHours = Number(form.hours || 1);
+      if (form.bookingType === 'daily') actualHours = Number(form.days || 1) * 24;
+      else if (form.bookingType === 'monthly') actualHours = Number(form.months || 1) * 24 * 30;
+
+      fd.append('hours', actualHours);
       fd.append('startTime', form.startTime || new Date().toISOString());
-      fd.append('slotId', form.slotId);
+      if (form.slotId) fd.append('slotId', form.slotId);
       fd.append('bookingType', form.bookingType || 'hourly');
       fd.append('useWalletBalance', useWallet);
       if (form.driverImageFile) fd.append('driverImageFile', form.driverImageFile);
@@ -1215,6 +1220,53 @@ const SeekerDashboard = () => {
                     </div>
                   )}
 
+                  {/* Supported Vehicle Sizes & Types Overview Card */}
+                  <div className="space-y-2 pt-3 border-t border-slate-100">
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                        🚗 Vehicles That Fit in This Spot
+                      </p>
+                      <span className="text-[11px] font-bold text-slate-400">Capacity Fit Guide</span>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {[
+                        { id: 'hatchback', name: 'Hatchback', icon: '🚗', desc: 'Small cars (Swift, i20, Baleno)' },
+                        { id: 'sedan', name: 'Sedan', icon: '🚘', desc: 'Midsize cars (Dzire, City, Verna)' },
+                        { id: 'suv', name: 'SUV', icon: '🚙', desc: 'Large cars (Creta, Seltos, XUV700)' },
+                        { id: '2-wheeler', name: '2-Wheeler', icon: '🏍️', desc: 'Bikes & Scooters (Activa, Pulsar, Splendor)' },
+                      ].map((v) => {
+                        const fits = !selectedSpace.suitableVehicles ||
+                          selectedSpace.suitableVehicles.length === 0 ||
+                          (v.id === '2-wheeler'
+                            ? selectedSpace.suitableVehicles.includes('2-wheeler')
+                            : (selectedSpace.suitableVehicles.includes('4-wheeler') || selectedSpace.suitableVehicles.includes(v.id)));
+                        return (
+                          <div
+                            key={v.id}
+                            className={`flex items-center justify-between p-2.5 rounded-2xl border transition-colors ${
+                              fits
+                                ? 'bg-emerald-50/60 border-emerald-200 text-slate-800'
+                                : 'bg-slate-50 border-slate-200 text-slate-400 opacity-60'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <span className="text-xl shrink-0">{v.icon}</span>
+                              <div className="min-w-0">
+                                <p className="text-xs font-black text-slate-900 truncate leading-tight">{v.name}</p>
+                                <p className="text-[10px] text-slate-400 truncate leading-tight">{v.desc}</p>
+                              </div>
+                            </div>
+                            <span className={`text-[10px] font-black px-2 py-0.5 rounded-md shrink-0 ${
+                              fits ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-500'
+                            }`}>
+                              {fits ? '✓ FITS' : '✕ NO'}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
                   {/* Navigation Button */}
                   <div className="pt-2 border-t border-slate-100 flex gap-2">
                     <a
@@ -1278,7 +1330,19 @@ const SeekerDashboard = () => {
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <select
                           value={form.vehicleNumber}
-                          onChange={e => setForm(p => ({ ...p, vehicleNumber: e.target.value }))}
+                          onChange={e => {
+                            const chosenPlate = e.target.value;
+                            const matchedV = user?.vehicles?.find(v => v.plateNumber === chosenPlate);
+                            let matchedType = form.vehicleType;
+                            if (matchedV) {
+                              const vt = (matchedV.vehicleType || matchedV.type || '').toLowerCase();
+                              if (vt.includes('2') || vt.includes('bike') || vt.includes('scooter')) matchedType = '2-wheeler';
+                              else if (vt.includes('sedan')) matchedType = 'sedan';
+                              else if (vt.includes('suv')) matchedType = 'suv';
+                              else if (vt.includes('hatchback')) matchedType = 'hatchback';
+                            }
+                            setForm(p => ({ ...p, vehicleNumber: chosenPlate, vehicleType: matchedType }));
+                          }}
                           className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-800 focus:outline-none focus:border-emerald-500"
                         >
                           <option value="" disabled>Select from Saved Vehicles</option>
@@ -1297,143 +1361,326 @@ const SeekerDashboard = () => {
                       </div>
                     </div>
 
-                    {/* Vehicle Type Switcher */}
-                    <div>
-                      <label className="block text-xs font-extrabold text-slate-600 uppercase tracking-wider mb-2">
-                        Vehicle Type
-                      </label>
-                      <div className="grid grid-cols-2 gap-3">
-                        <button
-                          type="button"
-                          onClick={() => setForm(p => ({ ...p, bookingType: 'hourly' }))}
-                          className="py-3 px-4 rounded-2xl text-xs font-extrabold border transition-all bg-emerald-50 text-emerald-700 border-emerald-300 shadow-sm"
-                        >
-                          🚗 4-Wheeler (Car)
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setForm(p => ({ ...p, bookingType: 'hourly' }))}
-                          className="py-3 px-4 rounded-2xl text-xs font-bold border border-slate-200 text-slate-600 hover:bg-slate-50 transition-all"
-                        >
-                          🏍️ 2-Wheeler (Bike)
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Parking Duration (Hours) Pills */}
-                    <div>
-                      <label className="block text-xs font-extrabold text-slate-600 uppercase tracking-wider mb-2">
-                        Parking Duration (Hours)
-                      </label>
-                      <div className="grid grid-cols-4 gap-2.5">
-                        {['1', '2', '4', '8'].map(hr => (
-                          <button
-                            key={hr}
-                            type="button"
-                            onClick={() => setForm(p => ({ ...p, hours: hr }))}
-                            className={`py-3 rounded-2xl text-xs font-black transition-all border ${
-                              form.hours === hr
-                                ? 'bg-emerald-500 text-white border-emerald-500 shadow-md shadow-emerald-500/20'
-                                : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-                            }`}
-                          >
-                            {hr} hr{hr !== '1' ? 's' : ''}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Select Parking Slot */}
+                    {/* Your Vehicle Type / Size (Matches Seeker App 1:1) */}
                     <div>
                       <div className="flex items-center justify-between mb-2">
                         <label className="block text-xs font-extrabold text-slate-600 uppercase tracking-wider">
-                          Select Parking Slot
+                          Your Vehicle Type / Size
                         </label>
-                        {fetchingSlots && (
-                          <span className="text-[11px] font-bold text-slate-400 animate-pulse">Checking live slot availability...</span>
-                        )}
+                        <span className="text-[11px] font-bold text-slate-400">
+                          Select size to verify fit
+                        </span>
                       </div>
-                      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
-                        {bookingAvailableSlots.map(s => {
-                          const isSelected = form.slotId === s.slotId;
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                        {[
+                          { id: 'hatchback', label: 'Hatchback', icon: '🚗', desc: 'Swift, i20, Baleno' },
+                          { id: 'sedan', label: 'Sedan', icon: '🚘', desc: 'Dzire, City, Verna' },
+                          { id: 'suv', label: 'SUV', icon: '🚙', desc: 'Creta, Seltos, XUV' },
+                          { id: '2-wheeler', label: '2-Wheeler', icon: '🏍️', desc: 'Bikes & Scooters' },
+                        ].map((vt) => {
+                          const isSelected = (form.vehicleType || 'hatchback') === vt.id;
+                          const fits = vt.id === '2-wheeler'
+                            ? (!selectedSpace.suitableVehicles || selectedSpace.suitableVehicles.length === 0 || selectedSpace.suitableVehicles.includes('2-wheeler'))
+                            : (!selectedSpace.suitableVehicles || selectedSpace.suitableVehicles.length === 0 || selectedSpace.suitableVehicles.includes('4-wheeler') || selectedSpace.suitableVehicles.includes(vt.id));
+                          
                           return (
                             <button
-                              key={s.slotId}
+                              key={vt.id}
                               type="button"
-                              disabled={!s.isAvailable}
-                              onClick={() => setForm(p => ({ ...p, slotId: s.slotId }))}
-                              className={`py-3 px-2 rounded-2xl text-xs font-black transition-all border text-center ${
-                                !s.isAvailable
-                                  ? 'bg-rose-50 border-rose-300 text-rose-400 cursor-not-allowed select-none opacity-85'
-                                  : isSelected
-                                  ? 'bg-emerald-500 text-white border-emerald-500 shadow-lg shadow-emerald-500/25 scale-105'
-                                  : 'bg-white text-slate-700 border-slate-200 hover:border-emerald-400 hover:bg-emerald-50/40 hover:text-emerald-700'
-                              }`}
+                              onClick={() => setForm(p => ({ ...p, vehicleType: vt.id }))}
+                              className={`p-3 rounded-2xl border text-left transition-all ${
+                                isSelected
+                                  ? 'bg-emerald-50 border-emerald-500 ring-2 ring-emerald-500 shadow-sm'
+                                  : 'bg-white border-slate-200 hover:border-slate-300'
+                              } ${!fits ? 'opacity-70 border-rose-200' : ''}`}
                             >
-                              <span className="text-sm font-black">{s.slotId}</span>
-                              {!s.isAvailable ? (
-                                <span className="block text-[9px] font-black text-rose-600 mt-1 uppercase tracking-wider">🚫 Booked</span>
-                              ) : isSelected ? (
-                                <span className="block text-[9px] font-black text-emerald-100 mt-1 uppercase tracking-wider">✓ Selected</span>
-                              ) : (
-                                <span className="block text-[9px] font-black text-emerald-600 mt-1 uppercase tracking-wider">🟢 Free</span>
-                              )}
+                              <div className="flex items-center justify-between">
+                                <span className="text-xl">{vt.icon}</span>
+                                <span className={`text-[9px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider ${
+                                  fits ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
+                                }`}>
+                                  {fits ? '✓ Fits' : '⚠️ Tight'}
+                                </span>
+                              </div>
+                              <p className={`text-xs font-black mt-2 ${isSelected ? 'text-emerald-950' : 'text-slate-800'}`}>
+                                {vt.label}
+                              </p>
+                              <p className="text-[10px] text-slate-400 truncate mt-0.5">
+                                {vt.desc}
+                              </p>
                             </button>
                           );
                         })}
                       </div>
                     </div>
 
-                    {/* PlanToPark Wallet Money Deduction Card */}
+                    {/* Multi-Tier Duration & Pricing (Matches Seeker App 1:1) */}
                     {(() => {
-                      const price = selectedSpace.pricePerHour || 50;
-                      const hrs = Number(form.hours || 1);
-                      const baseTotal = price * hrs;
+                      const hourlyRate = selectedSpace.pricePerHour !== undefined ? selectedSpace.pricePerHour : (selectedSpace.hourlyRate || 40);
+                      const dailyRate = selectedSpace.pricePerDay || (hourlyRate * 8);
+                      const monthlyRate = selectedSpace.pricePerMonth || (hourlyRate * 8 * 25);
+
+                      let rawTotalPrice = hourlyRate;
+                      let baseRateCalculationText = '';
+
+                      if (form.bookingType === 'hourly') {
+                        const hrs = Math.max(1, Number(form.hours || 2));
+                        rawTotalPrice = hrs * hourlyRate;
+                        baseRateCalculationText = `₹${hourlyRate} × ${hrs} hr${hrs > 1 ? 's' : ''} = ₹${rawTotalPrice}`;
+                      } else if (form.bookingType === 'daily') {
+                        const days = Math.max(1, Number(form.days || 1));
+                        rawTotalPrice = days * dailyRate;
+                        baseRateCalculationText = `₹${dailyRate} × ${days} day${days > 1 ? 's' : ''} = ₹${rawTotalPrice}`;
+                      } else if (form.bookingType === 'monthly') {
+                        const months = Math.max(1, Number(form.months || 1));
+                        rawTotalPrice = months * monthlyRate;
+                        baseRateCalculationText = `₹${monthlyRate} × ${months} mo${months > 1 ? 's' : ''} = ₹${rawTotalPrice}`;
+                      }
+
                       const maxDiscount = Number(selectedSpace.maxWalletDiscount ?? 10);
-                      const discount = (useWallet && maxDiscount > 0) ? Math.min(walletBalance, maxDiscount, baseTotal) : 0;
-                      const finalTotal = Math.max(0, baseTotal - discount);
+                      const discount = (useWallet && maxDiscount > 0) ? Math.min(walletBalance, maxDiscount, rawTotalPrice) : 0;
+                      const finalTotal = Math.max(0, rawTotalPrice - discount);
 
                       return (
                         <>
-                          <div className="bg-emerald-50/70 border border-emerald-200/80 rounded-2xl p-4.5 space-y-3">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-2.5">
-                                <span className="text-lg">👛</span>
-                                <div>
-                                  <p className="text-xs font-black text-emerald-950">PlanToPark Wallet Balance</p>
-                                  <p className="text-[11px] text-emerald-700 font-bold">₹{walletBalance} available</p>
-                                </div>
-                              </div>
-                              <label className="relative inline-flex items-center cursor-pointer">
-                                <input
-                                  type="checkbox"
-                                  checked={useWallet}
-                                  onChange={e => setUseWallet(e.target.checked)}
-                                  className="sr-only peer"
-                                />
-                                <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
-                              </label>
+                          {/* Duration Mode Switcher */}
+                          <div className="space-y-2">
+                            <label className="block text-xs font-extrabold text-slate-600 uppercase tracking-wider">
+                              Select Booking Duration Mode
+                            </label>
+                            <div className="grid grid-cols-3 gap-2.5">
+                              {[
+                                { id: 'hourly', label: '⏱️ Hourly', rateText: `₹${hourlyRate}/hr` },
+                                { id: 'daily', label: '📅 1 Day Flat', rateText: `₹${dailyRate}` },
+                                { id: 'monthly', label: '🗓️ 1 Month', rateText: `₹${monthlyRate}` },
+                              ].map((plan) => {
+                                const isSelected = (form.bookingType || 'hourly') === plan.id;
+                                return (
+                                  <button
+                                    key={plan.id}
+                                    type="button"
+                                    onClick={() => setForm(p => ({ ...p, bookingType: plan.id }))}
+                                    className={`p-3 rounded-2xl border text-center transition-all ${
+                                      isSelected
+                                        ? 'bg-emerald-50 border-emerald-500 ring-2 ring-emerald-500 shadow-sm'
+                                        : 'bg-white border-slate-200 hover:border-slate-300'
+                                    }`}
+                                  >
+                                    <p className={`text-xs font-black ${isSelected ? 'text-emerald-950' : 'text-slate-800'}`}>
+                                      {plan.label}
+                                    </p>
+                                    <p className={`text-[11px] font-bold mt-0.5 ${isSelected ? 'text-emerald-700' : 'text-slate-400'}`}>
+                                      {plan.rateText}
+                                    </p>
+                                  </button>
+                                );
+                              })}
                             </div>
-                            {useWallet && discount > 0 && (
-                              <p className="text-[11px] font-bold text-emerald-800 bg-white/80 px-3 py-1.5 rounded-xl border border-emerald-100">
-                                ✨ ₹{discount} wallet discount automatically applied!
-                              </p>
-                            )}
                           </div>
 
-                          {/* Price Breakdown */}
-                          <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 space-y-2 text-xs">
-                            <div className="flex justify-between text-slate-500 font-medium">
-                              <span>Parking Fee ({hrs} hr{hrs > 1 ? 's' : ''} × ₹{price})</span>
-                              <span className="font-bold text-slate-800">₹{baseTotal}</span>
+                          {/* Interactive +/- Stepper Duration Control */}
+                          {form.bookingType === 'hourly' && (
+                            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-3">
+                              <div className="flex items-center justify-between">
+                                <span className="text-xs font-extrabold text-slate-700">⏱️ Parking Duration (Hours)</span>
+                                <span className="text-xs font-black text-emerald-600">₹{hourlyRate}/hr</span>
+                              </div>
+                              <div className="flex items-center gap-3">
+                                <button
+                                  type="button"
+                                  onClick={() => setForm(p => ({ ...p, hours: String(Math.max(1, Number(p.hours || 1) - 1)) }))}
+                                  disabled={Number(form.hours || 1) <= 1}
+                                  className="w-12 h-12 rounded-2xl bg-white border border-slate-200 text-slate-800 font-black text-xl hover:bg-slate-100 disabled:opacity-40 transition-all flex items-center justify-center shrink-0"
+                                >
+                                  −
+                                </button>
+                                <div className="flex-1 bg-white border border-slate-200 rounded-2xl p-2.5 text-center">
+                                  <p className="text-base font-black text-slate-900 leading-tight">
+                                    {form.hours || 1} {Number(form.hours || 1) === 1 ? 'Hour' : 'Hours'}
+                                  </p>
+                                  <p className="text-[11px] font-bold text-slate-400">
+                                    ₹{Number(form.hours || 1) * hourlyRate} Total Base
+                                  </p>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => setForm(p => ({ ...p, hours: String(Math.min(24, Number(p.hours || 1) + 1)) }))}
+                                  disabled={Number(form.hours || 1) >= 24}
+                                  className="w-12 h-12 rounded-2xl bg-white border border-slate-200 text-slate-800 font-black text-xl hover:bg-slate-100 disabled:opacity-40 transition-all flex items-center justify-center shrink-0"
+                                >
+                                  +
+                                </button>
+                              </div>
+                              {/* Quick Hours Presets */}
+                              <div className="flex items-center gap-2 pt-1 overflow-x-auto">
+                                {[1, 2, 4, 8, 12, 24].map((hr) => (
+                                  <button
+                                    key={hr}
+                                    type="button"
+                                    onClick={() => setForm(p => ({ ...p, hours: String(hr) }))}
+                                    className={`flex-1 py-1.5 px-2 rounded-xl text-xs font-black border transition-all ${
+                                      Number(form.hours || 1) === hr
+                                        ? 'bg-emerald-500 text-white border-emerald-500 shadow-sm'
+                                        : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
+                                    }`}
+                                  >
+                                    {hr}h
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {form.bookingType === 'daily' && (
+                            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-3">
+                              <div className="flex items-center justify-between">
+                                <span className="text-xs font-extrabold text-slate-700">📅 Parking Duration (Days)</span>
+                                <span className="text-xs font-black text-emerald-600">₹{dailyRate}/day</span>
+                              </div>
+                              <div className="flex items-center gap-3">
+                                <button
+                                  type="button"
+                                  onClick={() => setForm(p => ({ ...p, days: String(Math.max(1, Number(p.days || 1) - 1)) }))}
+                                  disabled={Number(form.days || 1) <= 1}
+                                  className="w-12 h-12 rounded-2xl bg-white border border-slate-200 text-slate-800 font-black text-xl hover:bg-slate-100 disabled:opacity-40 transition-all flex items-center justify-center shrink-0"
+                                >
+                                  −
+                                </button>
+                                <div className="flex-1 bg-white border border-slate-200 rounded-2xl p-2.5 text-center">
+                                  <p className="text-base font-black text-slate-900 leading-tight">
+                                    {form.days || 1} {Number(form.days || 1) === 1 ? 'Day' : 'Days'}
+                                  </p>
+                                  <p className="text-[11px] font-bold text-slate-400">
+                                    ₹{Number(form.days || 1) * dailyRate} Total Base
+                                  </p>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => setForm(p => ({ ...p, days: String(Math.min(30, Number(p.days || 1) + 1)) }))}
+                                  disabled={Number(form.days || 1) >= 30}
+                                  className="w-12 h-12 rounded-2xl bg-white border border-slate-200 text-slate-800 font-black text-xl hover:bg-slate-100 disabled:opacity-40 transition-all flex items-center justify-center shrink-0"
+                                >
+                                  +
+                                </button>
+                              </div>
+                              {/* Quick Days Presets */}
+                              <div className="flex items-center gap-2 pt-1 overflow-x-auto">
+                                {[1, 2, 3, 5, 7, 15].map((d) => (
+                                  <button
+                                    key={d}
+                                    type="button"
+                                    onClick={() => setForm(p => ({ ...p, days: String(d) }))}
+                                    className={`flex-1 py-1.5 px-2 rounded-xl text-xs font-black border transition-all ${
+                                      Number(form.days || 1) === d
+                                        ? 'bg-emerald-500 text-white border-emerald-500 shadow-sm'
+                                        : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
+                                    }`}
+                                  >
+                                    {d}d
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {form.bookingType === 'monthly' && (
+                            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-3">
+                              <div className="flex items-center justify-between">
+                                <span className="text-xs font-extrabold text-slate-700">🗓️ Parking Duration (Months)</span>
+                                <span className="text-xs font-black text-emerald-600">₹{monthlyRate}/mo</span>
+                              </div>
+                              <div className="flex items-center gap-3">
+                                <button
+                                  type="button"
+                                  onClick={() => setForm(p => ({ ...p, months: String(Math.max(1, Number(p.months || 1) - 1)) }))}
+                                  disabled={Number(form.months || 1) <= 1}
+                                  className="w-12 h-12 rounded-2xl bg-white border border-slate-200 text-slate-800 font-black text-xl hover:bg-slate-100 disabled:opacity-40 transition-all flex items-center justify-center shrink-0"
+                                >
+                                  −
+                                </button>
+                                <div className="flex-1 bg-white border border-slate-200 rounded-2xl p-2.5 text-center">
+                                  <p className="text-base font-black text-slate-900 leading-tight">
+                                    {form.months || 1} {Number(form.months || 1) === 1 ? 'Month' : 'Months'}
+                                  </p>
+                                  <p className="text-[11px] font-bold text-slate-400">
+                                    ₹{Number(form.months || 1) * monthlyRate} Total Base
+                                  </p>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => setForm(p => ({ ...p, months: String(Math.min(12, Number(p.months || 1) + 1)) }))}
+                                  disabled={Number(form.months || 1) >= 12}
+                                  className="w-12 h-12 rounded-2xl bg-white border border-slate-200 text-slate-800 font-black text-xl hover:bg-slate-100 disabled:opacity-40 transition-all flex items-center justify-center shrink-0"
+                                >
+                                  +
+                                </button>
+                              </div>
+                              {/* Quick Months Presets */}
+                              <div className="flex items-center gap-2 pt-1 overflow-x-auto">
+                                {[1, 2, 3, 6, 12].map((m) => (
+                                  <button
+                                    key={m}
+                                    type="button"
+                                    onClick={() => setForm(p => ({ ...p, months: String(m) }))}
+                                    className={`flex-1 py-1.5 px-2 rounded-xl text-xs font-black border transition-all ${
+                                      Number(form.months || 1) === m
+                                        ? 'bg-emerald-500 text-white border-emerald-500 shadow-sm'
+                                        : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
+                                    }`}
+                                  >
+                                    {m}m
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* PlanToPark Wallet Money Deduction Card */}
+                          {walletBalance > 0 && maxDiscount > 0 && (
+                            <div
+                              onClick={() => setUseWallet(p => !p)}
+                              className={`p-4 rounded-2xl border transition-all cursor-pointer flex items-center justify-between ${
+                                useWallet
+                                  ? 'bg-emerald-50/80 border-emerald-300 ring-1 ring-emerald-300'
+                                  : 'bg-slate-50 border-slate-200'
+                              }`}
+                            >
+                              <div className="flex items-center gap-3">
+                                <div className={`h-10 w-10 rounded-xl flex items-center justify-center text-lg ${
+                                  useWallet ? 'bg-emerald-500 text-white' : 'bg-slate-200 text-slate-600'
+                                }`}>
+                                  ⚡
+                                </div>
+                                <div>
+                                  <p className="text-xs font-black text-slate-900">
+                                    Use PlanToPark Wallet (-₹{discount})
+                                  </p>
+                                  <p className="text-[11px] text-slate-500 font-medium mt-0.5">
+                                    Available Balance: ₹{walletBalance}.00 • Max ₹{maxDiscount} usable
+                                  </p>
+                                </div>
+                              </div>
+                              <div className={`h-5 w-5 rounded-md flex items-center justify-center text-xs font-black ${
+                                useWallet ? 'bg-emerald-500 text-white' : 'border border-slate-300 bg-white'
+                              }`}>
+                                {useWallet && '✓'}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Live Price Breakdown Box */}
+                          <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 space-y-2.5 text-xs">
+                            <div className="flex justify-between text-slate-600 font-medium">
+                              <span>Base Rate</span>
+                              <span className="font-bold text-slate-800">{baseRateCalculationText}</span>
                             </div>
                             {discount > 0 && (
                               <div className="flex justify-between text-emerald-600 font-bold">
-                                <span>Wallet Discount Applied</span>
-                                <span>- ₹{discount}</span>
+                                <span>⚡ Wallet Money Applied</span>
+                                <span>- ₹{discount}.00</span>
                               </div>
                             )}
-                            <div className="flex justify-between text-slate-500 font-medium">
+                            <div className="flex justify-between text-slate-600 font-medium">
                               <span>Platform Convenience Fee</span>
                               <span className="font-bold text-slate-800">₹0 (Free)</span>
                             </div>
@@ -1976,7 +2223,19 @@ const SeekerDashboard = () => {
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <select
                           value={form.vehicleNumber}
-                          onChange={e => setForm(p => ({ ...p, vehicleNumber: e.target.value }))}
+                          onChange={e => {
+                            const chosenPlate = e.target.value;
+                            const matchedV = user?.vehicles?.find(v => v.plateNumber === chosenPlate);
+                            let matchedType = form.vehicleType;
+                            if (matchedV) {
+                              const vt = (matchedV.vehicleType || matchedV.type || '').toLowerCase();
+                              if (vt.includes('2') || vt.includes('bike') || vt.includes('scooter')) matchedType = '2-wheeler';
+                              else if (vt.includes('sedan')) matchedType = 'sedan';
+                              else if (vt.includes('suv')) matchedType = 'suv';
+                              else if (vt.includes('hatchback')) matchedType = 'hatchback';
+                            }
+                            setForm(p => ({ ...p, vehicleNumber: chosenPlate, vehicleType: matchedType }));
+                          }}
                           className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-800 focus:outline-none focus:border-emerald-500"
                         >
                           <option value="" disabled>Select from Saved Vehicles</option>
@@ -1995,114 +2254,292 @@ const SeekerDashboard = () => {
                       </div>
                     </div>
 
-                    {/* Vehicle Type Switcher */}
-                    <div>
-                      <label className="block text-xs font-extrabold text-slate-600 uppercase tracking-wider mb-2">
-                        Vehicle Type
-                      </label>
-                      <div className="grid grid-cols-2 gap-3">
-                        <button
-                          type="button"
-                          onClick={() => setForm(p => ({ ...p, bookingType: 'hourly' }))}
-                          className="py-3 px-4 rounded-2xl text-xs font-extrabold border transition-all bg-emerald-50 text-emerald-700 border-emerald-300 shadow-sm"
-                        >
-                          🚗 4-Wheeler (Car)
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setForm(p => ({ ...p, bookingType: 'hourly' }))}
-                          className="py-3 px-4 rounded-2xl text-xs font-bold border border-slate-200 text-slate-600 hover:bg-slate-50 transition-all"
-                        >
-                          🏍️ 2-Wheeler (Bike)
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Parking Duration (Hours) Pills */}
-                    <div>
-                      <label className="block text-xs font-extrabold text-slate-600 uppercase tracking-wider mb-2">
-                        Parking Duration (Hours)
-                      </label>
-                      <div className="grid grid-cols-4 gap-2.5">
-                        {['1', '2', '4', '8'].map(hr => (
-                          <button
-                            key={hr}
-                            type="button"
-                            onClick={() => setForm(p => ({ ...p, hours: hr }))}
-                            className={`py-3 rounded-2xl text-xs font-black transition-all border ${
-                              form.hours === hr
-                                ? 'bg-emerald-500 text-white border-emerald-500 shadow-md shadow-emerald-500/20'
-                                : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-                            }`}
-                          >
-                            {hr} hr{hr !== '1' ? 's' : ''}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Select Parking Slot */}
+                    {/* Your Vehicle Type / Size (Matches Seeker App 1:1) */}
                     <div>
                       <div className="flex items-center justify-between mb-2">
                         <label className="block text-xs font-extrabold text-slate-600 uppercase tracking-wider">
-                          Select Parking Slot
+                          Your Vehicle Type / Size
                         </label>
-                        {fetchingSlots && (
-                          <span className="text-[11px] font-bold text-slate-400 animate-pulse">Checking live slot availability...</span>
-                        )}
+                        <span className="text-[11px] font-bold text-slate-400">
+                          Select size to verify fit
+                        </span>
                       </div>
-                      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
-                        {bookingAvailableSlots.map(s => {
-                          const isSelected = form.slotId === s.slotId;
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                        {[
+                          { id: 'hatchback', label: 'Hatchback', icon: '🚗', desc: 'Swift, i20, Baleno' },
+                          { id: 'sedan', label: 'Sedan', icon: '🚘', desc: 'Dzire, City, Verna' },
+                          { id: 'suv', label: 'SUV', icon: '🚙', desc: 'Creta, Seltos, XUV' },
+                          { id: '2-wheeler', label: '2-Wheeler', icon: '🏍️', desc: 'Bikes & Scooters' },
+                        ].map((vt) => {
+                          const isSelected = (form.vehicleType || 'hatchback') === vt.id;
+                          const fits = vt.id === '2-wheeler'
+                            ? (!selectedSpace.suitableVehicles || selectedSpace.suitableVehicles.length === 0 || selectedSpace.suitableVehicles.includes('2-wheeler'))
+                            : (!selectedSpace.suitableVehicles || selectedSpace.suitableVehicles.length === 0 || selectedSpace.suitableVehicles.includes('4-wheeler') || selectedSpace.suitableVehicles.includes(vt.id));
+                          
                           return (
                             <button
-                              key={s.slotId}
+                              key={vt.id}
                               type="button"
-                              disabled={!s.isAvailable}
-                              onClick={() => setForm(p => ({ ...p, slotId: s.slotId }))}
-                              className={`py-3 px-2 rounded-2xl text-xs font-black transition-all border text-center ${
-                                !s.isAvailable
-                                  ? 'bg-rose-50 border-rose-300 text-rose-400 cursor-not-allowed select-none opacity-85'
-                                  : isSelected
-                                  ? 'bg-emerald-500 text-white border-emerald-500 shadow-lg shadow-emerald-500/25 scale-105'
-                                  : 'bg-white text-slate-700 border-slate-200 hover:border-emerald-400 hover:bg-emerald-50/40 hover:text-emerald-700'
-                              }`}
+                              onClick={() => setForm(p => ({ ...p, vehicleType: vt.id }))}
+                              className={`p-3 rounded-2xl border text-left transition-all ${
+                                isSelected
+                                  ? 'bg-emerald-50 border-emerald-500 ring-2 ring-emerald-500 shadow-sm'
+                                  : 'bg-white border-slate-200 hover:border-slate-300'
+                              } ${!fits ? 'opacity-70 border-rose-200' : ''}`}
                             >
-                              <span className="text-sm font-black">{s.slotId}</span>
-                              {!s.isAvailable ? (
-                                <span className="block text-[9px] font-black text-rose-600 mt-1 uppercase tracking-wider">🚫 Booked</span>
-                              ) : isSelected ? (
-                                <span className="block text-[9px] font-black text-emerald-100 mt-1 uppercase tracking-wider">✓ Selected</span>
-                              ) : (
-                                <span className="block text-[9px] font-black text-emerald-600 mt-1 uppercase tracking-wider">🟢 Free</span>
-                              )}
+                              <div className="flex items-center justify-between">
+                                <span className="text-xl">{vt.icon}</span>
+                                <span className={`text-[9px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider ${
+                                  fits ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
+                                }`}>
+                                  {fits ? '✓ Fits' : '⚠️ Tight'}
+                                </span>
+                              </div>
+                              <p className={`text-xs font-black mt-2 ${isSelected ? 'text-emerald-950' : 'text-slate-800'}`}>
+                                {vt.label}
+                              </p>
+                              <p className="text-[10px] text-slate-400 truncate mt-0.5">
+                                {vt.desc}
+                              </p>
                             </button>
                           );
                         })}
                       </div>
                     </div>
 
-                    {/* PlanToPark Wallet Money Deduction Card */}
+                    {/* Multi-Tier Duration & Pricing (Matches Seeker App 1:1) */}
                     {(() => {
-                      const hourlyRate = selectedSpace.pricePerHour || 40;
-                      const rawTotal = Number(form.hours || 1) * hourlyRate;
-                      const maxWallet = selectedSpace.maxWalletDiscount !== undefined ? Number(selectedSpace.maxWalletDiscount) : 10;
-                      const discount = (useWallet && walletBalance > 0 && maxWallet > 0) ? Math.min(walletBalance, maxWallet, rawTotal) : 0;
-                      const finalTotal = Math.max(0, rawTotal - discount);
+                      const hourlyRate = selectedSpace.pricePerHour !== undefined ? selectedSpace.pricePerHour : (selectedSpace.hourlyRate || 40);
+                      const dailyRate = selectedSpace.pricePerDay || (hourlyRate * 8);
+                      const monthlyRate = selectedSpace.pricePerMonth || (hourlyRate * 8 * 25);
+
+                      let rawTotalPrice = hourlyRate;
+                      let baseRateCalculationText = '';
+
+                      if (form.bookingType === 'hourly') {
+                        const hrs = Math.max(1, Number(form.hours || 2));
+                        rawTotalPrice = hrs * hourlyRate;
+                        baseRateCalculationText = `₹${hourlyRate} × ${hrs} hr${hrs > 1 ? 's' : ''} = ₹${rawTotalPrice}`;
+                      } else if (form.bookingType === 'daily') {
+                        const days = Math.max(1, Number(form.days || 1));
+                        rawTotalPrice = days * dailyRate;
+                        baseRateCalculationText = `₹${dailyRate} × ${days} day${days > 1 ? 's' : ''} = ₹${rawTotalPrice}`;
+                      } else if (form.bookingType === 'monthly') {
+                        const months = Math.max(1, Number(form.months || 1));
+                        rawTotalPrice = months * monthlyRate;
+                        baseRateCalculationText = `₹${monthlyRate} × ${months} mo${months > 1 ? 's' : ''} = ₹${rawTotalPrice}`;
+                      }
+
+                      const maxDiscount = Number(selectedSpace.maxWalletDiscount ?? 10);
+                      const discount = (useWallet && maxDiscount > 0) ? Math.min(walletBalance, maxDiscount, rawTotalPrice) : 0;
+                      const finalTotal = Math.max(0, rawTotalPrice - discount);
 
                       return (
                         <>
-                          {walletBalance > 0 && maxWallet > 0 && (
+                          {/* Duration Mode Switcher */}
+                          <div className="space-y-2">
+                            <label className="block text-xs font-extrabold text-slate-600 uppercase tracking-wider">
+                              Select Booking Duration Mode
+                            </label>
+                            <div className="grid grid-cols-3 gap-2.5">
+                              {[
+                                { id: 'hourly', label: '⏱️ Hourly', rateText: `₹${hourlyRate}/hr` },
+                                { id: 'daily', label: '📅 1 Day Flat', rateText: `₹${dailyRate}` },
+                                { id: 'monthly', label: '🗓️ 1 Month', rateText: `₹${monthlyRate}` },
+                              ].map((plan) => {
+                                const isSelected = (form.bookingType || 'hourly') === plan.id;
+                                return (
+                                  <button
+                                    key={plan.id}
+                                    type="button"
+                                    onClick={() => setForm(p => ({ ...p, bookingType: plan.id }))}
+                                    className={`p-3 rounded-2xl border text-center transition-all ${
+                                      isSelected
+                                        ? 'bg-emerald-50 border-emerald-500 ring-2 ring-emerald-500 shadow-sm'
+                                        : 'bg-white border-slate-200 hover:border-slate-300'
+                                    }`}
+                                  >
+                                    <p className={`text-xs font-black ${isSelected ? 'text-emerald-950' : 'text-slate-800'}`}>
+                                      {plan.label}
+                                    </p>
+                                    <p className={`text-[11px] font-bold mt-0.5 ${isSelected ? 'text-emerald-700' : 'text-slate-400'}`}>
+                                      {plan.rateText}
+                                    </p>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+
+                          {/* Interactive +/- Stepper Duration Control */}
+                          {form.bookingType === 'hourly' && (
+                            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-3">
+                              <div className="flex items-center justify-between">
+                                <span className="text-xs font-extrabold text-slate-700">⏱️ Parking Duration (Hours)</span>
+                                <span className="text-xs font-black text-emerald-600">₹{hourlyRate}/hr</span>
+                              </div>
+                              <div className="flex items-center gap-3">
+                                <button
+                                  type="button"
+                                  onClick={() => setForm(p => ({ ...p, hours: String(Math.max(1, Number(p.hours || 1) - 1)) }))}
+                                  disabled={Number(form.hours || 1) <= 1}
+                                  className="w-12 h-12 rounded-2xl bg-white border border-slate-200 text-slate-800 font-black text-xl hover:bg-slate-100 disabled:opacity-40 transition-all flex items-center justify-center shrink-0"
+                                >
+                                  −
+                                </button>
+                                <div className="flex-1 bg-white border border-slate-200 rounded-2xl p-2.5 text-center">
+                                  <p className="text-base font-black text-slate-900 leading-tight">
+                                    {form.hours || 1} {Number(form.hours || 1) === 1 ? 'Hour' : 'Hours'}
+                                  </p>
+                                  <p className="text-[11px] font-bold text-slate-400">
+                                    ₹{Number(form.hours || 1) * hourlyRate} Total Base
+                                  </p>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => setForm(p => ({ ...p, hours: String(Math.min(24, Number(p.hours || 1) + 1)) }))}
+                                  disabled={Number(form.hours || 1) >= 24}
+                                  className="w-12 h-12 rounded-2xl bg-white border border-slate-200 text-slate-800 font-black text-xl hover:bg-slate-100 disabled:opacity-40 transition-all flex items-center justify-center shrink-0"
+                                >
+                                  +
+                                </button>
+                              </div>
+                              {/* Quick Hours Presets */}
+                              <div className="flex items-center gap-2 pt-1 overflow-x-auto">
+                                {[1, 2, 4, 8, 12, 24].map((hr) => (
+                                  <button
+                                    key={hr}
+                                    type="button"
+                                    onClick={() => setForm(p => ({ ...p, hours: String(hr) }))}
+                                    className={`flex-1 py-1.5 px-2 rounded-xl text-xs font-black border transition-all ${
+                                      Number(form.hours || 1) === hr
+                                        ? 'bg-emerald-500 text-white border-emerald-500 shadow-sm'
+                                        : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
+                                    }`}
+                                  >
+                                    {hr}h
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {form.bookingType === 'daily' && (
+                            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-3">
+                              <div className="flex items-center justify-between">
+                                <span className="text-xs font-extrabold text-slate-700">📅 Parking Duration (Days)</span>
+                                <span className="text-xs font-black text-emerald-600">₹{dailyRate}/day</span>
+                              </div>
+                              <div className="flex items-center gap-3">
+                                <button
+                                  type="button"
+                                  onClick={() => setForm(p => ({ ...p, days: String(Math.max(1, Number(p.days || 1) - 1)) }))}
+                                  disabled={Number(form.days || 1) <= 1}
+                                  className="w-12 h-12 rounded-2xl bg-white border border-slate-200 text-slate-800 font-black text-xl hover:bg-slate-100 disabled:opacity-40 transition-all flex items-center justify-center shrink-0"
+                                >
+                                  −
+                                </button>
+                                <div className="flex-1 bg-white border border-slate-200 rounded-2xl p-2.5 text-center">
+                                  <p className="text-base font-black text-slate-900 leading-tight">
+                                    {form.days || 1} {Number(form.days || 1) === 1 ? 'Day' : 'Days'}
+                                  </p>
+                                  <p className="text-[11px] font-bold text-slate-400">
+                                    ₹{Number(form.days || 1) * dailyRate} Total Base
+                                  </p>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => setForm(p => ({ ...p, days: String(Math.min(30, Number(p.days || 1) + 1)) }))}
+                                  disabled={Number(form.days || 1) >= 30}
+                                  className="w-12 h-12 rounded-2xl bg-white border border-slate-200 text-slate-800 font-black text-xl hover:bg-slate-100 disabled:opacity-40 transition-all flex items-center justify-center shrink-0"
+                                >
+                                  +
+                                </button>
+                              </div>
+                              {/* Quick Days Presets */}
+                              <div className="flex items-center gap-2 pt-1 overflow-x-auto">
+                                {[1, 2, 3, 5, 7, 15].map((d) => (
+                                  <button
+                                    key={d}
+                                    type="button"
+                                    onClick={() => setForm(p => ({ ...p, days: String(d) }))}
+                                    className={`flex-1 py-1.5 px-2 rounded-xl text-xs font-black border transition-all ${
+                                      Number(form.days || 1) === d
+                                        ? 'bg-emerald-500 text-white border-emerald-500 shadow-sm'
+                                        : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
+                                    }`}
+                                  >
+                                    {d}d
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {form.bookingType === 'monthly' && (
+                            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-3">
+                              <div className="flex items-center justify-between">
+                                <span className="text-xs font-extrabold text-slate-700">🗓️ Parking Duration (Months)</span>
+                                <span className="text-xs font-black text-emerald-600">₹{monthlyRate}/mo</span>
+                              </div>
+                              <div className="flex items-center gap-3">
+                                <button
+                                  type="button"
+                                  onClick={() => setForm(p => ({ ...p, months: String(Math.max(1, Number(p.months || 1) - 1)) }))}
+                                  disabled={Number(form.months || 1) <= 1}
+                                  className="w-12 h-12 rounded-2xl bg-white border border-slate-200 text-slate-800 font-black text-xl hover:bg-slate-100 disabled:opacity-40 transition-all flex items-center justify-center shrink-0"
+                                >
+                                  −
+                                </button>
+                                <div className="flex-1 bg-white border border-slate-200 rounded-2xl p-2.5 text-center">
+                                  <p className="text-base font-black text-slate-900 leading-tight">
+                                    {form.months || 1} {Number(form.months || 1) === 1 ? 'Month' : 'Months'}
+                                  </p>
+                                  <p className="text-[11px] font-bold text-slate-400">
+                                    ₹{Number(form.months || 1) * monthlyRate} Total Base
+                                  </p>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => setForm(p => ({ ...p, months: String(Math.min(12, Number(p.months || 1) + 1)) }))}
+                                  disabled={Number(form.months || 1) >= 12}
+                                  className="w-12 h-12 rounded-2xl bg-white border border-slate-200 text-slate-800 font-black text-xl hover:bg-slate-100 disabled:opacity-40 transition-all flex items-center justify-center shrink-0"
+                                >
+                                  +
+                                </button>
+                              </div>
+                              {/* Quick Months Presets */}
+                              <div className="flex items-center gap-2 pt-1 overflow-x-auto">
+                                {[1, 2, 3, 6, 12].map((m) => (
+                                  <button
+                                    key={m}
+                                    type="button"
+                                    onClick={() => setForm(p => ({ ...p, months: String(m) }))}
+                                    className={`flex-1 py-1.5 px-2 rounded-xl text-xs font-black border transition-all ${
+                                      Number(form.months || 1) === m
+                                        ? 'bg-emerald-500 text-white border-emerald-500 shadow-sm'
+                                        : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
+                                    }`}
+                                  >
+                                    {m}m
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* PlanToPark Wallet Money Deduction Card */}
+                          {walletBalance > 0 && maxDiscount > 0 && (
                             <div
                               onClick={() => setUseWallet(p => !p)}
                               className={`p-4 rounded-2xl border transition-all cursor-pointer flex items-center justify-between ${
                                 useWallet
-                                  ? 'bg-emerald-50/70 border-emerald-300'
+                                  ? 'bg-emerald-50/80 border-emerald-300 ring-1 ring-emerald-300'
                                   : 'bg-slate-50 border-slate-200'
                               }`}
                             >
-                              <div className="flex items-center gap-3.5">
-                                <div className={`h-9 w-9 rounded-xl flex items-center justify-center text-base ${
+                              <div className="flex items-center gap-3">
+                                <div className={`h-10 w-10 rounded-xl flex items-center justify-center text-lg ${
                                   useWallet ? 'bg-emerald-500 text-white' : 'bg-slate-200 text-slate-600'
                                 }`}>
                                   ⚡
@@ -2111,8 +2548,8 @@ const SeekerDashboard = () => {
                                   <p className="text-xs font-black text-slate-900">
                                     Use PlanToPark Wallet (-₹{discount})
                                   </p>
-                                  <p className="text-[11px] text-slate-400 font-medium mt-0.5">
-                                    Available Balance: ₹{walletBalance}.00 • Max ₹{maxWallet} usable
+                                  <p className="text-[11px] text-slate-500 font-medium mt-0.5">
+                                    Available Balance: ₹{walletBalance}.00 • Max ₹{maxDiscount} usable
                                   </p>
                                 </div>
                               </div>
@@ -2124,19 +2561,19 @@ const SeekerDashboard = () => {
                             </div>
                           )}
 
-                          {/* Price Breakdown Box */}
-                          <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-5 space-y-2.5 text-xs">
-                            <div className="flex items-center justify-between text-slate-600">
+                          {/* Live Price Breakdown Box */}
+                          <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 space-y-2.5 text-xs">
+                            <div className="flex justify-between text-slate-600 font-medium">
                               <span>Base Rate</span>
-                              <span className="font-bold text-slate-800">₹{hourlyRate} × {form.hours} hrs = ₹{rawTotal}</span>
+                              <span className="font-bold text-slate-800">{baseRateCalculationText}</span>
                             </div>
                             {discount > 0 && (
-                              <div className="flex items-center justify-between text-emerald-600 font-bold">
+                              <div className="flex justify-between text-emerald-600 font-bold">
                                 <span>⚡ Wallet Money Applied</span>
-                                <span className="font-black">- ₹{discount}.00</span>
+                                <span>- ₹{discount}.00</span>
                               </div>
                             )}
-                            <div className="flex items-center justify-between text-slate-600">
+                            <div className="flex justify-between text-slate-600 font-medium">
                               <span>Platform Convenience Fee</span>
                               <span className="font-bold text-slate-800">₹0 (Free)</span>
                             </div>
