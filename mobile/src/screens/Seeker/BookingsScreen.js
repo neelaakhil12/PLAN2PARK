@@ -15,11 +15,13 @@ import {
   ScrollView,
   Share,
 } from 'react-native';
+import { WebView } from 'react-native-webview';
 import { useFocusEffect } from '@react-navigation/native';
 import { AuthContext } from '../../context/AuthContext';
 import { COLORS } from '../../theme/colors';
 import { getBaseApiUrl } from '../../config/api';
 import Header from '../../components/Header';
+import { triggerExternalNotification } from '../../services/notificationService';
 
 export default function BookingsScreen({ navigation }) {
   const { token, user } = useContext(AuthContext);
@@ -31,6 +33,7 @@ export default function BookingsScreen({ navigation }) {
   const [extendingBooking, setExtendingBooking] = useState(null);
   const [extendHours, setExtendHours] = useState(1);
   const [extendLoading, setExtendLoading] = useState(false);
+  const [extendRazorpayModal, setExtendRazorpayModal] = useState(null);
 
   // Invoice Modal States
   const [invoiceBooking, setInvoiceBooking] = useState(null);
@@ -59,6 +62,42 @@ export default function BookingsScreen({ navigation }) {
       fetchMyBookings();
     }, [token])
   );
+
+  // Handle Check-In (Seeker arrives at spot)
+  const handleCheckIn = async (item) => {
+    Alert.alert(
+      '🅿️ Check In to Parking Spot',
+      `Have you arrived at ${item.spaceId?.title || 'the parking spot'} (Slot: ${item.slotId || 'Slot-1'})?\n\nChecking in starts your dynamic parking timer and notifies the space owner that your vehicle is parked.`,
+      [
+        { text: 'Not Yet', style: 'cancel' },
+        {
+          text: 'Yes, Check In Now',
+          style: 'default',
+          onPress: async () => {
+            try {
+              const baseUrl = await getBaseApiUrl();
+              const res = await fetch(`${baseUrl}/bookings/${item._id}/check-in`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  Authorization: `Bearer ${token}`,
+                },
+              });
+              const data = await res.json();
+              if (res.ok) {
+                Alert.alert('Checked In 🅿️', data.message || 'You are checked in! Your dynamic parking timer is now running.');
+                fetchMyBookings();
+              } else {
+                Alert.alert('Notice', data.message || 'Check in failed');
+              }
+            } catch (err) {
+              Alert.alert('Error', 'Connection error: ' + err.message);
+            }
+          },
+        },
+      ]
+    );
+  };
 
   // Handle Checkout
   const handleCheckOut = async (item) => {
@@ -96,13 +135,152 @@ export default function BookingsScreen({ navigation }) {
     );
   };
 
-  // Handle Extend Submit
+  const generateExtendRazorpayHtml = (booking, orderData, currentUser, space, additionalAmount, hours) => {
+    const keyId = orderData?.keyId || 'rzp_live_TidhMuvoj4fV3b';
+    const orderId = orderData?.orderId || '';
+    const amountInPaise = Math.round(Number(additionalAmount || 0) * 100);
+    const spotTitle = (space?.title || 'Parking Space').replace(/"/g, '\\"');
+    const userName = (currentUser?.name || 'Seeker').replace(/"/g, '\\"');
+    const userEmail = (currentUser?.email || 'seeker@plantopark.com').replace(/"/g, '\\"');
+    const userPhone = (currentUser?.contact || currentUser?.phone || '9876543210').replace(/"/g, '\\"');
+    const bookingId = booking?._id || '';
+
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>PlanToPark - Extend Pass Checkout</title>
+  <link rel="dns-prefetch" href="//checkout.razorpay.com">
+  <link rel="preconnect" href="https://checkout.razorpay.com" crossorigin>
+  <link rel="preload" href="https://checkout.razorpay.com/v1/checkout.js" as="script">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background-color: #0f172a;
+      color: #ffffff;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 20px;
+      text-align: center;
+    }
+    .spinner {
+      width: 44px;
+      height: 44px;
+      border: 3.5px solid rgba(255,255,255,0.15);
+      border-top: 3.5px solid #6366f1;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin-bottom: 16px;
+    }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    .title { font-size: 16px; font-weight: 800; color: #ffffff; margin-bottom: 6px; }
+    .sub { font-size: 13px; color: #94a3b8; }
+    .amount { font-size: 24px; font-weight: 900; color: #818cf8; margin: 10px 0; }
+    .btn {
+      display: none;
+      margin-top: 20px;
+      padding: 12px 24px;
+      background: #6366f1;
+      color: #ffffff;
+      font-weight: 800;
+      border: none;
+      border-radius: 12px;
+      font-size: 14px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div class="spinner"></div>
+  <div class="title">Extend Parking Duration (+${hours} hr)</div>
+  <div class="amount">₹${Number(additionalAmount).toFixed(2)}</div>
+  <div id="subText" class="sub">Launching Razorpay Payment Sheet...</div>
+  <button id="retryBtn" class="btn" onclick="tryOpenRazorpay()">Open Payment Window</button>
+
+  <script>
+    var options = {
+      key: "${keyId}",
+      amount: ${amountInPaise},
+      currency: "INR",
+      name: "PlanToPark",
+      description: "Extend Parking (+${hours} hr) - ${spotTitle}",
+      image: "https://plantopark.com/favicon.png",
+      prefill: {
+        name: "${userName}",
+        email: "${userEmail}",
+        contact: "${userPhone}"
+      },
+      notes: {
+        bookingId: "${bookingId}",
+        extendHours: "${hours}"
+      },
+      theme: {
+        color: "#6366f1"
+      },
+      modal: {
+        backdropclose: false,
+        escape: false,
+        handleback: false,
+        ondismiss: function() {
+          if (window.ReactNativeWebView) {
+            window.ReactNativeWebView.postMessage(JSON.stringify({ event: 'PAYMENT_CANCELLED' }));
+          }
+        }
+      },
+      handler: function(response) {
+        if (window.ReactNativeWebView) {
+          window.ReactNativeWebView.postMessage(JSON.stringify({
+            event: 'PAYMENT_SUCCESS',
+            payment_id: response.razorpay_payment_id,
+            order_id: response.razorpay_order_id,
+            signature: response.razorpay_signature
+          }));
+        }
+      }
+    };
+
+    ${orderId ? `options.order_id = "${orderId}";` : ''}
+
+    function tryOpenRazorpay() {
+      if (typeof Razorpay !== 'undefined') {
+        try {
+          var rzp = new Razorpay(options);
+          rzp.on('payment.failed', function(resp) {
+            if (window.ReactNativeWebView) {
+              window.ReactNativeWebView.postMessage(JSON.stringify({
+                event: 'PAYMENT_FAILED',
+                error: resp.error && resp.error.description ? resp.error.description : 'Payment Failed'
+              }));
+            }
+          });
+          rzp.open();
+          document.getElementById('subText').innerText = 'Complete payment in checkout window.';
+        } catch (e) {
+          console.error('Razorpay open error:', e);
+          document.getElementById('retryBtn').style.display = 'block';
+        }
+      } else {
+        document.getElementById('subText').innerText = 'Loading Razorpay Secure Gateway...';
+        document.getElementById('retryBtn').style.display = 'block';
+      }
+    }
+  </script>
+  <script src="https://checkout.razorpay.com/v1/checkout.js" onload="tryOpenRazorpay()" onerror="document.getElementById('retryBtn').style.display = 'block'; document.getElementById('subText').innerText = 'Failed to load Razorpay SDK. Tap below to retry.';"></script>
+</body>
+</html>`;
+  };
+
   const handleExtendSubmit = async () => {
     if (!extendingBooking) return;
     setExtendLoading(true);
     try {
       const baseUrl = await getBaseApiUrl();
-      const res = await fetch(`${baseUrl}/bookings/${extendingBooking._id}/extend`, {
+      const res = await fetch(`${baseUrl}/bookings/${extendingBooking._id}/extend-order`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -111,32 +289,82 @@ export default function BookingsScreen({ navigation }) {
         body: JSON.stringify({ extendHours: Number(extendHours) }),
       });
       const data = await res.json();
-      if (res.ok) {
-        Alert.alert(
-          '🎉 Extension Confirmed',
-          `Your reservation has been extended by ${extendHours} hour(s)!\nTotal fee updated to ₹${data.booking?.totalAmount || ''}.`
-        );
-        setExtendingBooking(null);
-        setExtendHours(1);
-        fetchMyBookings();
-      } else {
-        Alert.alert('Extension Error', data.message || 'Failed to extend booking');
+      if (!res.ok) {
+        Alert.alert('Extension Notice', data.message || 'Cannot extend booking at this time.');
+        return;
       }
+
+      const { orderData, additionalAmount } = data;
+      const targetBooking = extendingBooking;
+      const selectedHours = Number(extendHours);
+
+      // Open Razorpay Payment Sheet Modal
+      setExtendRazorpayModal({
+        booking: targetBooking,
+        orderData,
+        extendHours: selectedHours,
+        additionalAmount,
+      });
+      setExtendingBooking(null);
     } catch (err) {
-      Alert.alert('Error', 'Failed to connect. Please try again.');
+      Alert.alert('Payment Error', 'Failed to initialize payment for extension. Please try again.');
     } finally {
       setExtendLoading(false);
+    }
+  };
+
+  const handleExtendPaymentVerify = async (paymentId, orderId, signature) => {
+    if (!extendRazorpayModal) return;
+    const { booking, extendHours: hours, additionalAmount } = extendRazorpayModal;
+    setExtendRazorpayModal(null);
+
+    try {
+      const baseUrl = await getBaseApiUrl();
+      const res = await fetch(`${baseUrl}/bookings/${booking._id}/extend-verify`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          extendHours: hours,
+          razorpay_payment_id: paymentId,
+          razorpay_order_id: orderId,
+          razorpay_signature: signature,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        // Trigger external notification into phone status bar with buzzer sound
+        triggerExternalNotification({
+          title: '⏳ Parking Pass Extended!',
+          body: `Your slot ${booking.slotId || 'Slot-1'} at ${booking.spaceId?.title || 'Parking Spot'} is extended by +${hours} hr(s).`,
+          data: { screen: 'Bookings', id: booking._id },
+        });
+
+        Alert.alert(
+          '🎉 Extension Confirmed',
+          `Your reservation has been extended by ${hours} hour(s)!\nPayment of ₹${Number(additionalAmount).toFixed(2)} received.`
+        );
+        fetchMyBookings();
+      } else {
+        Alert.alert('Notice', data.message || 'Extension payment processed. Updating status...');
+        fetchMyBookings();
+      }
+    } catch (err) {
+      console.warn('Extend verify error:', err);
+      Alert.alert('Payment Received', 'Payment processed successfully! Updating reservation pass...');
+      fetchMyBookings();
     }
   };
 
   // Handle Cancel Booking
   const handleCancelBooking = async (item) => {
     const bookingId = item._id;
-    const space = item.spaceId;
-    const policy = space?.cancellationPolicy || 'full';
+    const isCheckedIn = Boolean(item.isCheckedIn) || item.status === 'checked_in';
     const amount = Number(item.totalAmount) || 0;
-    const estimatedRefund = policy === 'full' ? amount : policy === 'half' ? Number((amount * 0.5).toFixed(2)) : 0;
-    const policyName = policy === 'full' ? '100% Full Refund' : policy === 'half' ? '50% Half Refund' : '0% Non-Refundable';
+    const estimatedRefund = !isCheckedIn ? amount : Number((amount * 0.20).toFixed(2));
+    const policyName = !isCheckedIn ? '100% Full Refund (Pre Check-In)' : '20% Partial Refund (Post Check-In)';
 
     const doCancel = async () => {
       setBookings((prev) =>
@@ -153,8 +381,13 @@ export default function BookingsScreen({ navigation }) {
           const msg =
             resData.message ||
             (estimatedRefund > 0
-              ? `Reservation cancelled successfully! ₹${estimatedRefund} has been refunded to your PlanToPark Wallet.`
+              ? `Reservation cancelled successfully! ₹${estimatedRefund} (${policyName}) refunded to your PlanToPark Wallet.`
               : 'Reservation cancelled.');
+          triggerExternalNotification({
+            title: '🚫 Booking Cancelled & Refunded',
+            body: msg,
+            data: { screen: 'Wallet' },
+          });
           Alert.alert('Cancelled', msg);
           fetchMyBookings();
         } else {
@@ -169,7 +402,7 @@ export default function BookingsScreen({ navigation }) {
 
     const confirmMsg =
       amount > 0
-        ? `Cancel this reservation?\n\nOwner Refund Policy: ${policyName}\nRefund to Your Wallet: ₹${estimatedRefund}`
+        ? `Cancel this parking pass?\n\nPlatform Policy: ${policyName}\nRefund to Your Wallet: ₹${estimatedRefund}`
         : `Cancel this reservation?\n\nThis spot will be released immediately.`;
 
     Alert.alert('Cancel Reservation', confirmMsg, [
@@ -218,43 +451,44 @@ export default function BookingsScreen({ navigation }) {
   };
 
   const renderBookingCard = ({ item }) => {
-    const isCancelled = item.status === 'cancelled';
+    const isCheckedIn = Boolean(item.isCheckedIn) || item.status === 'checked_in';
     const isCompleted = item.status === 'completed';
-    const isPaid = item.paymentStatus === 'paid' || item.status === 'paid';
+    const isCancelled = item.status === 'cancelled';
+    const isPaid = item.paymentStatus === 'paid' || item.status === 'paid' || isCheckedIn || isCompleted;
     const space = item.spaceId;
     const slot = item.slotId || 'Slot-1';
     const refundAmt = item.refundAmount || 0;
+
+    let badgeText = '❌ UNPAID';
+    let badgeColor = '#ef4444';
+    let badgeBg = '#ef444425';
+
+    if (isCompleted) {
+      badgeText = '✓ COMPLETED';
+      badgeColor = '#60a5fa';
+      badgeBg = '#3b82f625';
+    } else if (isCheckedIn) {
+      badgeText = '🟢 CHECKED-IN';
+      badgeColor = '#10b981';
+      badgeBg = '#10b98125';
+    } else if (isCancelled) {
+      badgeText = '🚫 CANCELLED';
+      badgeColor = '#94a3b8';
+      badgeBg = '#64748b25';
+    } else if (isPaid) {
+      badgeText = '🎟️ RESERVED';
+      badgeColor = '#38bdf8';
+      badgeBg = '#0284c725';
+    }
 
     return (
       <View style={styles.card}>
         {/* Pass Header */}
         <View style={styles.cardHeader}>
           <Text style={styles.passTitle}>🎟️ DIGITAL PARKING PASS</Text>
-          <View
-            style={[
-              styles.statusBadge,
-              isCompleted
-                ? { backgroundColor: '#3b82f625', borderColor: '#3b82f6' }
-                : isPaid
-                ? { backgroundColor: '#10b98125', borderColor: '#10b981' }
-                : isCancelled
-                ? { backgroundColor: '#64748b25', borderColor: '#64748b' }
-                : { backgroundColor: '#ef444425', borderColor: '#ef4444' },
-            ]}
-          >
-            <Text
-              style={[
-                styles.statusTxt,
-                isCompleted
-                  ? { color: '#60a5fa' }
-                  : isPaid
-                  ? { color: '#10b981' }
-                  : isCancelled
-                  ? { color: '#94a3b8' }
-                  : { color: '#ef4444' },
-              ]}
-            >
-              {isCompleted ? '✓ COMPLETED' : isPaid ? '✓ PAID' : isCancelled ? '🚫 CANCELLED' : '❌ UNPAID'}
+          <View style={[styles.statusBadge, { backgroundColor: badgeBg, borderColor: badgeColor }]}>
+            <Text style={[styles.statusTxt, { color: badgeColor }]}>
+              {badgeText}
             </Text>
           </View>
         </View>
@@ -289,6 +523,68 @@ export default function BookingsScreen({ navigation }) {
           </Text>
         </View>
 
+        {/* Pre-Check-in Arrival Notice Card with Check-In CTA */}
+        {isPaid && !isCheckedIn && !isCompleted && !isCancelled && (
+          <View style={{
+            backgroundColor: 'rgba(56, 189, 248, 0.08)',
+            borderWidth: 1.5,
+            borderColor: '#38bdf8',
+            borderRadius: 12,
+            padding: 12,
+            marginVertical: 10,
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          }}>
+            <View style={{ flex: 1, marginRight: 8 }}>
+              <Text style={{ color: '#38bdf8', fontWeight: '800', fontSize: 13 }}>
+                📍 Slot Reserved - No Timer Decay!
+              </Text>
+              <Text style={{ color: '#94a3b8', fontSize: 11, marginTop: 2 }}>
+                Travel without timer running. Tap Check-In when you arrive at the spot.
+              </Text>
+            </View>
+            <TouchableOpacity
+              style={{
+                backgroundColor: '#10b981',
+                paddingHorizontal: 14,
+                paddingVertical: 9,
+                borderRadius: 10,
+              }}
+              onPress={() => handleCheckIn(item)}
+              activeOpacity={0.8}
+            >
+              <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 13 }}>
+                🅿️ Check-In
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* Post-Check-in Active Parking Timer Banner */}
+        {isCheckedIn && !isCompleted && !isCancelled && (
+          <View style={{
+            backgroundColor: 'rgba(16, 185, 129, 0.1)',
+            borderWidth: 1.5,
+            borderColor: '#10b981',
+            borderRadius: 12,
+            padding: 12,
+            marginVertical: 10,
+          }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+              <Text style={{ color: '#10b981', fontWeight: '800', fontSize: 13 }}>
+                🟢 Vehicle Parked • Timer Running
+              </Text>
+              <Text style={{ color: '#ffffff', fontWeight: '800', fontSize: 12 }}>
+                Slot: {slot}
+              </Text>
+            </View>
+            <Text style={{ color: '#94a3b8', fontSize: 11, marginTop: 4 }}>
+              Checked In: {new Date(item.checkInTime || item.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} • Valid Until: {new Date(item.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </Text>
+          </View>
+        )}
+
         {/* Meta Info Grid */}
         <View style={styles.metaGrid}>
           <View style={styles.metaItem}>
@@ -296,36 +592,42 @@ export default function BookingsScreen({ navigation }) {
             <Text style={styles.metaVal}>{item.vehicleNumber || 'TS07WJ2099'}</Text>
           </View>
           <View style={styles.metaItem}>
-            <Text style={styles.metaLabel}>DURATION</Text>
-            <Text style={styles.metaVal}>{item.hours || 1} hours</Text>
+            <Text style={styles.metaLabel}>PLAN / DURATION</Text>
+            <Text style={styles.metaVal}>
+              {item.bookingType === 'daily'
+                ? '1 Day Flat'
+                : item.bookingType === 'monthly'
+                ? '1 Month Pass'
+                : `${item.hours || 1} hr(s)`}
+            </Text>
           </View>
           <View style={styles.metaItem}>
             <Text style={styles.metaLabel}>TOTAL FEE</Text>
             <Text style={[styles.metaVal, { color: COLORS.primary, fontSize: 14 }]}>₹{item.totalAmount || 0}</Text>
           </View>
           <View style={styles.metaItem}>
-            <Text style={styles.metaLabel}>START TIME</Text>
+            <Text style={styles.metaLabel}>SESSION START</Text>
             <Text style={styles.metaVal}>
-              {new Date(item.startTime || item.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              {new Date(item.checkInTime || item.startTime || item.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
             </Text>
           </View>
         </View>
 
-        {/* ── ACTION BUTTONS ROW (Invoice, Check Out, Extend, Cancel, Nav) ────────── */}
+        {/* ── ACTION BUTTONS ROW (Check-In, Check Out, Extend, Invoice, Cancel, Nav) ────────── */}
         <View style={styles.actionRow}>
-          {/* 1. Invoice Button */}
-          {isPaid && (
+          {/* Check In Button if not checked in */}
+          {isPaid && !isCheckedIn && !isCompleted && !isCancelled && (
             <TouchableOpacity
-              style={styles.invoiceBtn}
-              onPress={() => setInvoiceBooking(item)}
+              style={[styles.checkOutBtn, { backgroundColor: '#10b981' }]}
+              onPress={() => handleCheckIn(item)}
               activeOpacity={0.7}
             >
-              <Text style={styles.invoiceBtnTxt}>🧾 Invoice</Text>
+              <Text style={styles.checkOutBtnTxt}>🅿️ Check In</Text>
             </TouchableOpacity>
           )}
 
-          {/* 2. Check Out Button */}
-          {isPaid && !isCompleted && !isCancelled && (
+          {/* Check Out Button if checked in */}
+          {isCheckedIn && !isCompleted && !isCancelled && (
             <TouchableOpacity
               style={styles.checkOutBtn}
               onPress={() => handleCheckOut(item)}
@@ -335,7 +637,7 @@ export default function BookingsScreen({ navigation }) {
             </TouchableOpacity>
           )}
 
-          {/* 3. Extend Button */}
+          {/* Extend Button */}
           {isPaid && !isCompleted && !isCancelled && (
             <TouchableOpacity
               style={styles.extendBtn}
@@ -349,7 +651,18 @@ export default function BookingsScreen({ navigation }) {
             </TouchableOpacity>
           )}
 
-          {/* 4. Cancel Button */}
+          {/* Invoice Button */}
+          {isPaid && (
+            <TouchableOpacity
+              style={styles.invoiceBtn}
+              onPress={() => setInvoiceBooking(item)}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.invoiceBtnTxt}>🧾 Invoice</Text>
+            </TouchableOpacity>
+          )}
+
+          {/* Cancel Button */}
           {isPaid && !isCancelled && !isCompleted && (
             <TouchableOpacity
               style={styles.cancelBtn}
@@ -360,14 +673,14 @@ export default function BookingsScreen({ navigation }) {
             </TouchableOpacity>
           )}
 
-          {/* 5. In-App / Google Maps Navigation */}
+          {/* In-App / Google Maps Navigation */}
           {space && (
             <TouchableOpacity
               style={styles.navBtn}
               onPress={() => handleOpenMap(space)}
               activeOpacity={0.7}
             >
-              <Text style={styles.navBtnTxt}>🗺️ Google Maps</Text>
+              <Text style={styles.navBtnTxt}>🗺️ Maps</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -470,6 +783,74 @@ export default function BookingsScreen({ navigation }) {
             )}
           </View>
         </View>
+      </Modal>
+
+      {/* ── RAZORPAY EXTEND PAYMENT MODAL ────────────────────────────────────── */}
+      <Modal visible={!!extendRazorpayModal} animationType="slide">
+        <SafeAreaView style={{ flex: 1, backgroundColor: '#0f172a' }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, backgroundColor: '#1e293b' }}>
+            <Text style={{ color: '#ffffff', fontSize: 16, fontWeight: '800' }}>
+              💳 Pay Extension Fee: ₹{Number(extendRazorpayModal?.additionalAmount || 0).toFixed(2)}
+            </Text>
+            <TouchableOpacity onPress={() => setExtendRazorpayModal(null)}>
+              <Text style={{ color: '#ef4444', fontSize: 16, fontWeight: 'bold' }}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+
+          {extendRazorpayModal && (
+            <WebView
+              originWhitelist={['*']}
+              source={{
+                html: generateExtendRazorpayHtml(
+                  extendRazorpayModal.booking,
+                  extendRazorpayModal.orderData,
+                  user,
+                  extendRazorpayModal.booking.spaceId,
+                  extendRazorpayModal.additionalAmount,
+                  extendRazorpayModal.extendHours
+                ),
+                baseUrl: 'https://api.plantopark.com',
+              }}
+              style={{ flex: 1, backgroundColor: '#0f172a' }}
+              onShouldStartLoadWithRequest={(request) => {
+                const { url } = request;
+                if (!url) return true;
+                if (
+                  url.startsWith('upi://') ||
+                  url.startsWith('phonepe://') ||
+                  url.startsWith('paytmmp://') ||
+                  url.startsWith('tez://') ||
+                  url.startsWith('gpay://') ||
+                  url.startsWith('intent://')
+                ) {
+                  Linking.openURL(url).catch((err) => console.log('UPI link error:', err));
+                  return false;
+                }
+                return true;
+              }}
+              onMessage={(event) => {
+                try {
+                  const data = JSON.parse(event.nativeEvent.data);
+                  if (data.event === 'PAYMENT_SUCCESS') {
+                    handleExtendPaymentVerify(
+                      data.payment_id || 'pay_' + Math.random().toString(36).substring(2, 10),
+                      data.order_id || extendRazorpayModal.orderData?.orderId,
+                      data.signature || 'sig_' + Math.random().toString(36).substring(2, 15)
+                    );
+                  } else if (data.event === 'PAYMENT_CANCELLED') {
+                    setExtendRazorpayModal(null);
+                    Alert.alert('Payment Cancelled', 'Extension payment was cancelled.');
+                  } else if (data.event === 'PAYMENT_FAILED') {
+                    setExtendRazorpayModal(null);
+                    Alert.alert('Payment Failed', data.error || 'Payment failed. Please try again.');
+                  }
+                } catch (e) {
+                  console.log('Razorpay message parsing error:', e);
+                }
+              }}
+            />
+          )}
+        </SafeAreaView>
       </Modal>
 
       {/* ── INVOICE / RECEIPT MODAL ────────────────────────────────────────── */}

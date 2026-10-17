@@ -444,6 +444,52 @@ const OwnerDashboard = () => {
     }
   };
 
+  // Owner Manual Check-In
+  const handleOwnerCheckIn = async (bookingId, vehicleNumber) => {
+    if (!window.confirm(`Confirm Check-In for vehicle ${vehicleNumber || 'this booking'}?\n\nDynamic parking timer will start from this moment.`)) return;
+    try {
+      const res = await fetch(`${API_URL}/bookings/${bookingId}/check-in`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        }
+      });
+      const data = await res.json();
+      if (res.ok) {
+        alert(`🅿️ Vehicle ${vehicleNumber || ''} checked in successfully! Dynamic parking timer has started.`);
+        fetchOwnerData();
+      } else {
+        alert(data.message || 'Could not check in booking');
+      }
+    } catch (err) {
+      alert('Network error while checking in: ' + err.message);
+    }
+  };
+
+  // Owner Manual Check-Out & Slot Release
+  const handleOwnerCheckOut = async (bookingId, vehicleNumber, slotId) => {
+    if (!window.confirm(`Check out vehicle ${vehicleNumber || 'this booking'}?\n\nSlot ${slotId || ''} will be freed and made available for new bookings immediately.`)) return;
+    try {
+      const res = await fetch(`${API_URL}/bookings/${bookingId}/checkout`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        }
+      });
+      const data = await res.json();
+      if (res.ok) {
+        alert(`👋 Vehicle ${vehicleNumber || ''} checked out. Slot ${slotId || ''} is now freed!`);
+        fetchOwnerData();
+      } else {
+        alert(data.message || 'Could not check out');
+      }
+    } catch (err) {
+      alert('Network error while checking out: ' + err.message);
+    }
+  };
+
   // Delete Booking Order
   const handleDeleteBooking = async (bookingId) => {
     if (!window.confirm('Are you sure you want to delete this booking order?')) return;
@@ -1239,16 +1285,63 @@ const OwnerDashboard = () => {
                         </div>
                       </div>
 
+                      {/* Check-In / Departure Live Status Information */}
+                      {item.isCheckedIn && (
+                        <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-2xl px-3.5 py-2 text-xs font-semibold flex items-center justify-between">
+                          <span className="flex items-center gap-1.5 font-bold">
+                            <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                            🚗 Vehicle Parked &amp; Timer Running
+                          </span>
+                          {item.checkInTime && (
+                            <span className="text-slate-500 font-medium text-[11px]">
+                              Checked In: {new Date(item.checkInTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          )}
+                        </div>
+                      )}
+
+                      {isCompleted && item.checkOutTime && (
+                        <div className="bg-blue-50 border border-blue-200 text-blue-800 rounded-2xl px-3.5 py-2 text-xs font-semibold">
+                          👋 Departed at {new Date(item.checkOutTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} • Slot Available
+                        </div>
+                      )}
+
                       {/* Action Buttons */}
                       <div className="pt-2 flex flex-wrap items-center justify-between gap-2">
-                        {item.seekerContact ? (
-                          <a
-                            href={`tel:${item.seekerContact}`}
-                            className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 font-bold text-xs px-3.5 py-2 rounded-xl transition-colors flex items-center gap-1.5"
-                          >
-                            <Phone className="h-3.5 w-3.5" /> Call Seeker ({item.seekerContact})
-                          </a>
-                        ) : <div />}
+                        <div className="flex flex-wrap items-center gap-2">
+                          {/* Manual Check-In by Owner */}
+                          {isPaid && !item.isCheckedIn && !isCompleted && !isCancelled && (
+                            <button
+                              type="button"
+                              onClick={() => handleOwnerCheckIn(item._id, item.vehicleNumber)}
+                              className="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs px-3.5 py-2 rounded-xl transition-all shadow-sm flex items-center gap-1.5 cursor-pointer hover:-translate-y-0.5"
+                              title="Check in this vehicle if seeker forgot"
+                            >
+                              🅿️ Check In
+                            </button>
+                          )}
+
+                          {/* Manual Check-Out by Owner */}
+                          {item.isCheckedIn && !isCompleted && !isCancelled && (
+                            <button
+                              type="button"
+                              onClick={() => handleOwnerCheckOut(item._id, item.vehicleNumber, slot)}
+                              className="bg-slate-800 hover:bg-slate-900 text-white font-extrabold text-xs px-3.5 py-2 rounded-xl transition-all shadow-sm flex items-center gap-1.5 cursor-pointer hover:-translate-y-0.5"
+                              title="Check out this vehicle and free up the slot"
+                            >
+                              🚪 Check Out
+                            </button>
+                          )}
+
+                          {item.seekerContact ? (
+                            <a
+                              href={`tel:${item.seekerContact}`}
+                              className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 font-bold text-xs px-3.5 py-2 rounded-xl transition-colors flex items-center gap-1.5"
+                            >
+                              <Phone className="h-3.5 w-3.5" /> Call Seeker ({item.seekerContact})
+                            </a>
+                          ) : null}
+                        </div>
 
                         <button
                           onClick={() => handleDeleteBooking(item._id)}

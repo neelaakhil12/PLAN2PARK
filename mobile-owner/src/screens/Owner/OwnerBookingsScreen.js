@@ -74,6 +74,84 @@ export default function OwnerBookingsScreen({ navigation }) {
     }
   };
 
+  const handleOwnerCheckIn = async (bookingId, vehicleNumber) => {
+    const doCheckIn = async () => {
+      try {
+        const baseUrl = await getBaseApiUrl();
+        const res = await fetch(`${baseUrl}/bookings/${bookingId}/check-in`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+          },
+        });
+        const data = await res.json();
+        if (res.ok) {
+          const msg = `Vehicle ${vehicleNumber || ''} checked in successfully! Dynamic parking timer has started.`;
+          if (Platform.OS === 'web' && typeof window !== 'undefined') {
+            window.alert(msg);
+          } else {
+            Alert.alert('Checked In 🅿️', msg);
+          }
+          fetchOwnerBookings();
+        } else {
+          Alert.alert('Notice', data.message || 'Could not check in booking');
+        }
+      } catch (err) {
+        Alert.alert('Error', 'Failed to reach server: ' + err.message);
+      }
+    };
+
+    const confirmMsg = `Confirm Check-In for vehicle ${vehicleNumber || 'this booking'}? Dynamic timer will start now.`;
+    if (Platform.OS === 'web' && typeof window !== 'undefined' && window.confirm) {
+      if (window.confirm(confirmMsg)) doCheckIn();
+    } else {
+      Alert.alert('Check-In Commuter', confirmMsg, [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Yes, Check In', onPress: doCheckIn },
+      ]);
+    }
+  };
+
+  const handleOwnerCheckOut = async (bookingId, vehicleNumber, slotId) => {
+    const doCheckOut = async () => {
+      try {
+        const baseUrl = await getBaseApiUrl();
+        const res = await fetch(`${baseUrl}/bookings/${bookingId}/checkout`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+          },
+        });
+        const data = await res.json();
+        if (res.ok) {
+          const msg = `Vehicle ${vehicleNumber || ''} checked out. Slot ${slotId || ''} is now freed and available for new bookings!`;
+          if (Platform.OS === 'web' && typeof window !== 'undefined') {
+            window.alert(msg);
+          } else {
+            Alert.alert('Checked Out 👋', msg);
+          }
+          fetchOwnerBookings();
+        } else {
+          Alert.alert('Notice', data.message || 'Could not check out');
+        }
+      } catch (err) {
+        Alert.alert('Error', 'Failed to reach server: ' + err.message);
+      }
+    };
+
+    const confirmMsg = `Check out vehicle ${vehicleNumber || 'this booking'}? Slot ${slotId || ''} will be released immediately.`;
+    if (Platform.OS === 'web' && typeof window !== 'undefined' && window.confirm) {
+      if (window.confirm(confirmMsg)) doCheckOut();
+    } else {
+      Alert.alert('Check-Out Vehicle', confirmMsg, [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Yes, Check Out & Free Slot', onPress: doCheckOut },
+      ]);
+    }
+  };
+
   const handleDeleteBooking = async (bookingId, vehicleNumber) => {
     const doDelete = async () => {
       try {
@@ -192,8 +270,33 @@ export default function OwnerBookingsScreen({ navigation }) {
           </View>
         ) : (
           filteredBookings.map((booking) => {
-            const isPaid = booking.paymentStatus === 'paid' || booking.status === 'paid';
+            const isCheckedIn = Boolean(booking.isCheckedIn) || booking.status === 'checked_in';
+            const isCompleted = booking.status === 'completed';
             const isCancelled = booking.status === 'cancelled';
+            const isPaid = booking.paymentStatus === 'paid' || booking.status === 'paid' || isCheckedIn || isCompleted;
+
+            let badgeText = '🔴 FAILED';
+            let badgeColor = '#ef4444';
+            let badgeBg = '#ef444420';
+
+            if (isCompleted) {
+              badgeText = '✓ COMPLETED';
+              badgeColor = '#60a5fa';
+              badgeBg = '#3b82f620';
+            } else if (isCheckedIn) {
+              badgeText = '🟢 CHECKED-IN';
+              badgeColor = '#10b981';
+              badgeBg = '#10b98125';
+            } else if (isCancelled) {
+              badgeText = '🚫 CANCELLED';
+              badgeColor = '#94a3b8';
+              badgeBg = '#64748b20';
+            } else if (isPaid) {
+              badgeText = '🎟️ ALLOTTED (PAID)';
+              badgeColor = '#38bdf8';
+              badgeBg = '#0284c725';
+            }
+
             const spotTitle = booking.spaceId?.title || 'Parking Space';
             const seekerName = booking.seekerName || booking.seekerId?.name || 'Seeker';
             const seekerPhone = booking.seekerContact || booking.seekerId?.contact || '';
@@ -215,15 +318,9 @@ export default function OwnerBookingsScreen({ navigation }) {
                     <Text style={styles.spotTitle}>{spotTitle}</Text>
                     <Text style={styles.slotBadge}>🅿️ Slot: {slot}</Text>
                   </View>
-                  <View style={[
-                    styles.statusBadge, 
-                    { 
-                      backgroundColor: isPaid ? '#10b98120' : isCancelled ? '#64748b20' : '#ef444420', 
-                      borderColor: isPaid ? '#10b981' : isCancelled ? '#64748b' : '#ef4444' 
-                    }
-                  ]}>
-                    <Text style={[styles.statusTxt, { color: isPaid ? '#10b981' : isCancelled ? '#94a3b8' : '#ef4444' }]}>
-                      {isPaid ? '✓ PAID' : isCancelled ? '🚫 CANCELLED' : '🔴 FAILED'}
+                  <View style={[styles.statusBadge, { backgroundColor: badgeBg, borderColor: badgeColor }]}>
+                    <Text style={[styles.statusTxt, { color: badgeColor }]}>
+                      {badgeText}
                     </Text>
                   </View>
                 </View>
@@ -250,15 +347,81 @@ export default function OwnerBookingsScreen({ navigation }) {
                   </View>
                 </View>
 
+                {/* Check-In / Departure Status Information */}
+                {isCheckedIn && (
+                  <View style={{
+                    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                    borderWidth: 1,
+                    borderColor: 'rgba(16, 185, 129, 0.3)',
+                    borderRadius: 8,
+                    paddingHorizontal: 10,
+                    paddingVertical: 6,
+                    marginHorizontal: 12,
+                    marginBottom: 10,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                  }}>
+                    <Text style={{ color: '#10b981', fontSize: 11, fontWeight: '800' }}>
+                      🚗 Vehicle Parked & Timer Running
+                    </Text>
+                    {booking.checkInTime && (
+                      <Text style={{ color: '#94a3b8', fontSize: 10 }}>
+                        In: {new Date(booking.checkInTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </Text>
+                    )}
+                  </View>
+                )}
+
+                {isCompleted && booking.checkOutTime && (
+                  <View style={{
+                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                    borderWidth: 1,
+                    borderColor: 'rgba(59, 130, 246, 0.3)',
+                    borderRadius: 8,
+                    paddingHorizontal: 10,
+                    paddingVertical: 6,
+                    marginHorizontal: 12,
+                    marginBottom: 10,
+                  }}>
+                    <Text style={{ color: '#60a5fa', fontSize: 11, fontWeight: '700' }}>
+                      👋 Departed at {new Date(booking.checkOutTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} • Slot Free
+                    </Text>
+                  </View>
+                )}
+
                 {/* Footer with date and actions */}
                 <View style={styles.cardFooter}>
                   <Text style={styles.dateTxt}>📅 {dateStr}</Text>
-                  <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+                  <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                    {/* Check In Button for Owner */}
+                    {isPaid && !isCheckedIn && !isCompleted && !isCancelled && (
+                      <TouchableOpacity
+                        style={styles.checkInBtn}
+                        onPress={() => handleOwnerCheckIn(booking._id, booking.vehicleNumber)}
+                        activeOpacity={0.8}
+                      >
+                        <Text style={styles.checkInBtnTxt}>🅿️ Check In</Text>
+                      </TouchableOpacity>
+                    )}
+
+                    {/* Check Out Button for Owner */}
+                    {isCheckedIn && !isCompleted && !isCancelled && (
+                      <TouchableOpacity
+                        style={styles.checkOutBtn}
+                        onPress={() => handleOwnerCheckOut(booking._id, booking.vehicleNumber, slot)}
+                        activeOpacity={0.8}
+                      >
+                        <Text style={styles.checkOutBtnTxt}>🚪 Check Out</Text>
+                      </TouchableOpacity>
+                    )}
+
                     {seekerPhone ? (
                       <TouchableOpacity style={styles.callBtn} onPress={() => handleCallSeeker(seekerPhone)}>
                         <Text style={styles.callBtnTxt}>📞 Call</Text>
                       </TouchableOpacity>
                     ) : null}
+
                     <TouchableOpacity
                       style={styles.deleteOrderBtn}
                       onPress={() => handleDeleteBooking(booking._id, booking.vehicleNumber)}
@@ -435,6 +598,34 @@ const styles = StyleSheet.create({
     color: '#60a5fa',
     fontSize: 12,
     fontWeight: '700',
+  },
+  checkInBtn: {
+    backgroundColor: '#10b981',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  checkInBtnTxt: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  checkOutBtn: {
+    backgroundColor: '#f59e0b',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  checkOutBtnTxt: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '800',
   },
   deleteOrderBtn: {
     backgroundColor: '#ef444420',

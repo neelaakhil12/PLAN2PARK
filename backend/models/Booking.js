@@ -74,8 +74,20 @@ const bookingSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ['pending_approval', 'allotted', 'paid', 'completed', 'cancelled'],
+      enum: ['pending_approval', 'allotted', 'paid', 'checked_in', 'completed', 'cancelled'],
       default: 'pending_approval',
+    },
+    isCheckedIn: {
+      type: Boolean,
+      default: false,
+    },
+    checkInTime: {
+      type: Date,
+      default: null,
+    },
+    checkOutTime: {
+      type: Date,
+      default: null,
     },
     paymentStatus: {
       type: String,
@@ -99,7 +111,7 @@ const bookingSchema = new mongoose.Schema(
     },
     refundStatus: {
       type: String,
-      enum: ['none', 'full', 'half', 'rejected'],
+      enum: ['none', 'full', 'half', 'partial_20', 'rejected'],
       default: 'none',
     },
     refundPolicyApplied: {

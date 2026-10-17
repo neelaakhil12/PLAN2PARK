@@ -246,6 +246,7 @@ export default function SpotDetailsScreen({ route, navigation }) {
   const [vehicleNumber, setVehicleNumber] = useState(getUserPlateNumber() || '');
   const [vehicleType, setVehicleType] = useState('4-wheeler');
   const [durationHours, setDurationHours] = useState('2');
+  const [bookingMode, setBookingMode] = useState('hourly'); // 'hourly', 'daily', 'monthly'
   const [loading, setLoading] = useState(false);
   const [bookingSuccessModal, setBookingSuccessModal] = useState(null);
   const [walletBalance, setWalletBalance] = useState(0);
@@ -288,7 +289,22 @@ export default function SpotDetailsScreen({ route, navigation }) {
   }, [token]);
 
   const hourlyRate = space.pricePerHour !== undefined ? space.pricePerHour : (space.hourlyRate || 40);
-  const rawTotalPrice = Number(durationHours || 1) * hourlyRate;
+  const dailyRate = space.pricePerDay || (hourlyRate * 8);
+  const monthlyRate = space.pricePerMonth || (hourlyRate * 8 * 25);
+
+  let rawTotalPrice = hourlyRate;
+  let effectiveHours = Number(durationHours || 1);
+  if (bookingMode === 'hourly') {
+    effectiveHours = Number(durationHours || 1);
+    rawTotalPrice = effectiveHours * hourlyRate;
+  } else if (bookingMode === 'daily') {
+    effectiveHours = 24;
+    rawTotalPrice = dailyRate;
+  } else if (bookingMode === 'monthly') {
+    effectiveHours = 24 * 30;
+    rawTotalPrice = monthlyRate;
+  }
+
   const maxWalletAllowed = space.maxWalletDiscount !== undefined && space.maxWalletDiscount !== null ? Number(space.maxWalletDiscount) : 10;
   const walletDiscount = (useWallet && walletBalance > 0 && maxWalletAllowed > 0) ? Math.min(walletBalance, maxWalletAllowed, rawTotalPrice) : 0;
   const finalPayablePrice = Math.max(0, rawTotalPrice - walletDiscount);
@@ -320,7 +336,7 @@ export default function SpotDetailsScreen({ route, navigation }) {
     try {
       const baseUrl = await getBaseApiUrl();
       const startTime = new Date();
-      const actualHours = Number(durationHours || 1);
+      const actualHours = effectiveHours;
       const endTime = new Date(startTime.getTime() + actualHours * 60 * 60 * 1000);
 
       const payload = {
@@ -335,7 +351,7 @@ export default function SpotDetailsScreen({ route, navigation }) {
         totalAmount: rawTotalPrice,
         useWalletBalance: useWallet && walletDiscount > 0,
         walletAmountApplied: walletDiscount,
-        bookingType: 'hourly',
+        bookingType: bookingMode,
       };
 
       // 1. Create booking in backend
@@ -938,19 +954,51 @@ export default function SpotDetailsScreen({ route, navigation }) {
             })}
           </View>
 
-          {/* Duration Selector */}
-          <Text style={styles.label}>Parking Duration (Hours)</Text>
-          <View style={styles.durationRow}>
-            {['1', '2', '4', '8'].map((hr) => (
+          {/* Multi-Tier Booking Duration Plan */}
+          <Text style={styles.label}>Select Booking Duration Mode</Text>
+          <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
+            {[
+              { id: 'hourly', label: '⏱️ Hourly', rateText: `₹${hourlyRate}/hr` },
+              { id: 'daily', label: '📅 1 Day Flat', rateText: `₹${dailyRate}` },
+              { id: 'monthly', label: '🗓️ 1 Month Pass', rateText: `₹${monthlyRate}` },
+            ].map((plan) => (
               <TouchableOpacity
-                key={hr}
-                style={[styles.durBtn, durationHours === hr && styles.durBtnActive]}
-                onPress={() => setDurationHours(hr)}
+                key={plan.id}
+                style={[
+                  styles.vTypeBtn,
+                  bookingMode === plan.id && styles.vTypeBtnActive,
+                ]}
+                onPress={() => setBookingMode(plan.id)}
               >
-                <Text style={[styles.durTxt, durationHours === hr && styles.durTxtActive]}>{hr} hr{hr !== '1' ? 's' : ''}</Text>
+                <Text style={[styles.vTypeTxt, bookingMode === plan.id && styles.vTypeTxtActive]}>
+                  {plan.label}
+                </Text>
+                <Text style={{ fontSize: 10, color: bookingMode === plan.id ? '#38bdf8' : '#94a3b8', marginTop: 3, fontWeight: '700' }}>
+                  {plan.rateText}
+                </Text>
               </TouchableOpacity>
             ))}
           </View>
+
+          {/* If Hourly mode selected, show hour selection chips */}
+          {bookingMode === 'hourly' && (
+            <View style={{ marginBottom: 14 }}>
+              <Text style={styles.label}>Select Parking Hours</Text>
+              <View style={styles.durationRow}>
+                {['1', '2', '4', '8', '12'].map((hr) => (
+                  <TouchableOpacity
+                    key={hr}
+                    style={[styles.durBtn, durationHours === hr && styles.durBtnActive]}
+                    onPress={() => setDurationHours(hr)}
+                  >
+                    <Text style={[styles.durTxt, durationHours === hr && styles.durTxtActive]}>
+                      {hr} hr{hr !== '1' ? 's' : ''}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          )}
 
           {/* PlanToPark Wallet Money Deduction Card */}
           {walletBalance > 0 && maxWalletAllowed > 0 && (

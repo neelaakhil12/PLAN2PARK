@@ -63,6 +63,42 @@ export default function BookingsScreen({ navigation }) {
     }, [token])
   );
 
+  // Handle Check-In (Seeker arrives at spot)
+  const handleCheckIn = async (item) => {
+    Alert.alert(
+      '🅿️ Check In to Parking Spot',
+      `Have you arrived at ${item.spaceId?.title || 'the parking spot'} (Slot: ${item.slotId || 'Slot-1'})?\n\nChecking in starts your dynamic parking timer and notifies the space owner that your vehicle is parked.`,
+      [
+        { text: 'Not Yet', style: 'cancel' },
+        {
+          text: 'Yes, Check In Now',
+          style: 'default',
+          onPress: async () => {
+            try {
+              const baseUrl = await getBaseApiUrl();
+              const res = await fetch(`${baseUrl}/bookings/${item._id}/check-in`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  Authorization: `Bearer ${token}`,
+                },
+              });
+              const data = await res.json();
+              if (res.ok) {
+                Alert.alert('Checked In 🅿️', data.message || 'You are checked in! Your dynamic parking timer is now running.');
+                fetchMyBookings();
+              } else {
+                Alert.alert('Notice', data.message || 'Check in failed');
+              }
+            } catch (err) {
+              Alert.alert('Error', 'Connection error: ' + err.message);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   // Handle Checkout
   const handleCheckOut = async (item) => {
     Alert.alert(
@@ -325,11 +361,10 @@ export default function BookingsScreen({ navigation }) {
   // Handle Cancel Booking
   const handleCancelBooking = async (item) => {
     const bookingId = item._id;
-    const space = item.spaceId;
-    const policy = space?.cancellationPolicy || 'full';
+    const isCheckedIn = Boolean(item.isCheckedIn) || item.status === 'checked_in';
     const amount = Number(item.totalAmount) || 0;
-    const estimatedRefund = policy === 'full' ? amount : policy === 'half' ? Number((amount * 0.5).toFixed(2)) : 0;
-    const policyName = policy === 'full' ? '100% Full Refund' : policy === 'half' ? '50% Half Refund' : '0% Non-Refundable';
+    const estimatedRefund = !isCheckedIn ? amount : Number((amount * 0.20).toFixed(2));
+    const policyName = !isCheckedIn ? '100% Full Refund (Pre Check-In)' : '20% Partial Refund (Post Check-In)';
 
     const doCancel = async () => {
       setBookings((prev) =>
@@ -346,7 +381,7 @@ export default function BookingsScreen({ navigation }) {
           const msg =
             resData.message ||
             (estimatedRefund > 0
-              ? `Reservation cancelled successfully! ₹${estimatedRefund} has been refunded to your PlanToPark Wallet.`
+              ? `Reservation cancelled successfully! ₹${estimatedRefund} (${policyName}) refunded to your PlanToPark Wallet.`
               : 'Reservation cancelled.');
           triggerExternalNotification({
             title: '🚫 Booking Cancelled & Refunded',
@@ -367,7 +402,7 @@ export default function BookingsScreen({ navigation }) {
 
     const confirmMsg =
       amount > 0
-        ? `Cancel this reservation?\n\nOwner Refund Policy: ${policyName}\nRefund to Your Wallet: ₹${estimatedRefund}`
+        ? `Cancel this parking pass?\n\nPlatform Policy: ${policyName}\nRefund to Your Wallet: ₹${estimatedRefund}`
         : `Cancel this reservation?\n\nThis spot will be released immediately.`;
 
     Alert.alert('Cancel Reservation', confirmMsg, [
@@ -416,43 +451,44 @@ export default function BookingsScreen({ navigation }) {
   };
 
   const renderBookingCard = ({ item }) => {
-    const isCancelled = item.status === 'cancelled';
+    const isCheckedIn = Boolean(item.isCheckedIn) || item.status === 'checked_in';
     const isCompleted = item.status === 'completed';
-    const isPaid = item.paymentStatus === 'paid' || item.status === 'paid';
+    const isCancelled = item.status === 'cancelled';
+    const isPaid = item.paymentStatus === 'paid' || item.status === 'paid' || isCheckedIn || isCompleted;
     const space = item.spaceId;
     const slot = item.slotId || 'Slot-1';
     const refundAmt = item.refundAmount || 0;
+
+    let badgeText = '❌ UNPAID';
+    let badgeColor = '#ef4444';
+    let badgeBg = '#ef444425';
+
+    if (isCompleted) {
+      badgeText = '✓ COMPLETED';
+      badgeColor = '#60a5fa';
+      badgeBg = '#3b82f625';
+    } else if (isCheckedIn) {
+      badgeText = '🟢 CHECKED-IN';
+      badgeColor = '#10b981';
+      badgeBg = '#10b98125';
+    } else if (isCancelled) {
+      badgeText = '🚫 CANCELLED';
+      badgeColor = '#94a3b8';
+      badgeBg = '#64748b25';
+    } else if (isPaid) {
+      badgeText = '🎟️ RESERVED';
+      badgeColor = '#38bdf8';
+      badgeBg = '#0284c725';
+    }
 
     return (
       <View style={styles.card}>
         {/* Pass Header */}
         <View style={styles.cardHeader}>
           <Text style={styles.passTitle}>🎟️ DIGITAL PARKING PASS</Text>
-          <View
-            style={[
-              styles.statusBadge,
-              isCompleted
-                ? { backgroundColor: '#3b82f625', borderColor: '#3b82f6' }
-                : isPaid
-                ? { backgroundColor: '#10b98125', borderColor: '#10b981' }
-                : isCancelled
-                ? { backgroundColor: '#64748b25', borderColor: '#64748b' }
-                : { backgroundColor: '#ef444425', borderColor: '#ef4444' },
-            ]}
-          >
-            <Text
-              style={[
-                styles.statusTxt,
-                isCompleted
-                  ? { color: '#60a5fa' }
-                  : isPaid
-                  ? { color: '#10b981' }
-                  : isCancelled
-                  ? { color: '#94a3b8' }
-                  : { color: '#ef4444' },
-              ]}
-            >
-              {isCompleted ? '✓ COMPLETED' : isPaid ? '✓ PAID' : isCancelled ? '🚫 CANCELLED' : '❌ UNPAID'}
+          <View style={[styles.statusBadge, { backgroundColor: badgeBg, borderColor: badgeColor }]}>
+            <Text style={[styles.statusTxt, { color: badgeColor }]}>
+              {badgeText}
             </Text>
           </View>
         </View>
@@ -487,6 +523,68 @@ export default function BookingsScreen({ navigation }) {
           </Text>
         </View>
 
+        {/* Pre-Check-in Arrival Notice Card with Check-In CTA */}
+        {isPaid && !isCheckedIn && !isCompleted && !isCancelled && (
+          <View style={{
+            backgroundColor: 'rgba(56, 189, 248, 0.08)',
+            borderWidth: 1.5,
+            borderColor: '#38bdf8',
+            borderRadius: 12,
+            padding: 12,
+            marginVertical: 10,
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          }}>
+            <View style={{ flex: 1, marginRight: 8 }}>
+              <Text style={{ color: '#38bdf8', fontWeight: '800', fontSize: 13 }}>
+                📍 Slot Reserved - No Timer Decay!
+              </Text>
+              <Text style={{ color: '#94a3b8', fontSize: 11, marginTop: 2 }}>
+                Travel without timer running. Tap Check-In when you arrive at the spot.
+              </Text>
+            </View>
+            <TouchableOpacity
+              style={{
+                backgroundColor: '#10b981',
+                paddingHorizontal: 14,
+                paddingVertical: 9,
+                borderRadius: 10,
+              }}
+              onPress={() => handleCheckIn(item)}
+              activeOpacity={0.8}
+            >
+              <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 13 }}>
+                🅿️ Check-In
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* Post-Check-in Active Parking Timer Banner */}
+        {isCheckedIn && !isCompleted && !isCancelled && (
+          <View style={{
+            backgroundColor: 'rgba(16, 185, 129, 0.1)',
+            borderWidth: 1.5,
+            borderColor: '#10b981',
+            borderRadius: 12,
+            padding: 12,
+            marginVertical: 10,
+          }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+              <Text style={{ color: '#10b981', fontWeight: '800', fontSize: 13 }}>
+                🟢 Vehicle Parked • Timer Running
+              </Text>
+              <Text style={{ color: '#ffffff', fontWeight: '800', fontSize: 12 }}>
+                Slot: {slot}
+              </Text>
+            </View>
+            <Text style={{ color: '#94a3b8', fontSize: 11, marginTop: 4 }}>
+              Checked In: {new Date(item.checkInTime || item.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} • Valid Until: {new Date(item.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </Text>
+          </View>
+        )}
+
         {/* Meta Info Grid */}
         <View style={styles.metaGrid}>
           <View style={styles.metaItem}>
@@ -494,36 +592,42 @@ export default function BookingsScreen({ navigation }) {
             <Text style={styles.metaVal}>{item.vehicleNumber || 'TS07WJ2099'}</Text>
           </View>
           <View style={styles.metaItem}>
-            <Text style={styles.metaLabel}>DURATION</Text>
-            <Text style={styles.metaVal}>{item.hours || 1} hours</Text>
+            <Text style={styles.metaLabel}>PLAN / DURATION</Text>
+            <Text style={styles.metaVal}>
+              {item.bookingType === 'daily'
+                ? '1 Day Flat'
+                : item.bookingType === 'monthly'
+                ? '1 Month Pass'
+                : `${item.hours || 1} hr(s)`}
+            </Text>
           </View>
           <View style={styles.metaItem}>
             <Text style={styles.metaLabel}>TOTAL FEE</Text>
             <Text style={[styles.metaVal, { color: COLORS.primary, fontSize: 14 }]}>₹{item.totalAmount || 0}</Text>
           </View>
           <View style={styles.metaItem}>
-            <Text style={styles.metaLabel}>START TIME</Text>
+            <Text style={styles.metaLabel}>SESSION START</Text>
             <Text style={styles.metaVal}>
-              {new Date(item.startTime || item.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              {new Date(item.checkInTime || item.startTime || item.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
             </Text>
           </View>
         </View>
 
-        {/* ── ACTION BUTTONS ROW (Invoice, Check Out, Extend, Cancel, Nav) ────────── */}
+        {/* ── ACTION BUTTONS ROW (Check-In, Check Out, Extend, Invoice, Cancel, Nav) ────────── */}
         <View style={styles.actionRow}>
-          {/* 1. Invoice Button */}
-          {isPaid && (
+          {/* Check In Button if not checked in */}
+          {isPaid && !isCheckedIn && !isCompleted && !isCancelled && (
             <TouchableOpacity
-              style={styles.invoiceBtn}
-              onPress={() => setInvoiceBooking(item)}
+              style={[styles.checkOutBtn, { backgroundColor: '#10b981' }]}
+              onPress={() => handleCheckIn(item)}
               activeOpacity={0.7}
             >
-              <Text style={styles.invoiceBtnTxt}>🧾 Invoice</Text>
+              <Text style={styles.checkOutBtnTxt}>🅿️ Check In</Text>
             </TouchableOpacity>
           )}
 
-          {/* 2. Check Out Button */}
-          {isPaid && !isCompleted && !isCancelled && (
+          {/* Check Out Button if checked in */}
+          {isCheckedIn && !isCompleted && !isCancelled && (
             <TouchableOpacity
               style={styles.checkOutBtn}
               onPress={() => handleCheckOut(item)}
@@ -533,7 +637,7 @@ export default function BookingsScreen({ navigation }) {
             </TouchableOpacity>
           )}
 
-          {/* 3. Extend Button */}
+          {/* Extend Button */}
           {isPaid && !isCompleted && !isCancelled && (
             <TouchableOpacity
               style={styles.extendBtn}
@@ -547,7 +651,18 @@ export default function BookingsScreen({ navigation }) {
             </TouchableOpacity>
           )}
 
-          {/* 4. Cancel Button */}
+          {/* Invoice Button */}
+          {isPaid && (
+            <TouchableOpacity
+              style={styles.invoiceBtn}
+              onPress={() => setInvoiceBooking(item)}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.invoiceBtnTxt}>🧾 Invoice</Text>
+            </TouchableOpacity>
+          )}
+
+          {/* Cancel Button */}
           {isPaid && !isCancelled && !isCompleted && (
             <TouchableOpacity
               style={styles.cancelBtn}
@@ -558,14 +673,14 @@ export default function BookingsScreen({ navigation }) {
             </TouchableOpacity>
           )}
 
-          {/* 5. In-App / Google Maps Navigation */}
+          {/* In-App / Google Maps Navigation */}
           {space && (
             <TouchableOpacity
               style={styles.navBtn}
               onPress={() => handleOpenMap(space)}
               activeOpacity={0.7}
             >
-              <Text style={styles.navBtnTxt}>🗺️ Google Maps</Text>
+              <Text style={styles.navBtnTxt}>🗺️ Maps</Text>
             </TouchableOpacity>
           )}
         </View>

@@ -14,6 +14,7 @@ import {
   Image,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import * as Location from 'expo-location';
 import { AuthContext } from '../../context/AuthContext';
 import { endpoints, getBaseApiUrl, getImageUrl } from '../../config/api';
 import { COLORS } from '../../theme/colors';
@@ -43,6 +44,12 @@ export default function AddSpotScreen({ route, navigation }) {
   const [lat, setLat] = useState(editingSpot?.coordinates?.lat || editingSpot?.lat || null);
   const [lng, setLng] = useState(editingSpot?.coordinates?.lng || editingSpot?.lng || null);
   const [hourlyRate, setHourlyRate] = useState(String(editingSpot?.pricePerHour || editingSpot?.hourlyRate || '50'));
+  const [dailyRate, setDailyRate] = useState(
+    String(editingSpot?.pricePerDay || (editingSpot?.pricePerHour ? editingSpot.pricePerHour * 8 : '400'))
+  );
+  const [monthlyRate, setMonthlyRate] = useState(
+    String(editingSpot?.pricePerMonth || (editingSpot?.pricePerHour ? editingSpot.pricePerHour * 8 * 25 : '6000'))
+  );
   const [totalSpots, setTotalSpots] = useState(String(editingSpot?.totalSlots || (editingSpot?.slots ? editingSpot.slots.length : null) || editingSpot?.totalSpots || '5'));
   const [hasEvCharger, setHasEvCharger] = useState(Boolean(editingSpot?.hasEvCharger));
   const [isActive, setIsActive] = useState(editingSpot?.isActive !== false);
@@ -80,6 +87,16 @@ export default function AddSpotScreen({ route, navigation }) {
       setLat(s.coordinates?.lat || s.lat || null);
       setLng(s.coordinates?.lng || s.lng || null);
       setHourlyRate(String(s.pricePerHour !== undefined ? s.pricePerHour : (s.hourlyRate || '50')));
+      if (s.pricePerDay !== undefined && s.pricePerDay !== null) {
+        setDailyRate(String(s.pricePerDay));
+      } else if (s.pricePerHour) {
+        setDailyRate(String(s.pricePerHour * 8));
+      }
+      if (s.pricePerMonth !== undefined && s.pricePerMonth !== null) {
+        setMonthlyRate(String(s.pricePerMonth));
+      } else if (s.pricePerHour) {
+        setMonthlyRate(String(s.pricePerHour * 8 * 25));
+      }
       setTotalSpots(String(s.totalSlots || (s.slots ? s.slots.length : null) || s.totalSpots || '5'));
       setHasEvCharger(Boolean(s.hasEvCharger));
       setIsActive(s.isActive !== false);
@@ -470,10 +487,12 @@ export default function AddSpotScreen({ route, navigation }) {
     setLng(longitude);
 
     const mapsLink = `https://maps.google.com/?q=${latitude},${longitude}`;
+    setGoogleMapsLink(mapsLink);
+
     setCurrentLocInfo({
       name: 'Current GPS Location',
       title: 'Send your current location',
-      subtitle: '📡 Getting your address...',
+      subtitle: '📡 Resolving exact street address...',
       plotNo: '',
       colonyArea: '',
       landmark: '',
@@ -488,24 +507,47 @@ export default function AddSpotScreen({ route, navigation }) {
     let detectedArea = '';
     let detectedLandmark = '';
     let detectedCity = 'Hyderabad';
-    let detectedPin = pincode;
-    let compiled = '';
+    let detectedPin = pincode || '500001';
     let formattedAddr = '';
+    let foundPlaces = [];
 
-    // 1. Google Maps Geocoding API (Exact Indian Addresses)
+    // 1. Native platform reverse geocoding (Expo Location)
+    try {
+      const expoGeocode = await Location.reverseGeocodeAsync({ latitude, longitude });
+      if (expoGeocode && expoGeocode.length > 0) {
+        const top = expoGeocode[0];
+        if (top.streetNumber) detectedPlot = `H.No. ${top.streetNumber}`;
+        if (top.street && !detectedArea) detectedArea = top.street;
+        if (top.district) {
+          if (!detectedArea) detectedArea = top.district;
+          else if (!detectedLandmark) detectedLandmark = top.district;
+        }
+        if (top.subregion && !detectedArea) detectedArea = top.subregion;
+        if (top.name && top.name !== top.street && !detectedLandmark) {
+          detectedLandmark = top.name;
+        }
+        if (top.city) detectedCity = top.city;
+        if (top.postalCode) detectedPin = top.postalCode;
+        if (top.formattedAddress) formattedAddr = top.formattedAddress;
+      }
+    } catch (expoGeoErr) {
+      console.warn('Expo reverseGeocodeAsync error:', expoGeoErr);
+    }
+
+    // 2. Google Maps Geocoding API if key configured
     try {
       const gRes = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=${GOOGLE_MAPS_API_KEY}`);
       const gData = await gRes.json();
 
       if (gData && gData.results && gData.results.length > 0) {
-        formattedAddr = gData.results[0].formatted_address;
+        if (!formattedAddr) formattedAddr = gData.results[0].formatted_address;
 
         gData.results.forEach((resItem) => {
           resItem.address_components.forEach((comp) => {
             if (comp.types.includes('street_number') || comp.types.includes('premise') || comp.types.includes('subpremise')) {
               if (!detectedPlot) detectedPlot = `Plot No. ${comp.long_name}`;
             } else if (comp.types.includes('sublocality_level_2')) {
-              detectedArea = comp.long_name; // Priority to micro-colony like Chaitanya Hills
+              if (!detectedArea) detectedArea = comp.long_name;
             } else if (comp.types.includes('sublocality_level_1') || comp.types.includes('sublocality') || comp.types.includes('neighborhood')) {
               if (!detectedArea) detectedArea = comp.long_name;
             } else if (comp.types.includes('point_of_interest') || comp.types.includes('establishment')) {
@@ -518,43 +560,14 @@ export default function AddSpotScreen({ route, navigation }) {
           });
         });
 
-        // Extract house/plot numbers from address string if components missed it
         if (!detectedPlot && formattedAddr) {
           const plotMatch = formattedAddr.match(/(?:Plot|H\.?No|Flat|Door|House|D\.?No)?\s*(?:No\.?)?\s*(\d+[A-Za-z]?|\d+[-\/]\d+[-\/\d]*[A-Za-z]?)/i);
           if (plotMatch && plotMatch[1]) {
             detectedPlot = `H.No. ${plotMatch[1]}`;
           }
         }
-      }
-    } catch (gErr) {
-      console.warn('Google Geocode error:', gErr);
-    }
 
-    if (!detectedArea) detectedArea = 'Chaitanya Hills, BN Reddy Nagar';
-    compiled = [detectedPlot, detectedArea, detectedLandmark ? `Near ${detectedLandmark}` : '', detectedCity, detectedPin].filter(Boolean).join(', ');
-
-    // Update Current Location Info Banner
-    setCurrentLocInfo({
-      name: 'Current GPS Location',
-      title: 'Send your current location',
-      subtitle: `Accurate to 15 meters • ${detectedArea}`,
-      plotNo: detectedPlot,
-      colonyArea: detectedArea,
-      landmark: detectedLandmark,
-      city: detectedCity,
-      pincode: detectedPin,
-      address: formattedAddr || compiled,
-      googleMapsLink: mapsLink,
-    });
-
-    // 2. Fetch Nearby Places from Google Geocoding Results
-    let foundPlaces = [];
-    try {
-      const gRes2 = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=${GOOGLE_MAPS_API_KEY}`);
-      const gData2 = await gRes2.json();
-
-      if (gData2 && gData2.results) {
-        foundPlaces = gData2.results.slice(0, 8).map((r, idx) => {
+        foundPlaces = gData.results.slice(0, 8).map((r, idx) => {
           let pPlot = '';
           let pArea = detectedArea;
           let pCity = detectedCity;
@@ -570,24 +583,87 @@ export default function AddSpotScreen({ route, navigation }) {
           });
 
           const placeTitle = pLandmark || r.formatted_address.split(',')[0];
-
           return {
             id: String(idx),
             name: placeTitle,
-            subtitle: `${pArea}, ${pCity}`,
+            subtitle: `${pArea || ''}, ${pCity || ''}`,
             plotNo: pPlot || detectedPlot,
-            colonyArea: pArea,
+            colonyArea: pArea || detectedArea,
             landmark: pLandmark || placeTitle,
-            city: pCity,
-            pincode: pPin,
+            city: pCity || detectedCity,
+            pincode: pPin || detectedPin,
             address: r.formatted_address,
             googleMapsLink: `https://www.google.com/maps?q=${r.geometry.location.lat},${r.geometry.location.lng}`,
           };
         });
       }
-    } catch (e) {
-      console.warn('Nearby places error:', e);
+    } catch (gErr) {
+      console.warn('Google Geocode error:', gErr);
     }
+
+    // 3. Fallback: OpenStreetMap Nominatim
+    if (!detectedArea || !formattedAddr) {
+      try {
+        const osmRes = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`,
+          { headers: { 'User-Agent': 'PlanToPark-Mobile/1.0' } }
+        );
+        const osmData = await osmRes.json();
+        if (osmData && osmData.address) {
+          const addr = osmData.address;
+          if (!detectedPlot && (addr.house_number || addr.building)) {
+            detectedPlot = `H.No. ${addr.house_number || addr.building}`;
+          }
+          if (!detectedArea) {
+            detectedArea = addr.suburb || addr.neighbourhood || addr.residential || addr.road || '';
+          }
+          if (!detectedLandmark && (addr.amenity || addr.shop || addr.tourism || addr.office)) {
+            detectedLandmark = addr.amenity || addr.shop || addr.tourism || addr.office;
+          }
+          if (addr.city || addr.town || addr.village) {
+            detectedCity = addr.city || addr.town || addr.village;
+          }
+          if (addr.postcode) {
+            detectedPin = addr.postcode;
+          }
+          if (!formattedAddr && osmData.display_name) {
+            formattedAddr = osmData.display_name;
+          }
+        }
+      } catch (osmErr) {
+        console.warn('Nominatim reverse error:', osmErr);
+      }
+    }
+
+    if (!detectedArea) detectedArea = `Near ${detectedCity}`;
+    const compiled = [detectedPlot, detectedArea, detectedLandmark ? `Near ${detectedLandmark}` : '', detectedCity, detectedPin].filter(Boolean).join(', ');
+    const finalFormatted = formattedAddr || compiled;
+
+    // Direct auto-fill into screen inputs
+    if (detectedPlot) setPlotNo(detectedPlot);
+    if (detectedArea) setColonyArea(detectedArea);
+    if (detectedLandmark) setLandmark(detectedLandmark);
+    if (detectedCity) setCity(detectedCity);
+    if (detectedPin) setPincode(detectedPin);
+    setAddress(finalFormatted);
+    setGoogleMapsLink(mapsLink);
+    if (!title) {
+      setTitle(detectedArea ? `Parking at ${detectedArea}` : `Parking in ${detectedCity}`);
+    }
+
+    // Update Current Location Info Banner in Modal
+    setCurrentLocInfo({
+      name: 'Current GPS Location',
+      title: 'Send your current location',
+      subtitle: `Accurate • ${detectedArea}`,
+      plotNo: detectedPlot,
+      colonyArea: detectedArea,
+      landmark: detectedLandmark,
+      city: detectedCity,
+      pincode: detectedPin,
+      address: finalFormatted,
+      googleMapsLink: mapsLink,
+    });
 
     setNearbyPlaces(foundPlaces);
     setModalLoading(false);
@@ -608,42 +684,66 @@ export default function AddSpotScreen({ route, navigation }) {
 
   const handleLocateMe = async () => {
     setLocating(true);
-
-    // Open modal immediately with a loading spinner while GPS resolves
     setCurrentLocInfo(null);
     setNearbyPlaces([]);
     setShowLocationModal(true);
     setModalLoading(true);
 
-    let latVal = 17.312998;
-    let lngVal = 78.544726;
-    let gotRealLocation = false;
+    let latVal = null;
+    let lngVal = null;
 
     try {
-      if (typeof navigator !== 'undefined' && navigator.geolocation) {
+      // 1. Request foreground location permission and get device GPS via expo-location
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status === 'granted') {
+          const loc = await Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.High,
+          });
+          if (loc && loc.coords) {
+            latVal = loc.coords.latitude;
+            lngVal = loc.coords.longitude;
+          }
+        }
+      } catch (expoLocErr) {
+        console.warn('expo-location error:', expoLocErr);
+      }
+
+      // 2. Browser fallback for web testing
+      if ((!latVal || !lngVal) && typeof navigator !== 'undefined' && navigator.geolocation) {
         try {
-          // Give browser 15 seconds to get real GPS (so permission dialog can be shown)
           const pos = await new Promise((resolve) => {
             let done = false;
-            const timer = setTimeout(() => { if (!done) { done = true; resolve(null); } }, 15000);
+            const timer = setTimeout(() => { if (!done) { done = true; resolve(null); } }, 10000);
             navigator.geolocation.getCurrentPosition(
               (p) => { if (!done) { done = true; clearTimeout(timer); resolve(p); } },
               (err) => { if (!done) { done = true; clearTimeout(timer); resolve(null); } },
-              { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+              { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
             );
           });
           if (pos && pos.coords) {
             latVal = pos.coords.latitude;
             lngVal = pos.coords.longitude;
-            gotRealLocation = true;
           }
-        } catch (geoErr) { console.warn('GPS warning', geoErr); }
+        } catch (webGeoErr) {
+          console.warn('Web geolocation error:', webGeoErr);
+        }
       }
 
-      // Now fetch with real (or default) coordinates
+      if (!latVal || !lngVal) {
+        showAlert(
+          'Location Access Required',
+          'Could not retrieve live GPS coordinates. Please ensure device location/GPS is turned ON and permissions are allowed.'
+        );
+        setShowLocationModal(false);
+        setModalLoading(false);
+        return;
+      }
+
       await fetchWhatsAppStyleLocations(latVal, lngVal);
     } catch (err) {
       console.error('Locate error:', err);
+      showAlert('GPS Error', err.message || 'Could not fetch current location.');
       setModalLoading(false);
     } finally {
       setLocating(false);
@@ -792,11 +892,13 @@ export default function AddSpotScreen({ route, navigation }) {
           images: spotImages,
           hourlyRate: Number(hourlyRate),
           pricePerHour: Number(hourlyRate),
+          pricePerDay: Number(dailyRate || (Number(hourlyRate) * 8)),
+          pricePerMonth: Number(monthlyRate || (Number(hourlyRate) * 8 * 25)),
           totalSpots: Number(totalSpots),
           totalSlots: Number(totalSpots),
           hasEvCharger: isVehicleStorageYard ? false : Boolean(hasEvCharger),
           isActive,
-          cancellationPolicy,
+          cancellationPolicy: 'full',
           maxWalletDiscount: Number(maxWalletDiscount || 0),
           suitableVehicles: isVehicleStorageYard ? ['hatchback', 'sedan', 'suv', 'commercial', '4-wheeler'] : suitableVehicles,
           spaceCategory: isVehicleStorageYard ? 'commercial_vehicle_storage' : 'standard',
@@ -1116,83 +1218,90 @@ export default function AddSpotScreen({ route, navigation }) {
               </View>
             </>
           ) : (
-            <View style={styles.row}>
-              <View style={styles.col}>
-                <Text style={styles.label}>Hourly Rate (₹)</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="50"
-                  placeholderTextColor={COLORS.textMuted}
-                  keyboardType="numeric"
-                  value={hourlyRate}
-                  onChangeText={setHourlyRate}
-                />
+            <>
+              <View style={styles.row}>
+                <View style={styles.col}>
+                  <Text style={styles.label}>Hourly Rate (₹)</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="50"
+                    placeholderTextColor={COLORS.textMuted}
+                    keyboardType="numeric"
+                    value={hourlyRate}
+                    onChangeText={setHourlyRate}
+                  />
+                </View>
+                <View style={styles.col}>
+                  <Text style={styles.label}>Total Capacity (Slots)</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="5"
+                    placeholderTextColor={COLORS.textMuted}
+                    keyboardType="numeric"
+                    value={totalSpots}
+                    onChangeText={setTotalSpots}
+                  />
+                </View>
               </View>
-              <View style={styles.col}>
-                <Text style={styles.label}>Total Capacity (Slots)</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="5"
-                  placeholderTextColor={COLORS.textMuted}
-                  keyboardType="numeric"
-                  value={totalSpots}
-                  onChangeText={setTotalSpots}
-                />
+
+              {/* Daily & Monthly Tier Pricing Inputs */}
+              <View style={styles.row}>
+                <View style={styles.col}>
+                  <Text style={styles.label}>Daily Rate (₹/day)</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="400"
+                    placeholderTextColor={COLORS.textMuted}
+                    keyboardType="numeric"
+                    value={dailyRate}
+                    onChangeText={setDailyRate}
+                  />
+                  <Text style={{ color: COLORS.textMuted, fontSize: 10, marginTop: 3 }}>24-hour flat booking</Text>
+                </View>
+                <View style={styles.col}>
+                  <Text style={styles.label}>Monthly Rate (₹/mo)</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="6000"
+                    placeholderTextColor={COLORS.textMuted}
+                    keyboardType="numeric"
+                    value={monthlyRate}
+                    onChangeText={setMonthlyRate}
+                  />
+                  <Text style={{ color: COLORS.textMuted, fontSize: 10, marginTop: 3 }}>30-day monthly pass</Text>
+                </View>
               </View>
-            </View>
+            </>
           )}
 
-          {/* Cancellation & Refund Policy Options (Owner Choice) */}
-          <View style={{ marginTop: 14, marginBottom: 14 }}>
-            <Text style={styles.switchTitle}>🛡️ Cancellation & Refund Policy</Text>
-            <Text style={styles.switchSub}>Select refund amount seeker receives if they cancel:</Text>
-
-            <View style={{ gap: 8, marginTop: 10 }}>
-              {[
-                { id: 'full', title: '🟢 100% Full Refund', sub: 'Seeker receives full 100% paid amount credited to wallet' },
-                { id: 'half', title: '🟡 50% Half Refund', sub: 'Seeker receives 50% refund; you keep 50% compensation' },
-                { id: 'none', title: '🔴 0% No Refund', sub: 'Strict non-refundable booking' },
-              ].map((policy) => {
-                const isSelected = cancellationPolicy === policy.id;
-                return (
-                  <TouchableOpacity
-                    key={policy.id}
-                    style={{
-                      backgroundColor: isSelected ? '#a855f720' : '#0f172a80',
-                      borderColor: isSelected ? COLORS.ownerAccent : COLORS.borderDark,
-                      borderWidth: 1.5,
-                      borderRadius: 12,
-                      padding: 12,
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                    }}
-                    onPress={() => setCancellationPolicy(policy.id)}
-                    activeOpacity={0.8}
-                  >
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ color: isSelected ? COLORS.white : COLORS.textMuted, fontSize: 14, fontWeight: '800' }}>
-                        {policy.title}
-                      </Text>
-                      <Text style={{ color: COLORS.textMuted, fontSize: 11, marginTop: 2 }}>
-                        {policy.sub}
-                      </Text>
-                    </View>
-                    <View style={{
-                      width: 20,
-                      height: 20,
-                      borderRadius: 10,
-                      borderWidth: 2,
-                      borderColor: isSelected ? COLORS.ownerAccent : '#475569',
-                      backgroundColor: isSelected ? COLORS.ownerAccent : 'transparent',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}>
-                      {isSelected && <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: COLORS.white }} />}
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
+          {/* Standard Platform Cancellation & Refund Policy Card */}
+          <View style={{
+            marginTop: 14,
+            marginBottom: 16,
+            backgroundColor: 'rgba(56, 189, 248, 0.08)',
+            borderWidth: 1.5,
+            borderColor: 'rgba(56, 189, 248, 0.25)',
+            borderRadius: 14,
+            padding: 14,
+          }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+              <Text style={{ fontSize: 18 }}>🛡️</Text>
+              <Text style={{ color: COLORS.white, fontSize: 14, fontWeight: '800' }}>
+                Standard Platform Refund Policy
+              </Text>
+            </View>
+            <Text style={{ color: '#94a3b8', fontSize: 12, lineHeight: 18, marginBottom: 8 }}>
+              PlanToPark automatically applies standard platform terms to safeguard both parties:
+            </Text>
+            <View style={{ gap: 6 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6 }}>
+                <Text style={{ color: '#10b981', fontWeight: '800', fontSize: 12 }}>• Pre Check-In:</Text>
+                <Text style={{ color: '#cbd5e1', fontSize: 12, flex: 1 }}>100% Full Refund credited to commuter's wallet.</Text>
+              </View>
+              <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6 }}>
+                <Text style={{ color: '#f59e0b', fontWeight: '800', fontSize: 12 }}>• Post Check-In:</Text>
+                <Text style={{ color: '#cbd5e1', fontSize: 12, flex: 1 }}>20% Refund to commuter; 80% retained for space owner.</Text>
+              </View>
             </View>
           </View>
 

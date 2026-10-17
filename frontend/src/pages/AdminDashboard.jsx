@@ -6256,6 +6256,7 @@ const StatusBadge = ({ status }) => {
     pending: 'bg-amber-50 text-amber-700 border-amber-200',
     rejected: 'bg-rose-50 text-rose-600 border-rose-200',
     paid: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    checked_in: 'bg-emerald-600 text-white border-emerald-700 font-extrabold shadow-xs',
     allotted: 'bg-indigo-50 text-indigo-700 border-indigo-200',
     completed: 'bg-slate-100 text-slate-500 border-slate-200',
     pending_approval: 'bg-amber-50 text-amber-700 border-amber-200',

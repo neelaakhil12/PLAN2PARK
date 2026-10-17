@@ -729,15 +729,82 @@ const SeekerDashboard = () => {
     }
   };
 
-  const handleCancel = async (id) => {
-    if (!window.confirm('Cancel this booking request?')) return;
-    const res = await fetch(`${API_URL}/bookings/${id}/cancel`, { method: 'PUT', headers: { Authorization: `Bearer ${token}` } });
-    if (res.ok) { alert('Booking cancelled.'); fetchData(); }
+  const handleCheckIn = async (booking) => {
+    if (!window.confirm(`Check-in now for slot ${booking.slotId || 'assigned'}?\n\nYour dynamic parking timer will start counting from this moment.`)) return;
+    try {
+      const res = await fetch(`${API_URL}/bookings/${booking._id}/check-in`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        }
+      });
+      const data = await res.json();
+      if (res.ok) {
+        alert('🅿️ Checked In Successfully! Your parking timer is now running.');
+        fetchData();
+      } else {
+        alert(data.message || 'Check-in failed');
+      }
+    } catch (err) {
+      alert('Network error during check-in: ' + err.message);
+    }
+  };
+
+  const handleCancel = async (bookingOrId) => {
+    const booking = typeof bookingOrId === 'object' ? bookingOrId : bookings.find(b => b._id === bookingOrId);
+    const bookingId = booking?._id || bookingOrId;
+    const isCheckedIn = booking?.isCheckedIn || booking?.status === 'checked_in';
+    const refundPct = isCheckedIn ? '20%' : '100%';
+    const refundDetails = isCheckedIn 
+      ? 'Because you have already checked in, 20% of your booking fee will be refunded back to your PlanToPark wallet (80% retained for space owner/platform).'
+      : 'Before check-in, 100% full refund will be credited back to your PlanToPark wallet.';
+    
+    if (!window.confirm(`Cancel this booking?\n\nStandard Platform Refund: ${refundPct}\n${refundDetails}\n\nDo you want to confirm cancellation?`)) return;
+
+    try {
+      const res = await fetch(`${API_URL}/bookings/${bookingId}/cancel`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        alert(data.message || `Booking cancelled. ${data.refundAmount ? `₹${data.refundAmount} refunded to your wallet.` : ''}`);
+        fetchData();
+      } else {
+        alert(data.message || 'Cancellation failed');
+      }
+    } catch (err) {
+      alert('Network error while cancelling booking');
+    }
   };
 
   const handleComplete = async (id) => {
-    const res = await fetch(`${API_URL}/bookings/${id}/complete`, { method: 'PUT', headers: { Authorization: `Bearer ${token}` } });
-    if (res.ok) { alert('Check-out completed. Thank you!'); fetchData(); }
+    if (!window.confirm('Check out of this spot now and free your slot?')) return;
+    try {
+      const res = await fetch(`${API_URL}/bookings/${id}/checkout`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        alert('Check-out completed. Slot is released. Thank you! 👋');
+        fetchData();
+      } else {
+        const res2 = await fetch(`${API_URL}/bookings/${id}/complete`, {
+          method: 'PUT',
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (res2.ok) {
+          alert('Check-out completed. Thank you! 👋');
+          fetchData();
+        } else {
+          const data = await res.json().catch(() => ({}));
+          alert(data.message || 'Could not complete checkout');
+        }
+      }
+    } catch (err) {
+      alert('Network error during check-out');
+    }
   };
 
   const handleToggleFavorite = async (spaceId) => {
@@ -2435,6 +2502,48 @@ const SeekerDashboard = () => {
                             </div>
                           </div>
 
+                          {/* Dynamic Check-in / Timer Banner */}
+                          {b.status === 'paid' && !b.isCheckedIn && (
+                            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3 text-xs flex items-center justify-between">
+                              <div>
+                                <p className="font-extrabold text-amber-900 flex items-center gap-1.5">
+                                  <span>📍</span> Arrived at Spot? Click Check-In
+                                </p>
+                                <p className="text-[11px] text-amber-700 mt-0.5">
+                                  Timer will start only when you or host click Check-In. 100% wallet refund available before check-in.
+                                </p>
+                              </div>
+                              <button
+                                onClick={() => handleCheckIn(b)}
+                                className="bg-emerald-600 hover:bg-emerald-700 text-white font-black px-3.5 py-1.5 rounded-xl text-xs shadow-sm shrink-0 ml-2 cursor-pointer hover:-translate-y-0.5"
+                              >
+                                🅿️ Check-In
+                              </button>
+                            </div>
+                          )}
+
+                          {(b.isCheckedIn || b.status === 'checked_in') && (
+                            <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-3 text-xs flex items-center justify-between">
+                              <div className="space-y-0.5">
+                                <p className="font-extrabold text-emerald-900 flex items-center gap-1.5">
+                                  <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                                  🚗 Parking Active • Dynamic Timer Running
+                                </p>
+                                {b.endTime && (
+                                  <p className="text-[11px] text-emerald-700">
+                                    Valid Until: <span className="font-bold">{new Date(b.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span> ({new Date(b.endTime).toLocaleDateString([], { month: 'short', day: 'numeric' })})
+                                  </p>
+                                )}
+                              </div>
+                              <button
+                                onClick={() => handleComplete(b._id)}
+                                className="bg-slate-800 hover:bg-slate-900 text-white font-black px-3 py-1.5 rounded-xl text-xs shadow-sm shrink-0 ml-2 cursor-pointer"
+                              >
+                                🚪 Check Out
+                              </button>
+                            </div>
+                          )}
+
                           {/* Info Grid details */}
                           <div className="grid grid-cols-2 gap-3 bg-slate-50 rounded-2xl p-3 border border-slate-100/80 text-xs">
                             <div>
@@ -2496,7 +2605,7 @@ const SeekerDashboard = () => {
                               </button>
                             )}
 
-                            {b.status === 'paid' && (
+                            {(b.status === 'paid' || b.status === 'checked_in') && (
                               <>
                                 <button 
                                   onClick={() => navigate(`/invoice/${b._id}`)} 
@@ -2504,7 +2613,15 @@ const SeekerDashboard = () => {
                                 >
                                   Invoice
                                 </button>
-                                {b.bookingType !== 'monthly' && (
+                                {!b.isCheckedIn && b.status === 'paid' && (
+                                  <button 
+                                    onClick={() => handleCheckIn(b)} 
+                                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-black px-3 py-2 rounded-xl text-xs transition-all hover:-translate-y-0.5 shadow-sm"
+                                  >
+                                    🅿️ Check In
+                                  </button>
+                                )}
+                                {(b.isCheckedIn || b.status === 'checked_in') && b.bookingType !== 'monthly' && (
                                   <button 
                                     onClick={() => handleComplete(b._id)} 
                                     className="bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 font-extrabold px-3 py-2 rounded-xl text-xs transition-all hover:-translate-y-0.5"
@@ -2521,9 +2638,9 @@ const SeekerDashboard = () => {
                               </>
                             )}
 
-                            {['allotted', 'paid', 'pending_approval'].includes(b.status) && (
+                            {['allotted', 'paid', 'checked_in', 'pending_approval'].includes(b.status) && (
                               <button 
-                                onClick={() => handleCancel(b._id)} 
+                                onClick={() => handleCancel(b)} 
                                 className="bg-rose-50 border border-rose-200 text-rose-600 hover:bg-rose-100 font-bold px-3 py-2 rounded-xl text-xs transition-all hover:-translate-y-0.5 cursor-pointer"
                               >
                                 Cancel

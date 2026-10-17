@@ -428,10 +428,10 @@ const enrichSpaceWithSlotAvailability = async (spaces) => {
   const now = new Date();
   const spaceIds = spaces.map((s) => s._id);
 
-  // Find all active bookings (allotted or paid) where end time is in the future
+  // Find all active bookings (allotted, paid, or checked_in) where end time is in the future
   const activeBookings = await Booking.find({
     spaceId: { $in: spaceIds },
-    status: { $in: ['allotted', 'paid', 'pending_approval'] },
+    status: { $in: ['allotted', 'paid', 'checked_in', 'pending_approval'] },
     endTime: { $gt: now },
   });
 
@@ -491,7 +491,7 @@ router.get('/:id/available-slots-by-time', async (req, res) => {
 
     const activeBookings = await Booking.find({
       spaceId: req.params.id,
-      status: 'paid',
+      status: { $in: ['paid', 'checked_in'] },
       startTime: { $lt: end },
       endTime: { $gt: start },
     });

@@ -162,10 +162,10 @@ router.post('/', protect, seekerOnly, upload.any(), async (req, res) => {
       status: { $in: ['allotted', 'pending_approval'] },
     });
 
-    // Only confirmed and PAID bookings permanently lock the slot
+    // Only confirmed and PAID or CHECKED_IN bookings permanently lock the slot
     const activeBookings = await Booking.find({
       spaceId,
-      status: 'paid',
+      status: { $in: ['paid', 'checked_in'] },
       startTime: { $lt: endTime },
       endTime: { $gt: start },
     });
@@ -373,7 +373,7 @@ router.get('/my-bookings', protect, seekerOnly, async (req, res) => {
   try {
     const bookings = await Booking.find({ 
       seekerId: req.user._id,
-      status: { $in: ['paid', 'completed', 'cancelled'] }
+      status: { $in: ['paid', 'checked_in', 'completed', 'cancelled'] }
     })
       .populate({
         path: 'spaceId',
@@ -569,6 +569,7 @@ router.put('/:id/complete', protect, async (req, res) => {
     }
 
     booking.status = 'completed';
+    booking.checkOutTime = new Date();
     await booking.save();
 
     res.json({ message: 'Booking completed and slot released', booking });
@@ -576,6 +577,176 @@ router.put('/:id/complete', protect, async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
+
+// @desc    Seeker arrives and checks in -> Starts dynamic parking timer
+// @route   POST & PUT /api/bookings/:id/check-in
+// @access  Private (Seeker, Owner, or Admin)
+const checkInHandler = async (req, res) => {
+  try {
+    const booking = await Booking.findById(req.params.id);
+    if (!booking) {
+      return res.status(404).json({ message: 'Booking not found' });
+    }
+
+    const space = await ParkingSpace.findById(booking.spaceId);
+    const isSeeker = booking.seekerId.toString() === req.user._id.toString();
+    const isOwner = space && space.ownerId && space.ownerId.toString() === req.user._id.toString();
+    const isAdmin = req.user.role === 'admin';
+
+    if (!isSeeker && !isOwner && !isAdmin) {
+      return res.status(401).json({ message: 'Not authorized to check in for this booking' });
+    }
+
+    if (booking.status === 'cancelled') {
+      return res.status(400).json({ message: 'Cannot check in to a cancelled reservation' });
+    }
+
+    if (booking.isCheckedIn) {
+      return res.json({ message: 'Already checked in', booking });
+    }
+
+    const now = new Date();
+    const durationHours = Number(booking.hours) || 1;
+    const dynamicEndTime = new Date(now.getTime() + durationHours * 60 * 60 * 1000);
+
+    booking.isCheckedIn = true;
+    booking.checkInTime = now;
+    booking.startTime = now; // Dynamic timer starts upon arrival!
+    booking.endTime = dynamicEndTime;
+    booking.status = 'checked_in';
+
+    await booking.save();
+
+    // ── Dispatch Real-Time Notifications ──
+    try {
+      // 1. Notify Space Owner: Commuter has arrived & checked in
+      if (space && space.ownerId) {
+        const ownerUser = await User.findById(space.ownerId);
+        if (ownerUser) {
+          const ownerMsg = `${booking.seekerName} (${booking.vehicleNumber}) has arrived and checked in at slot ${booking.slotId || 'assigned slot'} at ${space.title || 'your spot'}. Dynamic parking timer is now running.`;
+          await Notification.create({
+            userId: ownerUser._id,
+            targetRole: 'owner',
+            type: 'seeker_checked_in',
+            title: '🚗 Commuter Checked In!',
+            message: ownerMsg,
+            data: {
+              bookingId: booking._id,
+              spaceId: space._id,
+              slotId: booking.slotId,
+              checkInTime: now,
+              endTime: dynamicEndTime,
+            },
+          });
+
+          if (ownerUser.pushToken) {
+            sendPushNotification(
+              ownerUser.pushToken,
+              '🚗 Commuter Checked In!',
+              `${booking.seekerName} checked into Slot ${booking.slotId || ''} (${booking.vehicleNumber}). Dynamic timer started.`,
+              { screen: 'Orders', bookingId: booking._id, type: 'seeker_checked_in' }
+            );
+          }
+        }
+      }
+
+      // 2. Notify Seeker: Check-in confirmed & timer running
+      await Notification.create({
+        userId: booking.seekerId,
+        targetRole: 'seeker',
+        type: 'checkin_success',
+        title: '🅿️ Checked In Successfully!',
+        message: `Welcome! Your parking session at ${space ? space.title : 'Parking Spot'} has started. Slot: ${booking.slotId || 'Confirmed'}.`,
+        data: {
+          bookingId: booking._id,
+          spaceId: booking.spaceId,
+          slotId: booking.slotId,
+          checkInTime: now,
+          endTime: dynamicEndTime,
+        },
+      });
+    } catch (notifErr) {
+      console.warn('[Check-In] Notification dispatch error:', notifErr.message);
+    }
+
+    res.json({
+      message: 'Checked in successfully! Dynamic parking timer has started.',
+      booking,
+    });
+  } catch (error) {
+    console.error('Check-in error:', error);
+    res.status(500).json({ message: error.message });
+  }
+};
+router.post('/:id/check-in', protect, checkInHandler);
+router.put('/:id/check-in', protect, checkInHandler);
+
+// @desc    Seeker or Owner departs and checks out (releases slot)
+// @route   POST & PUT /api/bookings/:id/checkout
+// @access  Private
+const checkOutHandler = async (req, res) => {
+  try {
+    const booking = await Booking.findById(req.params.id);
+    if (!booking) {
+      return res.status(404).json({ message: 'Booking not found' });
+    }
+
+    const space = await ParkingSpace.findById(booking.spaceId);
+    const isSeeker = booking.seekerId.toString() === req.user._id.toString();
+    const isOwner = space && space.ownerId && space.ownerId.toString() === req.user._id.toString();
+    const isAdmin = req.user.role === 'admin';
+
+    if (!isSeeker && !isOwner && !isAdmin) {
+      return res.status(401).json({ message: 'Not authorized to checkout this booking' });
+    }
+
+    // Release the slot if allotted/paid
+    if (space && booking.slotId) {
+      const slot = space.slots.find((s) => s.slotId === booking.slotId);
+      if (slot) {
+        slot.isAvailable = true;
+        await space.save();
+      }
+    }
+
+    booking.status = 'completed';
+    booking.checkOutTime = new Date();
+    await booking.save();
+
+    // Notify owner
+    if (space && space.ownerId) {
+      try {
+        const ownerUser = await User.findById(space.ownerId);
+        if (ownerUser) {
+          await Notification.create({
+            userId: ownerUser._id,
+            targetRole: 'owner',
+            type: 'booking_completed',
+            title: '👋 Vehicle Departed - Slot Free',
+            message: `${booking.seekerName} (${booking.vehicleNumber}) has checked out. Slot ${booking.slotId || ''} is now vacant.`,
+            data: { bookingId: booking._id, spaceId: space._id, slotId: booking.slotId }
+          });
+          if (ownerUser.pushToken) {
+            sendPushNotification(
+              ownerUser.pushToken,
+              '👋 Vehicle Departed',
+              `Slot ${booking.slotId || ''} at ${space.title || 'your spot'} is now available.`,
+              { screen: 'Orders', bookingId: booking._id }
+            );
+          }
+        }
+      } catch (e) {
+        console.warn('Checkout notif error:', e.message);
+      }
+    }
+
+    res.json({ message: 'Checked out successfully. Slot is now released.', booking });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+router.post('/:id/checkout', protect, checkOutHandler);
+router.put('/:id/checkout', protect, checkOutHandler);
 
 // (Old cancel route removed in favor of unified cancelBookingHandler below)
 
@@ -1569,44 +1740,41 @@ const cancelBookingHandler = async (req, res) => {
     }
 
     let refundAmount = 0;
-    let policyApplied = (space && space.cancellationPolicy) ? space.cancellationPolicy : 'full';
-
-    // Allow owner/admin override from body if specified
-    if (req.body && req.body.cancellationPolicy) {
-      policyApplied = req.body.cancellationPolicy;
-    }
+    let policyApplied = '';
 
     if (booking.paymentStatus === 'paid' && booking.totalAmount > 0) {
       const previousOwnerEarnings = booking.ownerEarnings || 0;
 
-      if (policyApplied === 'full') {
+      if (!booking.isCheckedIn) {
+        // ── PRE CHECK-IN: 100% FULL REFUND TO COMMUTER ──
         refundAmount = booking.totalAmount;
-      } else if (policyApplied === 'half') {
-        refundAmount = Number((booking.totalAmount * 0.5).toFixed(2));
-      } else if (policyApplied === 'none') {
-        refundAmount = 0;
+        policyApplied = 'pre_checkin_full';
+        booking.refundStatus = 'full';
+        booking.refundPolicyApplied = '100% Full Refund (Pre Check-In)';
+        booking.adminCommission = 0;
+        booking.ownerEarnings = 0;
+      } else {
+        // ── POST CHECK-IN: 20% PARTIAL REFUND TO COMMUTER (80% RETAINED) ──
+        refundAmount = Number((booking.totalAmount * 0.20).toFixed(2));
+        policyApplied = 'post_checkin_20';
+        booking.refundStatus = 'partial_20';
+        booking.refundPolicyApplied = '20% Partial Refund (Post Check-In)';
+
+        const retainedTotal = Math.max(0, Number((booking.totalAmount - refundAmount).toFixed(2)));
+        const commissionRate = await getCommissionRate();
+        const newAdminCommission = Math.round(retainedTotal * (commissionRate / 100) * 100) / 100;
+        const newOwnerEarnings = Math.max(0, Math.round((retainedTotal - newAdminCommission) * 100) / 100);
+
+        booking.adminCommission = newAdminCommission;
+        booking.ownerEarnings = newOwnerEarnings;
       }
 
       booking.refundAmount = refundAmount;
-      booking.refundStatus = policyApplied === 'full' ? 'full' : policyApplied === 'half' ? 'half' : 'rejected';
-      booking.refundPolicyApplied = policyApplied;
 
-      // Calculate retained amounts after refund
-      const retainedTotal = Math.max(0, booking.totalAmount - refundAmount);
-      let newAdminCommission = 0;
-      let newOwnerEarnings = 0;
-
-      if (retainedTotal > 0) {
-        const commissionRate = await getCommissionRate();
-        newAdminCommission = Math.round(retainedTotal * (commissionRate / 100) * 100) / 100;
-        newOwnerEarnings = Math.max(0, Math.round((retainedTotal - newAdminCommission) * 100) / 100);
-      }
-
-      booking.adminCommission = newAdminCommission;
-      booking.ownerEarnings = newOwnerEarnings;
-
-      // 1. Debit previously credited earnings from Space Owner's wallet
+      // 1. Debit difference from Space Owner's wallet
+      const newOwnerEarnings = booking.ownerEarnings || 0;
       const ownerDebitAmount = Math.max(0, Number((previousOwnerEarnings - newOwnerEarnings).toFixed(2)));
+
       if (space && space.ownerId && ownerDebitAmount > 0) {
         const owner = await User.findById(space.ownerId);
         if (owner) {
@@ -1619,7 +1787,9 @@ const cancelBookingHandler = async (req, res) => {
             owner.walletTransactions.push({
               type: 'debit',
               amount: ownerDebitAmount,
-              description: `Booking #${booking._id.toString().slice(-6).toUpperCase()} cancelled & refunded to commuter - Payout reversed`,
+              description: !booking.isCheckedIn
+                ? `Booking #${booking._id.toString().slice(-6).toUpperCase()} cancelled prior to check-in - Full refund reversed`
+                : `Booking #${booking._id.toString().slice(-6).toUpperCase()} cancelled post check-in - 20% refund adjustment (Retained: ₹${newOwnerEarnings})`,
               bookingId: booking._id,
               date: new Date(),
             });
@@ -1630,19 +1800,24 @@ const cancelBookingHandler = async (req, res) => {
                 userId: owner._id,
                 targetRole: 'owner',
                 type: 'wallet_debit',
-                title: '⚠️ Wallet Debited (Booking Cancelled)',
-                message: `₹${ownerDebitAmount} debited from your wallet as Booking #${booking._id.toString().slice(-6).toUpperCase()} was cancelled and refunded.`,
+                title: '⚠️ Wallet Adjusted (Booking Cancelled)',
+                message: !booking.isCheckedIn
+                  ? `₹${ownerDebitAmount} debited as commuter cancelled before check-in (100% refunded to commuter).`
+                  : `₹${ownerDebitAmount} adjusted as commuter cancelled post check-in. You retain ₹${newOwnerEarnings} (80% retained).`,
                 data: {
                   bookingId: booking._id,
                   spaceId: space._id,
                   amount: ownerDebitAmount,
+                  retained: newOwnerEarnings,
                 },
               });
               if (owner.pushToken) {
                 sendPushNotification(
                   owner.pushToken,
-                  '⚠️ Wallet Debited (Booking Cancelled)',
-                  `₹${ownerDebitAmount} debited from your wallet as Booking #${booking._id.toString().slice(-6).toUpperCase()} was cancelled.`,
+                  '⚠️ Booking Cancelled by Commuter',
+                  !booking.isCheckedIn
+                    ? `Commuter cancelled prior to check-in. Slot released.`
+                    : `Commuter cancelled post check-in. You retain ₹${newOwnerEarnings}.`,
                   { screen: 'Wallet', bookingId: booking._id }
                 );
               }
@@ -1662,7 +1837,9 @@ const cancelBookingHandler = async (req, res) => {
           seeker.walletTransactions.push({
             type: 'credit',
             amount: refundAmount,
-            description: `Refund (${policyApplied === 'half' ? '50% Half Refund' : '100% Full Refund'}) for cancelled booking at ${space ? space.title : 'Parking Space'}`,
+            description: !booking.isCheckedIn
+              ? `100% Pre Check-In Full Refund for Booking #${booking._id.toString().slice(-6).toUpperCase()} at ${space ? space.title : 'Parking Spot'}`
+              : `20% Post Check-In Refund for Booking #${booking._id.toString().slice(-6).toUpperCase()} at ${space ? space.title : 'Parking Spot'}`,
             date: new Date(),
             bookingId: booking._id,
           });
@@ -1677,10 +1854,12 @@ const cancelBookingHandler = async (req, res) => {
 
     // ── Dispatch Cancellation & Refund Notifications (Seeker & Space Owner) ──
     try {
-      // 1. Seeker In-App & Push Notification with horn sound
+      // 1. Seeker In-App & Push Notification
+      const isPreCheckIn = !booking.isCheckedIn;
+      const policyLabel = isPreCheckIn ? '100% Pre Check-In Refund' : '20% Post Check-In Refund';
       const seekerNotifTitle = '🚫 Booking Cancelled & Refunded';
       const seekerNotifMsg = refundAmount > 0
-        ? `Your booking at ${space ? space.title : 'Parking Space'} was cancelled. ₹${refundAmount} (${policyApplied === 'half' ? '50%' : '100%'} refund) credited to your wallet!`
+        ? `Your booking at ${space ? space.title : 'Parking Space'} was cancelled. ₹${refundAmount} (${policyLabel}) credited to your wallet!`
         : `Your booking at ${space ? space.title : 'Parking Space'} was cancelled successfully.`;
 
       await Notification.create({
@@ -1707,7 +1886,7 @@ const cancelBookingHandler = async (req, res) => {
         );
       }
 
-      // 2. Space Owner In-App & Push Notification with horn sound
+      // 2. Space Owner In-App & Push Notification
       if (space && space.ownerId) {
         const ownerUser = await User.findById(space.ownerId);
         if (ownerUser) {
@@ -1743,7 +1922,7 @@ const cancelBookingHandler = async (req, res) => {
       console.warn('[Cancel Booking] Error dispatching notifications:', notifErr.message);
     }
 
-    const policyText = policyApplied === 'full' ? '100% Full Refund' : policyApplied === 'half' ? '50% Half Refund' : 'No Refund';
+    const policyText = !booking.isCheckedIn ? '100% Pre Check-In Refund' : '20% Post Check-In Refund';
     const message = refundAmount > 0
       ? `Reservation cancelled successfully. ₹${refundAmount} (${policyText}) has been refunded to your PlanToPark Wallet!`
       : `Reservation cancelled successfully (${policyText}).`;
