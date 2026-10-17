@@ -736,15 +736,7 @@ export default function BookingsScreen({ navigation }) {
               const checkInDate = item.checkInTime || item.startTime;
               const elapsed = checkInDate ? (Date.now() - new Date(checkInDate).getTime()) / (1000 * 60) : 0;
               if (elapsed > cancellationGraceMinutes) {
-                return (
-                  <TouchableOpacity
-                    style={[styles.cancelBtn, { borderColor: '#e2e8f0', backgroundColor: '#f8fafc', opacity: 0.6 }]}
-                    onPress={() => Alert.alert('⚠️ Cancellation Window Closed', `Cancellation is only permitted within ${cancellationGraceMinutes} minutes after check-in.\n\nPlease tap "Check Out" when your vehicle departs.`)}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={[styles.cancelBtnTxt, { color: '#94a3b8' }]}>Cancel (Closed)</Text>
-                  </TouchableOpacity>
-                );
+                return null;
               }
               const minsLeft = Math.max(1, Math.ceil(cancellationGraceMinutes - elapsed));
               return (

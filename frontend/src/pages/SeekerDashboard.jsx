@@ -3278,16 +3278,7 @@ const SeekerDashboard = () => {
                                 const checkInDate = b.checkInTime || b.startTime;
                                 const elapsed = checkInDate ? (Date.now() - new Date(checkInDate).getTime()) / (1000 * 60) : 0;
                                 if (elapsed > cancellationGraceMinutes) {
-                                  return (
-                                    <button
-                                      type="button"
-                                      onClick={() => alert(`⚠️ Cancellation Window Closed\n\nCancellation is only permitted within ${cancellationGraceMinutes} minutes of check-in. Your parking session is active.\n\nPlease click "Check Out" when your vehicle departs.`)}
-                                      className="bg-slate-100 border border-slate-200 text-slate-400 font-bold px-3 py-2 rounded-xl text-xs cursor-not-allowed opacity-60"
-                                      title={`Cancellation window expired (${cancellationGraceMinutes} mins after check-in). Please check out when leaving.`}
-                                    >
-                                      Cancel (Closed)
-                                    </button>
-                                  );
+                                  return null;
                                 }
                                 const minsLeft = Math.max(1, Math.ceil(cancellationGraceMinutes - elapsed));
                                 return (
