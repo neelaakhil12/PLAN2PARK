@@ -1715,6 +1715,32 @@ const cancelBookingHandler = async (req, res) => {
 
     const wasCheckedIn = Boolean(booking.isCheckedIn) || (booking.checkInTime && !booking.checkOutTime) || booking.status === 'checked_in';
 
+    if (wasCheckedIn) {
+      // Verify post-check-in cancellation grace window (configured by Admin)
+      let graceMinutes = 10;
+      try {
+        const SystemSetting = require('../models/SystemSetting');
+        const setting = await SystemSetting.findOne({ key: 'cancellation_rules' });
+        if (setting && setting.value && setting.value.postCheckInGraceMinutes) {
+          graceMinutes = Number(setting.value.postCheckInGraceMinutes) || 10;
+        }
+      } catch (e) {
+        graceMinutes = 10;
+      }
+
+      const checkInDate = booking.checkInTime || booking.startTime;
+      if (checkInDate) {
+        const elapsedMinutes = (Date.now() - new Date(checkInDate).getTime()) / (1000 * 60);
+        if (elapsedMinutes > graceMinutes) {
+          return res.status(400).json({
+            message: `Cancellation window expired (${graceMinutes} mins allowed after check-in). Your parking session is active. Please use Check Out when departing.`,
+            graceMinutes,
+            elapsedMinutes: Math.round(elapsedMinutes),
+          });
+        }
+      }
+    }
+
     booking.status = 'cancelled';
     booking.isCheckedIn = false;
     if (!booking.checkOutTime) {

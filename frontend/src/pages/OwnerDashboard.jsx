@@ -1472,7 +1472,7 @@ const OwnerDashboard = () => {
 
                   <div className="flex items-baseline gap-2 mt-2">
                     <p className={`text-4xl sm:text-5xl font-black font-mono tracking-tight ${Number(walletData.walletBalance || 0) < 0 ? 'text-rose-400' : 'text-white'}`}>
-                      ₹{Number(walletData.walletBalance || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      ₹{Number(walletData.walletBalance || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}
                     </p>
                   </div>
 
@@ -1486,13 +1486,13 @@ const OwnerDashboard = () => {
                   {walletData.pendingWithdrawal > 0 && (
                     <div className="inline-flex items-center gap-2 mt-3 bg-amber-500/20 border border-amber-400/40 px-3 py-1.5 rounded-xl text-amber-200 text-xs font-bold">
                       <Clock className="h-3.5 w-3.5 text-amber-300 animate-pulse" />
-                      ₹{Number(walletData.pendingWithdrawal).toFixed(2)} in pending withdrawal awaiting Admin settlement
+                      ₹{Number(walletData.pendingWithdrawal).toLocaleString('en-IN', { maximumFractionDigits: 2 })} in pending withdrawal awaiting Admin settlement
                     </div>
                   )}
 
                   <p className="text-xs text-slate-400 mt-3 font-medium max-w-xl">
                     {walletData.pendingWithdrawal > 0
-                      ? `Available to withdraw immediately: ₹${Number(walletData.availableBalance !== undefined ? walletData.availableBalance : Math.max(0, (walletData.walletBalance || 0) - walletData.pendingWithdrawal)).toFixed(2)}. Net earnings credited automatically upon booking verification.`
+                      ? `Available to withdraw immediately: ₹${Number(walletData.availableBalance !== undefined ? walletData.availableBalance : Math.max(0, (walletData.walletBalance || 0) - walletData.pendingWithdrawal)).toLocaleString('en-IN', { maximumFractionDigits: 2 })}. Net earnings credited automatically upon booking verification.`
                       : `Net booking revenues are automatically credited to your wallet balance after the ${walletData.platformCommissionRate || 15}% platform commission deduction.`}
                   </p>
                 </div>
@@ -2548,7 +2548,7 @@ const OwnerDashboard = () => {
                 <div>
                   <span className="text-[11px] font-bold text-emerald-800 uppercase tracking-wider block">Available to Withdraw</span>
                   <span className="text-2xl font-black text-emerald-950 font-mono">
-                    ₹{Number(walletData.availableBalance !== undefined ? walletData.availableBalance : Math.max(0, (walletData.walletBalance || 0) - (walletData.pendingWithdrawal || 0))).toFixed(2)}
+                    ₹{Number(walletData.availableBalance !== undefined ? walletData.availableBalance : Math.max(0, (walletData.walletBalance || 0) - (walletData.pendingWithdrawal || 0))).toLocaleString('en-IN', { maximumFractionDigits: 2 })}
                   </span>
                 </div>
                 <div className="text-right">

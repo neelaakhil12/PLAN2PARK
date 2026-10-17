@@ -38,6 +38,24 @@ export default function BookingsScreen({ navigation }) {
   // Invoice Modal States
   const [invoiceBooking, setInvoiceBooking] = useState(null);
 
+  // Cancellation Rules
+  const [cancellationGraceMinutes, setCancellationGraceMinutes] = useState(10);
+
+  const fetchCancellationRules = async () => {
+    try {
+      const baseUrl = await getBaseApiUrl();
+      const res = await fetch(`${baseUrl}/settings/cancellation-rules`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data?.postCheckInGraceMinutes) {
+          setCancellationGraceMinutes(data.postCheckInGraceMinutes);
+        }
+      }
+    } catch (e) {
+      // fallback default 10
+    }
+  };
+
   const fetchMyBookings = async () => {
     if (!token) return;
     try {
@@ -60,6 +78,7 @@ export default function BookingsScreen({ navigation }) {
   useFocusEffect(
     useCallback(() => {
       fetchMyBookings();
+      fetchCancellationRules();
     }, [token])
   );
 
@@ -363,8 +382,23 @@ export default function BookingsScreen({ navigation }) {
     const bookingId = item._id;
     const isCheckedIn = Boolean(item.isCheckedIn) || item.status === 'checked_in';
     const amount = Number(item.totalAmount) || 0;
+
+    if (isCheckedIn) {
+      const checkInDate = item.checkInTime || item.startTime;
+      const elapsed = checkInDate ? (Date.now() - new Date(checkInDate).getTime()) / (1000 * 60) : 0;
+      if (elapsed > cancellationGraceMinutes) {
+        Alert.alert(
+          '⚠️ Cancellation Window Expired',
+          `Cancellations are only permitted within ${cancellationGraceMinutes} minutes after check-in.\n\nYour parking session is currently active. Please tap "Check Out" when departing so your spot is cleanly released.`
+        );
+        return;
+      }
+    }
+
     const estimatedRefund = !isCheckedIn ? amount : Number((amount * 0.20).toFixed(2));
-    const policyName = !isCheckedIn ? '100% Full Refund (Pre Check-In)' : '20% Partial Refund (Post Check-In)';
+    const policyName = !isCheckedIn
+      ? '100% Full Refund (Pre Check-In)'
+      : `20% Partial Refund (Grace Window: ${cancellationGraceMinutes}m)`;
 
     const doCancel = async () => {
       setBookings((prev) =>
@@ -696,15 +730,43 @@ export default function BookingsScreen({ navigation }) {
           )}
 
           {/* Cancel Button */}
-          {isPaid && !isCancelled && !isCompleted && (
-            <TouchableOpacity
-              style={styles.cancelBtn}
-              onPress={() => handleCancelBooking(item)}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.cancelBtnTxt}>Cancel</Text>
-            </TouchableOpacity>
-          )}
+          {isPaid && !isCancelled && !isCompleted && (() => {
+            const isCheckedIn = Boolean(item.isCheckedIn) || item.status === 'checked_in';
+            if (isCheckedIn) {
+              const checkInDate = item.checkInTime || item.startTime;
+              const elapsed = checkInDate ? (Date.now() - new Date(checkInDate).getTime()) / (1000 * 60) : 0;
+              if (elapsed > cancellationGraceMinutes) {
+                return (
+                  <TouchableOpacity
+                    style={[styles.cancelBtn, { borderColor: '#e2e8f0', backgroundColor: '#f8fafc', opacity: 0.6 }]}
+                    onPress={() => Alert.alert('⚠️ Cancellation Window Closed', `Cancellation is only permitted within ${cancellationGraceMinutes} minutes after check-in.\n\nPlease tap "Check Out" when your vehicle departs.`)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.cancelBtnTxt, { color: '#94a3b8' }]}>Cancel (Closed)</Text>
+                  </TouchableOpacity>
+                );
+              }
+              const minsLeft = Math.max(1, Math.ceil(cancellationGraceMinutes - elapsed));
+              return (
+                <TouchableOpacity
+                  style={styles.cancelBtn}
+                  onPress={() => handleCancelBooking(item)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.cancelBtnTxt}>Cancel ({minsLeft}m left)</Text>
+                </TouchableOpacity>
+              );
+            }
+            return (
+              <TouchableOpacity
+                style={styles.cancelBtn}
+                onPress={() => handleCancelBooking(item)}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.cancelBtnTxt}>Cancel</Text>
+              </TouchableOpacity>
+            );
+          })()}
 
           {/* In-App / Google Maps Navigation */}
           {space && (
@@ -773,6 +835,35 @@ export default function BookingsScreen({ navigation }) {
 
                 {/* Hours Incrementer */}
                 <Text style={styles.extendHoursLabel}>Select Additional Hours:</Text>
+                
+                {/* Quick Presets */}
+                <View style={{ flexDirection: 'row', gap: 6, marginBottom: 14, justifyContent: 'center' }}>
+                  {[1, 2, 3, 4, 6].map((hrs) => (
+                    <TouchableOpacity
+                      key={hrs}
+                      onPress={() => setExtendHours(hrs)}
+                      style={{
+                        paddingVertical: 6,
+                        paddingHorizontal: 12,
+                        borderRadius: 10,
+                        backgroundColor: extendHours === hrs ? COLORS.primary : '#f1f5f9',
+                        borderWidth: 1,
+                        borderColor: extendHours === hrs ? COLORS.primary : '#e2e8f0',
+                      }}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 12,
+                          fontWeight: '800',
+                          color: extendHours === hrs ? '#ffffff' : '#475569',
+                        }}
+                      >
+                        +{hrs}h
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
                 <View style={styles.hoursSelectorRow}>
                   <TouchableOpacity
                     style={styles.stepBtn}

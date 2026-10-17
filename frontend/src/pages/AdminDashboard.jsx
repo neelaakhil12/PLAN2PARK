@@ -169,6 +169,50 @@ const AdminDashboard = () => {
   const [savingSupportSettings, setSavingSupportSettings] = useState(false);
   const [supportSettingsSuccess, setSupportSettingsSuccess] = useState(false);
 
+  const [cancellationGraceMinutes, setCancellationGraceMinutes] = useState(10);
+  const [savingGraceMinutes, setSavingGraceMinutes] = useState(false);
+  const [graceSuccess, setGraceSuccess] = useState(false);
+
+  const fetchCancellationRules = async () => {
+    try {
+      const res = await fetch(`${API_URL}/settings/cancellation-rules`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.postCheckInGraceMinutes !== undefined) {
+          setCancellationGraceMinutes(data.postCheckInGraceMinutes);
+        }
+      }
+    } catch (e) {
+      console.error('Fetch cancellation rules error:', e);
+    }
+  };
+
+  const handleSaveCancellationRules = async (e) => {
+    if (e) e.preventDefault();
+    setSavingGraceMinutes(true);
+    try {
+      const res = await fetch(`${API_URL}/settings/cancellation-rules`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ postCheckInGraceMinutes: Number(cancellationGraceMinutes) }),
+      });
+      if (res.ok) {
+        setGraceSuccess(true);
+        setTimeout(() => setGraceSuccess(false), 3500);
+      } else {
+        const d = await res.json();
+        alert(d.message || 'Failed to update cancellation grace window');
+      }
+    } catch (err) {
+      alert('Error updating cancellation rules: ' + err.message);
+    } finally {
+      setSavingGraceMinutes(false);
+    }
+  };
+
   const fetchSupportSettings = async () => {
     try {
       const res = await fetch(`${API_URL}/settings/support`);
@@ -811,6 +855,7 @@ const AdminDashboard = () => {
       if (rTerms && rTerms.ok) setTerms(await rTerms.json());
       if (rFaqs && rFaqs.ok) setFaqs(await rFaqs.json());
       fetchSupportSettings();
+      fetchCancellationRules();
 
       // Fetch wallet payouts, commission & owner revenue summary
       try {
@@ -1627,6 +1672,82 @@ const AdminDashboard = () => {
                           className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-extrabold px-6 py-3 rounded-xl text-xs flex items-center gap-2 shadow-lg shadow-indigo-600/25 transition-all cursor-pointer"
                         >
                           {savingCommission ? 'Saving Financial Settings...' : '💾 Save Financial Settings'}
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+
+                  {/* ── POST-CHECK-IN CANCELLATION GRACE WINDOW SETTINGS ── */}
+                  <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-6">
+                    <div className="border-b border-slate-100 pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div>
+                        <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
+                          <Clock className="h-5 w-5 text-indigo-500" />
+                          ⏱️ Commuter Post-Check-In Cancellation Window
+                        </h3>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          Controls how many minutes after check-in a commuter can cancel their parking session (with 20% partial refund).
+                        </p>
+                      </div>
+                      {graceSuccess && (
+                        <span className="px-3 py-1 rounded-full text-xs font-black bg-emerald-50 text-emerald-700 border border-emerald-200 animate-fadeIn">
+                          ✓ Cancellation Window Saved!
+                        </span>
+                      )}
+                    </div>
+
+                    <form onSubmit={handleSaveCancellationRules} className="space-y-6">
+                      <div className="bg-slate-50 rounded-2xl p-5 border border-slate-200/80 max-w-2xl">
+                        <div className="flex items-center justify-between mb-2">
+                          <label className="text-xs font-black text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                            <Clock className="h-4 w-4 text-indigo-500" />
+                            Cancellation Grace Window (Minutes)
+                          </label>
+                          <span className="text-xs font-extrabold px-2.5 py-0.5 rounded-full bg-indigo-100 text-indigo-700">
+                            Active: {cancellationGraceMinutes} mins
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-500 mb-4 leading-relaxed">
+                          When a commuter checks into a parking spot, they have a grace period of this many minutes to cancel (e.g. in case of emergency or immediate departure). Once this time passes, the Cancel button is automatically disabled and hidden on both the Website and Seeker Mobile App to prevent revenue loss for space owners.
+                        </p>
+                        <div className="flex items-center gap-3">
+                          <input
+                            type="number"
+                            min="1"
+                            max="180"
+                            value={cancellationGraceMinutes}
+                            onChange={(e) => setCancellationGraceMinutes(e.target.value)}
+                            className="w-40 bg-white border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm font-bold text-slate-800 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+                          />
+                          <span className="text-sm font-bold text-slate-600">Minutes</span>
+                        </div>
+
+                        {/* Quick Presets */}
+                        <div className="flex items-center gap-2 mt-3 flex-wrap">
+                          {[5, 10, 15, 20, 30, 45, 60].map(m => (
+                            <button
+                              key={m}
+                              type="button"
+                              onClick={() => setCancellationGraceMinutes(m)}
+                              className={`px-3 py-1 rounded-xl text-xs font-extrabold border transition-all cursor-pointer ${
+                                Number(cancellationGraceMinutes) === m
+                                  ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                                  : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
+                              }`}
+                            >
+                              {m} mins
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="flex justify-end">
+                        <button
+                          type="submit"
+                          disabled={savingGraceMinutes}
+                          className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-extrabold px-6 py-3 rounded-xl text-xs flex items-center gap-2 shadow-lg shadow-indigo-600/25 transition-all cursor-pointer"
+                        >
+                          {savingGraceMinutes ? 'Saving...' : '💾 Save Cancellation Rule'}
                         </button>
                       </div>
                     </form>

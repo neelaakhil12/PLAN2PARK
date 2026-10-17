@@ -122,6 +122,7 @@ const SeekerDashboard = () => {
   const [locatingGps, setLocatingGps] = useState(false);
   const [customAreaInput, setCustomAreaInput] = useState('');
   const [bookingFilter, setBookingFilter] = useState('all'); // 'all', 'active', 'past'
+  const [cancellationGraceMinutes, setCancellationGraceMinutes] = useState(10);
 
   // Transient UI states (overlays)
   const [selectedSpace, setSelectedSpace] = useState(null);
@@ -229,6 +230,11 @@ const SeekerDashboard = () => {
           setWalletTransactions(uData.walletTransactions);
         }
       }
+
+      fetch(`${API_URL}/settings/cancellation-rules`)
+        .then(r => r.json())
+        .then(d => { if (d && d.postCheckInGraceMinutes) setCancellationGraceMinutes(d.postCheckInGraceMinutes); })
+        .catch(() => {});
     } catch (e) { console.error(e); }
     setLoading(false);
   };
@@ -790,11 +796,23 @@ const SeekerDashboard = () => {
     const booking = typeof bookingOrId === 'object' ? bookingOrId : bookings.find(b => b._id === bookingOrId);
     const bookingId = booking?._id || bookingOrId;
     const isCheckedIn = Boolean(booking?.isCheckedIn) || booking?.status === 'checked_in';
+
+    if (isCheckedIn) {
+      const checkInDate = booking?.checkInTime || booking?.startTime;
+      if (checkInDate) {
+        const elapsed = (Date.now() - new Date(checkInDate).getTime()) / (1000 * 60);
+        if (elapsed > cancellationGraceMinutes) {
+          alert(`⚠️ Cancellation Window Closed\n\nCancellation is only permitted within ${cancellationGraceMinutes} minutes of check-in. Your parking session is active.\n\nPlease click "Check Out" when departing.`);
+          return;
+        }
+      }
+    }
+
     const amount = Number(booking?.totalAmount || 0) + Number(booking?.walletAmountUsed || 0);
     const refundPct = !isCheckedIn ? '100%' : '20%';
     const refundEstimated = !isCheckedIn ? amount : Number((amount * 0.20).toFixed(2));
     const refundDetails = isCheckedIn 
-      ? `Because you have already checked in, 20% (₹${refundEstimated}) will be refunded back to your PlanToPark wallet (80% retained for space owner/platform).`
+      ? `Because you have already checked in, 20% (₹${refundEstimated}) will be refunded back to your PlanToPark wallet (80% retained for space owner/platform).\n\n(Grace Period: ${cancellationGraceMinutes} minutes after check-in)`
       : `Before check-in, 100% full refund (₹${refundEstimated}) will be credited back to your PlanToPark wallet.`;
     
     if (!window.confirm(`Cancel Reservation\n\nStandard Platform Refund: ${refundPct}\n${refundDetails}\n\nDo you want to confirm cancellation?`)) return;
@@ -1684,7 +1702,7 @@ const SeekerDashboard = () => {
                                     Use PlanToPark Wallet (-₹{discount})
                                   </p>
                                   <p className="text-[11px] text-slate-500 font-medium mt-0.5">
-                                    Available Balance: ₹{walletBalance}.00 • Max ₹{maxDiscount} usable
+                                    Available Balance: ₹{Number(walletBalance || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })} • Max ₹{maxDiscount} usable
                                   </p>
                                 </div>
                               </div>
@@ -1705,7 +1723,7 @@ const SeekerDashboard = () => {
                             {discount > 0 && (
                               <div className="flex justify-between text-emerald-600 font-bold">
                                 <span>⚡ Wallet Money Applied</span>
-                                <span>- ₹{discount}.00</span>
+                                <span>- ₹{Number(discount || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}</span>
                               </div>
                             )}
                             <div className="flex justify-between text-slate-600 font-medium">
@@ -2577,7 +2595,7 @@ const SeekerDashboard = () => {
                                     Use PlanToPark Wallet (-₹{discount})
                                   </p>
                                   <p className="text-[11px] text-slate-500 font-medium mt-0.5">
-                                    Available Balance: ₹{walletBalance}.00 • Max ₹{maxDiscount} usable
+                                    Available Balance: ₹{Number(walletBalance || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })} • Max ₹{maxDiscount} usable
                                   </p>
                                 </div>
                               </div>
@@ -2598,7 +2616,7 @@ const SeekerDashboard = () => {
                             {discount > 0 && (
                               <div className="flex justify-between text-emerald-600 font-bold">
                                 <span>⚡ Wallet Money Applied</span>
-                                <span>- ₹{discount}.00</span>
+                                <span>- ₹{Number(discount || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}</span>
                               </div>
                             )}
                             <div className="flex justify-between text-slate-600 font-medium">
@@ -3254,14 +3272,45 @@ const SeekerDashboard = () => {
                             )}
 
                             {/* Cancel Button */}
-                            {isPaid && !isCancelled && !isCompleted && (
-                              <button
-                                onClick={() => handleCancel(b)}
-                                className="bg-rose-50 border border-rose-200 text-rose-600 hover:bg-rose-100 font-black px-3 py-2 rounded-xl text-xs transition-all hover:-translate-y-0.5 cursor-pointer"
-                              >
-                                Cancel
-                              </button>
-                            )}
+                            {isPaid && !isCancelled && !isCompleted && (() => {
+                              const isCheckedIn = Boolean(b.isCheckedIn) || b.status === 'checked_in';
+                              if (isCheckedIn) {
+                                const checkInDate = b.checkInTime || b.startTime;
+                                const elapsed = checkInDate ? (Date.now() - new Date(checkInDate).getTime()) / (1000 * 60) : 0;
+                                if (elapsed > cancellationGraceMinutes) {
+                                  return (
+                                    <button
+                                      type="button"
+                                      onClick={() => alert(`⚠️ Cancellation Window Closed\n\nCancellation is only permitted within ${cancellationGraceMinutes} minutes of check-in. Your parking session is active.\n\nPlease click "Check Out" when your vehicle departs.`)}
+                                      className="bg-slate-100 border border-slate-200 text-slate-400 font-bold px-3 py-2 rounded-xl text-xs cursor-not-allowed opacity-60"
+                                      title={`Cancellation window expired (${cancellationGraceMinutes} mins after check-in). Please check out when leaving.`}
+                                    >
+                                      Cancel (Closed)
+                                    </button>
+                                  );
+                                }
+                                const minsLeft = Math.max(1, Math.ceil(cancellationGraceMinutes - elapsed));
+                                return (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleCancel(b)}
+                                    className="bg-rose-50 border border-rose-200 text-rose-600 hover:bg-rose-100 font-black px-3 py-2 rounded-xl text-xs transition-all hover:-translate-y-0.5 cursor-pointer"
+                                    title={`Cancel within ${minsLeft} minutes for 20% partial refund`}
+                                  >
+                                    Cancel ({minsLeft}m left)
+                                  </button>
+                                );
+                              }
+                              return (
+                                <button
+                                  type="button"
+                                  onClick={() => handleCancel(b)}
+                                  className="bg-rose-50 border border-rose-200 text-rose-600 hover:bg-rose-100 font-black px-3 py-2 rounded-xl text-xs transition-all hover:-translate-y-0.5 cursor-pointer"
+                                >
+                                  Cancel
+                                </button>
+                              );
+                            })()}
                           </div>
 
                           {/* Navigation Buttons */}
@@ -3539,7 +3588,7 @@ const SeekerDashboard = () => {
                 </div>
                 <div>
                   <p className="text-emerald-100 text-xs font-bold uppercase tracking-wider">Available Refund &amp; Wallet Balance</p>
-                  <h2 className="text-4xl sm:text-5xl font-black mt-1">₹{walletBalance || 0}.00</h2>
+                  <h2 className="text-4xl sm:text-5xl font-black mt-1">₹{Number(walletBalance || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}</h2>
                   <p className="text-xs text-emerald-200 mt-2 font-medium">
                     ✓ Auto-credited upon reservation cancellation &amp; usable for future parking bookings.
                   </p>
@@ -3611,7 +3660,7 @@ const SeekerDashboard = () => {
                         <span className={`font-mono font-black text-sm shrink-0 ${
                           isCredit ? 'text-emerald-600' : 'text-rose-600'
                         }`}>
-                          {isCredit ? `+₹${Number(tx.amount).toFixed(2)}` : `−₹${Number(tx.amount).toFixed(2)}`}
+                          {isCredit ? `+₹${Number(tx.amount || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}` : `−₹${Number(tx.amount || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`}
                         </span>
                       </div>
                     );
@@ -3800,7 +3849,7 @@ const SeekerDashboard = () => {
                   <p className="text-[11px] text-slate-400 font-bold uppercase mt-0.5">Account</p>
                 </div>
                 <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 text-center">
-                  <p className="text-sm font-black text-emerald-600">₹{walletBalance || 150}.00</p>
+                  <p className="text-sm font-black text-emerald-600">₹{Number(walletBalance || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}</p>
                   <p className="text-[11px] text-slate-400 font-bold uppercase mt-0.5">Wallet</p>
                 </div>
                 <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 text-center">

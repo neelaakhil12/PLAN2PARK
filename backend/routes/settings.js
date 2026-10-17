@@ -99,4 +99,49 @@ router.put('/support', protect, adminOnly, async (req, res) => {
   }
 });
 
+// @desc    Get post-check-in cancellation grace period (public/seeker)
+// @route   GET /api/settings/cancellation-rules
+// @access  Public
+router.get('/cancellation-rules', async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  try {
+    let setting = await SystemSetting.findOne({ key: 'cancellation_rules' });
+    if (!setting) {
+      setting = await SystemSetting.create({
+        key: 'cancellation_rules',
+        value: { postCheckInGraceMinutes: 10 },
+        description: 'Post-check-in cancellation grace window (minutes) before cancellation locks',
+      });
+    }
+    const graceMinutes = Number(setting.value?.postCheckInGraceMinutes) || 10;
+    res.json({ postCheckInGraceMinutes: graceMinutes });
+  } catch (err) {
+    res.status(500).json({ postCheckInGraceMinutes: 10, message: err.message });
+  }
+});
+
+// @desc    Update post-check-in cancellation grace period (admin only)
+// @route   PUT /api/settings/cancellation-rules
+// @access  Private (Admin)
+router.put('/cancellation-rules', protect, adminOnly, async (req, res) => {
+  try {
+    const minutes = Math.max(1, Number(req.body.postCheckInGraceMinutes) || 10);
+    const setting = await SystemSetting.findOneAndUpdate(
+      { key: 'cancellation_rules' },
+      {
+        value: { postCheckInGraceMinutes: minutes },
+        description: 'Post-check-in cancellation grace window (minutes) before cancellation locks',
+      },
+      { upsert: true, new: true }
+    );
+    res.json({
+      message: `Cancellation grace window updated to ${minutes} minutes.`,
+      postCheckInGraceMinutes: minutes,
+    });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 module.exports = router;
+
