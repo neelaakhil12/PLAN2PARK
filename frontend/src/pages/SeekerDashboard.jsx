@@ -2592,7 +2592,16 @@ const SeekerDashboard = () => {
                         <div className="flex items-center justify-between border-t border-slate-100 mt-5 pt-4 gap-4">
                           <div>
                             <p className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider">Total Fee</p>
-                            <p className="text-xl font-black text-slate-900 mt-0.5">₹{b.totalAmount}</p>
+                            <div className="flex items-center gap-1.5 mt-0.5">
+                              <p className="text-xl font-black text-slate-900">
+                                ₹{(b.totalAmount || 0) + (b.walletAmountUsed || 0)}
+                              </p>
+                              {b.walletAmountUsed > 0 && (
+                                <span className="bg-emerald-100 text-emerald-800 text-[10px] font-black px-1.5 py-0.5 rounded-md border border-emerald-200">
+                                  💳 WALLET
+                                </span>
+                              )}
+                            </div>
                           </div>
                           
                           <div className="flex flex-wrap items-center gap-1.5">
@@ -2712,7 +2721,10 @@ const SeekerDashboard = () => {
                           <span className="bg-slate-100 px-2 py-0.5 rounded-lg border border-slate-200">{b.slotId || '—'}</span>
                         </td>
                         <td className="px-6 py-4">{b.hours} hrs</td>
-                        <td className="px-6 py-4 font-bold text-slate-900">₹{b.totalAmount}</td>
+                        <td className="px-6 py-4 font-bold text-slate-900">
+                          ₹{(b.totalAmount || 0) + (b.walletAmountUsed || 0)}
+                          {b.walletAmountUsed > 0 && <span className="ml-1 text-[10px] text-emerald-600 font-extrabold">💳</span>}
+                        </td>
                         <td className="px-6 py-4"><StatusBadge status={b.status} /></td>
                         <td className="px-6 py-4 text-slate-400 text-xs">{new Date(b.createdAt || b.startTime).toLocaleDateString()}</td>
                         <td className="px-6 py-4 text-right">
@@ -2766,7 +2778,10 @@ const SeekerDashboard = () => {
                         <td className="px-6 py-4 font-mono text-xs uppercase font-bold">{b.vehicleNumber}</td>
                         <td className="px-6 py-4 font-mono text-xs">{b.slotId || '—'}</td>
                         <td className="px-6 py-4">{b.hours} hrs</td>
-                        <td className="px-6 py-4 font-bold text-slate-900">₹{b.totalAmount}</td>
+                        <td className="px-6 py-4 font-bold text-slate-900">
+                          ₹{(b.totalAmount || 0) + (b.walletAmountUsed || 0)}
+                          {b.walletAmountUsed > 0 && <span className="ml-1 text-[10px] text-emerald-600 font-extrabold">💳</span>}
+                        </td>
                         <td className="px-6 py-4"><StatusBadge status={b.status} /></td>
                         <td className="px-6 py-4 text-slate-400 text-xs">{new Date(b.createdAt).toLocaleDateString()}</td>
                         <td className="px-6 py-4 text-right">

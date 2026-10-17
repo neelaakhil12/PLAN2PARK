@@ -82,6 +82,7 @@ const AdminDashboard = () => {
   const [submittingApproval, setSubmittingApproval] = useState(false);
   const [viewingReceiptUrl, setViewingReceiptUrl] = useState(null);
   const [payoutsFilter, setPayoutsFilter] = useState('all');
+  const [adminWalletFilter, setAdminWalletFilter] = useState('all');
 
   // ── Global Owner Earnings Breakdown Modal States ──
   const [showOwnerEarningsModal, setShowOwnerEarningsModal] = useState(false);
@@ -1304,6 +1305,7 @@ const AdminDashboard = () => {
     users: 'All Registered Platform Users',
     bookings: 'Platform Bookings',
     revenue: 'Revenue Reports & Ledger',
+    wallet: '💳 Platform Wallet / Treasury',
     payouts: '💸 Owner Withdrawals & Payout Requests',
     terms: '📜 Terms & Conditions Management',
     faqs: '💬 Chatbot FAQs (Parking Seeker)',
@@ -1318,6 +1320,7 @@ const AdminDashboard = () => {
     { id: 'users', path: '/admin/users', label: '👥 Users Management', icon: <Users className="h-4.5 w-4.5 text-emerald-400" /> },
     { id: 'bookings', path: '/admin/bookings', label: 'Platform Bookings', icon: <ClipboardList className="h-4.5 w-4.5" /> },
     { id: 'revenue', path: '/admin/revenue', label: 'Revenue & Invoices', icon: <DollarSign className="h-4.5 w-4.5 text-emerald-400" /> },
+    { id: 'wallet', path: '/admin/wallet', label: '💳 Platform Wallet', icon: <Landmark className="h-4.5 w-4.5 text-purple-400" /> },
     { id: 'payouts', path: '/admin/payouts', label: '💸 Owner Withdrawals', icon: <DollarSign className="h-4.5 w-4.5 text-amber-400" /> },
     { id: 'terms', path: '/admin/terms', label: '📜 Terms & Conditions', icon: <FileText className="h-4.5 w-4.5 text-indigo-400" /> },
     { id: 'faqs', path: '/admin/faqs', label: '💬 Chatbot FAQs', icon: <HelpCircle className="h-4.5 w-4.5 text-cyan-400" /> },
@@ -5965,6 +5968,259 @@ const AdminDashboard = () => {
                   </div>
                 </div>
               )}
+
+              {/* ═════════════════════════════════════════════════════════════════ */}
+              {/* ── VIEW: PLATFORM WALLET / TREASURY ──────────────────────────── */}
+              {/* ═════════════════════════════════════════════════════════════════ */}
+              {currentView === 'wallet' && (() => {
+                // Compute all platform treasury transactions from bookings
+                const treasuryTxs = [];
+                let totalCredits = 0;
+                let totalReversals = 0;
+
+                bookings.forEach((b) => {
+                  const grossAmount = (b.totalAmount || 0) + (b.walletAmountUsed || 0);
+                  const isCancelled = b.status === 'cancelled';
+                  const isPaid = b.paymentStatus === 'paid' || b.status === 'paid' || b.status === 'checked_in' || b.status === 'completed' || isCancelled;
+
+                  if (!isPaid && grossAmount <= 0) return;
+
+                  const commissionAmount = b.adminCommission !== undefined && b.adminCommission !== null
+                    ? Number(b.adminCommission)
+                    : Math.round(grossAmount * 0.1);
+
+                  // Credit event (when booking was confirmed/paid)
+                  if (commissionAmount > 0) {
+                    totalCredits += commissionAmount;
+                    treasuryTxs.push({
+                      id: `${b._id}-credit`,
+                      bookingId: b._id,
+                      bookingCode: b._id.toString().slice(-6).toUpperCase(),
+                      type: 'credit',
+                      title: 'Platform Commission Credit (10%)',
+                      grossAmount,
+                      amount: commissionAmount,
+                      commuter: b.seekerName || b.seekerId?.name || 'Commuter',
+                      spaceTitle: b.spaceId?.title || 'Parking Space',
+                      ownerName: b.spaceId?.ownerId?.name || 'Host',
+                      paymentMethod: b.walletAmountUsed > 0 && b.totalAmount === 0 ? 'Wallet' : (b.walletAmountUsed > 0 ? 'Split (Wallet + Razorpay)' : 'Razorpay'),
+                      date: b.createdAt || b.startTime,
+                      status: 'credited',
+                    });
+                  }
+
+                  // Cancellation reversal event
+                  if (isCancelled) {
+                    const wasCheckedIn = Boolean(b.wasCheckedIn) || (b.checkInTime && !b.checkOutTime) || b.status === 'checked_in';
+                    const reversedAmount = wasCheckedIn ? 0 : commissionAmount;
+
+                    if (reversedAmount > 0) {
+                      totalReversals += reversedAmount;
+                      treasuryTxs.push({
+                        id: `${b._id}-reversal`,
+                        bookingId: b._id,
+                        bookingCode: b._id.toString().slice(-6).toUpperCase(),
+                        type: 'reversal',
+                        title: 'Cancellation Commission Reversal (100% Refund)',
+                        grossAmount,
+                        amount: reversedAmount,
+                        commuter: b.seekerName || b.seekerId?.name || 'Commuter',
+                        spaceTitle: b.spaceId?.title || 'Parking Space',
+                        ownerName: b.spaceId?.ownerId?.name || 'Host',
+                        paymentMethod: 'Reversed to Seeker Wallet',
+                        date: b.updatedAt || b.createdAt,
+                        status: 'reversed',
+                      });
+                    }
+                  }
+                });
+
+                // Sort descending by date
+                treasuryTxs.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+                const netTreasuryBalance = Math.max(0, totalCredits - totalReversals);
+                const filteredTxs = treasuryTxs.filter((tx) => {
+                  if (adminWalletFilter === 'credits') return tx.type === 'credit';
+                  if (adminWalletFilter === 'reversals') return tx.type === 'reversal';
+                  return true;
+                });
+
+                return (
+                  <div className="space-y-6 animate-fadeIn text-left">
+                    {/* Header */}
+                    <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                      <div>
+                        <h2 className="text-xl sm:text-2xl font-black text-slate-900 flex items-center gap-2">
+                          Platform Wallet &amp; Treasury <span className="text-xl">💳</span>
+                        </h2>
+                        <p className="text-xs text-slate-500 font-medium mt-0.5">
+                          Direct overview of platform commissions, credits, cancellation reversals, and net earnings.
+                        </p>
+                      </div>
+                      <div className="bg-purple-50 text-purple-700 border border-purple-200 px-4 py-2 rounded-2xl text-xs font-black flex items-center gap-2">
+                        <Landmark className="h-4 w-4 text-purple-600" />
+                        10% Auto Platform Commission
+                      </div>
+                    </div>
+
+                    {/* KPI Summary Cards */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                      {/* Net Treasury Balance */}
+                      <div className="bg-gradient-to-br from-slate-900 to-purple-950 text-white rounded-3xl p-6 shadow-md relative overflow-hidden border border-slate-800">
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs font-bold text-purple-300 uppercase tracking-wider">Net Treasury Balance</p>
+                          <Landmark className="h-4 w-4 text-purple-300" />
+                        </div>
+                        <p className="text-3xl font-black font-mono tracking-tight mt-3 text-white">
+                          ₹{netTreasuryBalance.toFixed(2)}
+                        </p>
+                        <p className="text-[11px] text-purple-200 mt-1 font-medium">Retained platform net earnings</p>
+                      </div>
+
+                      {/* Total Fees Credited */}
+                      <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm">
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Total Fees Credited</p>
+                          <ArrowDownLeft className="h-4 w-4 text-emerald-500" />
+                        </div>
+                        <p className="text-3xl font-black font-mono tracking-tight text-emerald-600 mt-3">
+                          +₹{totalCredits.toFixed(2)}
+                        </p>
+                        <p className="text-[11px] text-slate-400 mt-1">Across all confirmed bookings</p>
+                      </div>
+
+                      {/* Total Reversed / Refunded */}
+                      <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm">
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Total Reversed</p>
+                          <ArrowUpRight className="h-4 w-4 text-rose-500" />
+                        </div>
+                        <p className="text-3xl font-black font-mono tracking-tight text-rose-600 mt-3">
+                          -₹{totalReversals.toFixed(2)}
+                        </p>
+                        <p className="text-[11px] text-slate-400 mt-1">Cancellation refund reversals</p>
+                      </div>
+
+                      {/* Total Treasury Transactions */}
+                      <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm">
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Total Transactions</p>
+                          <ClipboardList className="h-4 w-4 text-indigo-400" />
+                        </div>
+                        <p className="text-3xl font-black font-mono tracking-tight text-slate-800 mt-3">
+                          {treasuryTxs.length}
+                        </p>
+                        <p className="text-[11px] text-slate-400 mt-1">Credits &amp; cancellation adjustments</p>
+                      </div>
+                    </div>
+
+                    {/* Filter Pills */}
+                    <div className="bg-white border border-slate-200 rounded-3xl p-4 shadow-sm flex flex-wrap items-center justify-between gap-4">
+                      <div className="flex items-center gap-2">
+                        {[
+                          { id: 'all', label: `All Transactions (${treasuryTxs.length})` },
+                          { id: 'credits', label: `Commission Credits (+₹${totalCredits.toFixed(2)})` },
+                          { id: 'reversals', label: `Cancellation Reversals (-₹${totalReversals.toFixed(2)})` },
+                        ].map((f) => (
+                          <button
+                            key={f.id}
+                            type="button"
+                            onClick={() => setAdminWalletFilter(f.id)}
+                            className={`px-4 py-2 rounded-xl text-xs font-extrabold transition-all border shrink-0 cursor-pointer ${
+                              adminWalletFilter === f.id
+                                ? 'bg-purple-600 text-white border-purple-600 shadow-sm'
+                                : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                            }`}
+                          >
+                            {f.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Transactions Table */}
+                    <div className="bg-white border border-slate-200 rounded-3xl shadow-sm overflow-hidden">
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left text-xs">
+                          <thead className="bg-slate-50/80 border-b border-slate-100 text-slate-400 uppercase font-black text-[10px] tracking-wider">
+                            <tr>
+                              <th className="px-5 py-4">Transaction Details</th>
+                              <th className="px-5 py-4">Booking &amp; Commuter</th>
+                              <th className="px-5 py-4">Parking Space &amp; Host</th>
+                              <th className="px-5 py-4">Gross Fee</th>
+                              <th className="px-5 py-4">Commission (10%)</th>
+                              <th className="px-5 py-4 text-right">Net Impact</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100">
+                            {filteredTxs.length === 0 ? (
+                              <tr>
+                                <td colSpan="6" className="text-center py-12 text-slate-400">
+                                  <Landmark className="h-8 w-8 mx-auto text-slate-300 mb-2" />
+                                  <p className="font-bold text-slate-600">No transactions match this filter.</p>
+                                </td>
+                              </tr>
+                            ) : (
+                              filteredTxs.map((tx) => {
+                                const isCredit = tx.type === 'credit';
+                                return (
+                                  <tr key={tx.id} className="hover:bg-slate-50/60 transition-colors">
+                                    <td className="px-5 py-4">
+                                      <div className="flex items-center gap-3">
+                                        <div className={`h-8 w-8 rounded-xl flex items-center justify-center font-bold text-sm shrink-0 border ${
+                                          isCredit
+                                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                            : 'bg-rose-50 text-rose-700 border-rose-200'
+                                        }`}>
+                                          {isCredit ? '↓' : '↑'}
+                                        </div>
+                                        <div>
+                                          <p className="font-extrabold text-slate-900 leading-snug">{tx.title}</p>
+                                          <p className="text-[11px] text-slate-400 font-medium">
+                                            {new Date(tx.date).toLocaleString('en-IN', {
+                                              day: 'numeric',
+                                              month: 'short',
+                                              year: 'numeric',
+                                              hour: '2-digit',
+                                              minute: '2-digit',
+                                            })}
+                                          </p>
+                                        </div>
+                                      </div>
+                                    </td>
+                                    <td className="px-5 py-4">
+                                      <p className="font-mono font-bold text-slate-900">#{tx.bookingCode}</p>
+                                      <p className="text-[11px] text-slate-500 font-medium mt-0.5">{tx.commuter}</p>
+                                    </td>
+                                    <td className="px-5 py-4">
+                                      <p className="font-bold text-slate-900 truncate max-w-[180px]">{tx.spaceTitle}</p>
+                                      <p className="text-[11px] text-slate-500 font-medium mt-0.5">Host: {tx.ownerName}</p>
+                                    </td>
+                                    <td className="px-5 py-4">
+                                      <p className="font-mono font-bold text-slate-900">₹{tx.grossAmount}</p>
+                                      <span className="text-[10px] text-slate-400 font-semibold">{tx.paymentMethod}</span>
+                                    </td>
+                                    <td className="px-5 py-4">
+                                      <span className="bg-purple-50 text-purple-700 border border-purple-200 text-[10px] font-black px-2 py-0.5 rounded-md">
+                                        10% Platform Fee
+                                      </span>
+                                    </td>
+                                    <td className="px-5 py-4 text-right">
+                                      <span className={`text-sm font-black font-mono ${isCredit ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                        {isCredit ? '+' : '-'}₹{tx.amount.toFixed(2)}
+                                      </span>
+                                    </td>
+                                  </tr>
+                                );
+                              })
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
 
             </div>
           )}
