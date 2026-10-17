@@ -4090,17 +4090,50 @@ const SeekerDashboard = () => {
             <form onSubmit={handleExtendSubmit} className="space-y-5 text-left">
               <div>
                 <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Hours to Extend</label>
-                <select
-                  value={extendHours}
-                  onChange={e => setExtendHours(Number(e.target.value))}
-                  className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-indigo-400 bg-white"
-                >
-                  <option value="1">1 Hour</option>
-                  <option value="2">2 Hours</option>
-                  <option value="3">3 Hours</option>
-                  <option value="4">4 Hours</option>
-                  <option value="6">6 Hours</option>
-                </select>
+                <div className="flex items-center justify-between bg-slate-50 border-2 border-slate-200 rounded-2xl p-2">
+                  <button
+                    type="button"
+                    onClick={() => setExtendHours(prev => Math.max(1, prev - 1))}
+                    disabled={extendHours <= 1}
+                    className="w-12 h-12 rounded-xl bg-white border border-slate-200 text-slate-700 font-black text-2xl flex items-center justify-center hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed shadow-sm transition-all active:scale-95 cursor-pointer"
+                  >
+                    −
+                  </button>
+                  <div className="text-center">
+                    <span className="text-2xl font-black text-slate-900 block tracking-tight">
+                      {extendHours} {extendHours === 1 ? 'Hour' : 'Hours'}
+                    </span>
+                    <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                      +{(extendHours * 60)} mins
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setExtendHours(prev => Math.min(24, prev + 1))}
+                    disabled={extendHours >= 24}
+                    className="w-12 h-12 rounded-xl bg-indigo-600 text-white font-black text-2xl flex items-center justify-center hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed shadow-sm transition-all active:scale-95 cursor-pointer"
+                  >
+                    +
+                  </button>
+                </div>
+
+                {/* Quick Preset Buttons */}
+                <div className="flex items-center gap-2 mt-2.5">
+                  {[1, 2, 3, 4, 6].map(h => (
+                    <button
+                      key={h}
+                      type="button"
+                      onClick={() => setExtendHours(h)}
+                      className={`flex-1 py-1.5 rounded-xl text-xs font-black border transition-all cursor-pointer ${
+                        extendHours === h
+                          ? 'bg-indigo-50 border-indigo-400 text-indigo-700 shadow-sm'
+                          : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'
+                      }`}
+                    >
+                      {h}h
+                    </button>
+                  ))}
+                </div>
               </div>
               <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 text-xs text-slate-500 leading-relaxed">
                 Extension fee: <strong className="text-slate-800">₹{(extendHours * (extendingBooking.spaceId?.pricePerHour || 0)).toFixed(0)}</strong> · Extension is only permitted if the slot remains unoccupied during the extended time window.
