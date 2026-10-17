@@ -1728,24 +1728,40 @@ const cancelBookingHandler = async (req, res) => {
       return res.status(401).json({ message: 'Not authorized to cancel this booking' });
     }
 
+    if (booking.status === 'cancelled') {
+      return res.status(400).json({ message: 'Booking is already cancelled' });
+    }
+
+    const wasCheckedIn = Boolean(booking.isCheckedIn) || (booking.checkInTime && !booking.checkOutTime) || booking.status === 'checked_in';
+
     booking.status = 'cancelled';
+    booking.isCheckedIn = false;
+    if (!booking.checkOutTime) {
+      booking.checkOutTime = new Date();
+    }
 
     // Release slot immediately so others can book
     if (space && booking.slotId) {
-      const slot = space.slots.find((s) => s.slotId === booking.slotId);
+      const slot = space.slots && space.slots.find((s) => s.slotId === booking.slotId || (s.slotId && s.slotId.toLowerCase() === booking.slotId.toLowerCase()));
       if (slot) {
         slot.isAvailable = true;
-        await space.save();
       }
+      if (space.slots && space.slots.length > 0) {
+        space.availableSlots = space.slots.filter((s) => s.isAvailable).length;
+        space.occupiedSlots = Math.max(0, space.slots.length - space.availableSlots);
+      }
+      await space.save();
     }
 
     let refundAmount = 0;
     let policyApplied = '';
 
-    if (booking.paymentStatus === 'paid' && booking.totalAmount > 0) {
+    const isPaidBooking = booking.paymentStatus === 'paid' || booking.status === 'paid' || wasCheckedIn || booking.status === 'allotted';
+
+    if (isPaidBooking && booking.totalAmount > 0) {
       const previousOwnerEarnings = booking.ownerEarnings || 0;
 
-      if (!booking.isCheckedIn) {
+      if (!wasCheckedIn) {
         // ── PRE CHECK-IN: 100% FULL REFUND TO COMMUTER ──
         refundAmount = booking.totalAmount;
         policyApplied = 'pre_checkin_full';
@@ -1770,8 +1786,9 @@ const cancelBookingHandler = async (req, res) => {
       }
 
       booking.refundAmount = refundAmount;
+      booking.paymentStatus = 'refunded';
 
-      // 1. Debit difference from Space Owner's wallet
+      // 1. Debit difference from Space Owner's wallet (ALLOWS NEGATIVE BALANCE)
       const newOwnerEarnings = booking.ownerEarnings || 0;
       const ownerDebitAmount = Math.max(0, Number((previousOwnerEarnings - newOwnerEarnings).toFixed(2)));
 
@@ -1782,12 +1799,13 @@ const cancelBookingHandler = async (req, res) => {
             (t) => t.bookingId && t.bookingId.toString() === booking._id.toString() && t.type === 'debit'
           );
           if (!alreadyDebited) {
-            owner.walletBalance = Number(Math.max(0, (owner.walletBalance || 0) - ownerDebitAmount).toFixed(2));
+            // Allows negative balance if owner has already withdrawn funds
+            owner.walletBalance = Number(((owner.walletBalance || 0) - ownerDebitAmount).toFixed(2));
             if (!owner.walletTransactions) owner.walletTransactions = [];
             owner.walletTransactions.push({
               type: 'debit',
               amount: ownerDebitAmount,
-              description: !booking.isCheckedIn
+              description: !wasCheckedIn
                 ? `Booking #${booking._id.toString().slice(-6).toUpperCase()} cancelled prior to check-in - Full refund reversed`
                 : `Booking #${booking._id.toString().slice(-6).toUpperCase()} cancelled post check-in - 20% refund adjustment (Retained: ₹${newOwnerEarnings})`,
               bookingId: booking._id,
@@ -1801,7 +1819,7 @@ const cancelBookingHandler = async (req, res) => {
                 targetRole: 'owner',
                 type: 'wallet_debit',
                 title: '⚠️ Wallet Adjusted (Booking Cancelled)',
-                message: !booking.isCheckedIn
+                message: !wasCheckedIn
                   ? `₹${ownerDebitAmount} debited as commuter cancelled before check-in (100% refunded to commuter).`
                   : `₹${ownerDebitAmount} adjusted as commuter cancelled post check-in. You retain ₹${newOwnerEarnings} (80% retained).`,
                 data: {
@@ -1815,7 +1833,7 @@ const cancelBookingHandler = async (req, res) => {
                 sendPushNotification(
                   owner.pushToken,
                   '⚠️ Booking Cancelled by Commuter',
-                  !booking.isCheckedIn
+                  !wasCheckedIn
                     ? `Commuter cancelled prior to check-in. Slot released.`
                     : `Commuter cancelled post check-in. You retain ₹${newOwnerEarnings}.`,
                   { screen: 'Wallet', bookingId: booking._id }
@@ -1837,7 +1855,7 @@ const cancelBookingHandler = async (req, res) => {
           seeker.walletTransactions.push({
             type: 'credit',
             amount: refundAmount,
-            description: !booking.isCheckedIn
+            description: !wasCheckedIn
               ? `100% Pre Check-In Full Refund for Booking #${booking._id.toString().slice(-6).toUpperCase()} at ${space ? space.title : 'Parking Spot'}`
               : `20% Post Check-In Refund for Booking #${booking._id.toString().slice(-6).toUpperCase()} at ${space ? space.title : 'Parking Spot'}`,
             date: new Date(),
@@ -1855,7 +1873,7 @@ const cancelBookingHandler = async (req, res) => {
     // ── Dispatch Cancellation & Refund Notifications (Seeker & Space Owner) ──
     try {
       // 1. Seeker In-App & Push Notification
-      const isPreCheckIn = !booking.isCheckedIn;
+      const isPreCheckIn = !wasCheckedIn;
       const policyLabel = isPreCheckIn ? '100% Pre Check-In Refund' : '20% Post Check-In Refund';
       const seekerNotifTitle = '🚫 Booking Cancelled & Refunded';
       const seekerNotifMsg = refundAmount > 0

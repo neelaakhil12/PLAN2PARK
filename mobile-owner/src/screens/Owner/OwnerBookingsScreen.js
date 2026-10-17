@@ -270,16 +270,20 @@ export default function OwnerBookingsScreen({ navigation }) {
           </View>
         ) : (
           filteredBookings.map((booking) => {
-            const isCheckedIn = Boolean(booking.isCheckedIn) || booking.status === 'checked_in';
-            const isCompleted = booking.status === 'completed';
             const isCancelled = booking.status === 'cancelled';
-            const isPaid = booking.paymentStatus === 'paid' || booking.status === 'paid' || isCheckedIn || isCompleted;
+            const isCompleted = booking.status === 'completed';
+            const isCheckedIn = !isCancelled && !isCompleted && (Boolean(booking.isCheckedIn) || booking.status === 'checked_in');
+            const isPaid = !isCancelled && (booking.paymentStatus === 'paid' || booking.status === 'paid' || isCheckedIn || isCompleted);
 
             let badgeText = '🔴 FAILED';
             let badgeColor = '#ef4444';
             let badgeBg = '#ef444420';
 
-            if (isCompleted) {
+            if (isCancelled) {
+              badgeText = '🚫 CANCELLED';
+              badgeColor = '#ef4444';
+              badgeBg = '#ef444420';
+            } else if (isCompleted) {
               badgeText = '✓ COMPLETED';
               badgeColor = '#60a5fa';
               badgeBg = '#3b82f620';
@@ -287,10 +291,6 @@ export default function OwnerBookingsScreen({ navigation }) {
               badgeText = '🟢 CHECKED-IN';
               badgeColor = '#10b981';
               badgeBg = '#10b98125';
-            } else if (isCancelled) {
-              badgeText = '🚫 CANCELLED';
-              badgeColor = '#94a3b8';
-              badgeBg = '#64748b20';
             } else if (isPaid) {
               badgeText = '🎟️ ALLOTTED (PAID)';
               badgeColor = '#38bdf8';
@@ -341,14 +341,14 @@ export default function OwnerBookingsScreen({ navigation }) {
                   </View>
                   <View style={styles.detailItem}>
                     <Text style={styles.detailLabel}>💰 Your Payout</Text>
-                    <Text style={[styles.detailVal, { color: '#10b981', fontWeight: '800' }]}>
-                      ₹{isCancelled && booking.refundAmount > 0 ? `${myShare} (Retained)` : myShare}
+                    <Text style={[styles.detailVal, { color: isCancelled ? (myShare > 0 ? '#f59e0b' : '#94a3b8') : '#10b981', fontWeight: '800' }]}>
+                      ₹{isCancelled ? (myShare > 0 ? `${myShare} (Retained)` : '0.00 (Refunded)') : myShare}
                     </Text>
                   </View>
                 </View>
 
                 {/* Check-In / Departure Status Information */}
-                {isCheckedIn && (
+                {isCheckedIn && !isCancelled && (
                   <View style={{
                     backgroundColor: 'rgba(16, 185, 129, 0.1)',
                     borderWidth: 1,
@@ -368,6 +368,32 @@ export default function OwnerBookingsScreen({ navigation }) {
                     {booking.checkInTime && (
                       <Text style={{ color: '#94a3b8', fontSize: 10 }}>
                         In: {new Date(booking.checkInTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </Text>
+                    )}
+                  </View>
+                )}
+
+                {/* Cancelled Banner */}
+                {isCancelled && (
+                  <View style={{
+                    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                    borderWidth: 1,
+                    borderColor: 'rgba(239, 68, 68, 0.3)',
+                    borderRadius: 8,
+                    paddingHorizontal: 10,
+                    paddingVertical: 6,
+                    marginHorizontal: 12,
+                    marginBottom: 10,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                  }}>
+                    <Text style={{ color: '#f87171', fontSize: 11, fontWeight: '700' }}>
+                      🚫 Order Cancelled • Slot Released
+                    </Text>
+                    {booking.refundAmount > 0 && (
+                      <Text style={{ color: '#cbd5e1', fontSize: 10 }}>
+                        Refund: ₹{booking.refundAmount}
                       </Text>
                     )}
                   </View>
@@ -393,7 +419,7 @@ export default function OwnerBookingsScreen({ navigation }) {
                 {/* Footer with date and actions */}
                 <View style={styles.cardFooter}>
                   <Text style={styles.dateTxt}>📅 {dateStr}</Text>
-                  <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <View style={styles.actionButtonGroup}>
                     {/* Check In Button for Owner */}
                     {isPaid && !isCheckedIn && !isCompleted && !isCancelled && (
                       <TouchableOpacity
@@ -417,7 +443,7 @@ export default function OwnerBookingsScreen({ navigation }) {
                     )}
 
                     {seekerPhone ? (
-                      <TouchableOpacity style={styles.callBtn} onPress={() => handleCallSeeker(seekerPhone)}>
+                      <TouchableOpacity style={styles.callBtn} onPress={() => handleCallSeeker(seekerPhone)} activeOpacity={0.8}>
                         <Text style={styles.callBtnTxt}>📞 Call</Text>
                       </TouchableOpacity>
                     ) : null}
@@ -577,6 +603,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 8,
     marginTop: 12,
     paddingTop: 10,
     borderTopWidth: 1,
@@ -586,11 +614,18 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: COLORS.textMuted,
   },
+  actionButtonGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
   callBtn: {
     backgroundColor: '#3b82f620',
     borderWidth: 1,
     borderColor: '#3b82f6',
-    paddingHorizontal: 10,
+    paddingHorizontal: 8,
     paddingVertical: 5,
     borderRadius: 6,
   },
@@ -601,12 +636,12 @@ const styles = StyleSheet.create({
   },
   checkInBtn: {
     backgroundColor: '#10b981',
-    paddingHorizontal: 10,
+    paddingHorizontal: 8,
     paddingVertical: 5,
     borderRadius: 6,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 3,
   },
   checkInBtnTxt: {
     color: '#ffffff',
@@ -615,12 +650,12 @@ const styles = StyleSheet.create({
   },
   checkOutBtn: {
     backgroundColor: '#f59e0b',
-    paddingHorizontal: 10,
+    paddingHorizontal: 8,
     paddingVertical: 5,
     borderRadius: 6,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 3,
   },
   checkOutBtnTxt: {
     color: '#ffffff',
@@ -631,7 +666,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#ef444420',
     borderWidth: 1,
     borderColor: '#ef4444',
-    paddingHorizontal: 10,
+    paddingHorizontal: 8,
     paddingVertical: 5,
     borderRadius: 6,
   },

@@ -288,8 +288,16 @@ export default function WalletScreen({ navigation }) {
           <View style={styles.heroTopRow}>
             <View>
               <Text style={styles.heroLabel}>WALLET BALANCE</Text>
-              <Text style={styles.heroBalance}>₹{Number(walletData.walletBalance || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</Text>
-              {walletData.pendingWithdrawal > 0 ? (
+              <Text style={[styles.heroBalance, Number(walletData.walletBalance || 0) < 0 && { color: '#ef4444' }]}>
+                {Number(walletData.walletBalance || 0) < 0
+                  ? `-₹${Math.abs(Number(walletData.walletBalance)).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`
+                  : `₹${Number(walletData.walletBalance || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`}
+              </Text>
+              {Number(walletData.walletBalance || 0) < 0 ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 5, backgroundColor: '#ef444420', borderColor: '#ef444460', borderWidth: 1, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, alignSelf: 'flex-start' }}>
+                  <Text style={{ color: '#f87171', fontSize: 11, fontWeight: '700' }}>⚠️ Refund debit adjustment</Text>
+                </View>
+              ) : walletData.pendingWithdrawal > 0 ? (
                 <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 5, backgroundColor: '#f59e0b20', borderColor: '#f59e0b60', borderWidth: 1, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, alignSelf: 'flex-start' }}>
                   <Text style={{ color: '#fbbf24', fontSize: 11, fontWeight: '700' }}>⏳ ₹{Number(walletData.pendingWithdrawal).toFixed(2)} Pending Admin Approval</Text>
                 </View>

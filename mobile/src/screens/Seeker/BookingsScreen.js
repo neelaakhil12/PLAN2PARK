@@ -451,10 +451,10 @@ export default function BookingsScreen({ navigation }) {
   };
 
   const renderBookingCard = ({ item }) => {
-    const isCheckedIn = Boolean(item.isCheckedIn) || item.status === 'checked_in';
-    const isCompleted = item.status === 'completed';
     const isCancelled = item.status === 'cancelled';
-    const isPaid = item.paymentStatus === 'paid' || item.status === 'paid' || isCheckedIn || isCompleted;
+    const isCompleted = item.status === 'completed';
+    const isCheckedIn = !isCancelled && !isCompleted && (Boolean(item.isCheckedIn) || item.status === 'checked_in');
+    const isPaid = !isCancelled && (item.paymentStatus === 'paid' || item.status === 'paid' || isCheckedIn || isCompleted);
     const space = item.spaceId;
     const slot = item.slotId || 'Slot-1';
     const refundAmt = item.refundAmount || 0;
@@ -463,7 +463,11 @@ export default function BookingsScreen({ navigation }) {
     let badgeColor = '#ef4444';
     let badgeBg = '#ef444425';
 
-    if (isCompleted) {
+    if (isCancelled) {
+      badgeText = '🚫 CANCELLED';
+      badgeColor = '#ef4444';
+      badgeBg = '#ef444425';
+    } else if (isCompleted) {
       badgeText = '✓ COMPLETED';
       badgeColor = '#60a5fa';
       badgeBg = '#3b82f625';
@@ -471,10 +475,6 @@ export default function BookingsScreen({ navigation }) {
       badgeText = '🟢 CHECKED-IN';
       badgeColor = '#10b981';
       badgeBg = '#10b98125';
-    } else if (isCancelled) {
-      badgeText = '🚫 CANCELLED';
-      badgeColor = '#94a3b8';
-      badgeBg = '#64748b25';
     } else if (isPaid) {
       badgeText = '🎟️ RESERVED';
       badgeColor = '#38bdf8';
@@ -571,13 +571,15 @@ export default function BookingsScreen({ navigation }) {
             padding: 12,
             marginVertical: 10,
           }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-              <Text style={{ color: '#10b981', fontWeight: '800', fontSize: 13 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 6 }}>
+              <Text style={{ color: '#10b981', fontWeight: '800', fontSize: 13, flexShrink: 1 }}>
                 🟢 Vehicle Parked • Timer Running
               </Text>
-              <Text style={{ color: '#ffffff', fontWeight: '800', fontSize: 12 }}>
-                Slot: {slot}
-              </Text>
+              <View style={{ backgroundColor: '#10b98120', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 }}>
+                <Text style={{ color: '#ffffff', fontWeight: '800', fontSize: 12 }}>
+                  Slot: {slot}
+                </Text>
+              </View>
             </View>
             <Text style={{ color: '#94a3b8', fontSize: 11, marginTop: 4 }}>
               Checked In: {new Date(item.checkInTime || item.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} • Valid Until: {new Date(item.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -585,14 +587,45 @@ export default function BookingsScreen({ navigation }) {
           </View>
         )}
 
-        {/* Meta Info Grid */}
+        {/* Cancelled Info Notice */}
+        {isCancelled && (
+          <View style={{
+            backgroundColor: 'rgba(239, 68, 68, 0.08)',
+            borderWidth: 1.5,
+            borderColor: '#ef444450',
+            borderRadius: 12,
+            padding: 12,
+            marginVertical: 10,
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          }}>
+            <View style={{ flex: 1, marginRight: 8 }}>
+              <Text style={{ color: '#ef4444', fontWeight: '800', fontSize: 13 }}>
+                🚫 Reservation Cancelled
+              </Text>
+              <Text style={{ color: '#cbd5e1', fontSize: 11, marginTop: 2 }}>
+                {refundAmt > 0
+                  ? `₹${refundAmt} refunded to your PlanToPark wallet.`
+                  : 'This slot reservation was cancelled and released.'}
+              </Text>
+            </View>
+            {refundAmt > 0 && (
+              <View style={{ backgroundColor: '#10b98120', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 }}>
+                <Text style={{ color: '#10b981', fontWeight: '800', fontSize: 12 }}>+₹{refundAmt}</Text>
+              </View>
+            )}
+          </View>
+        )}
+
+        {/* Meta Info Grid (Clean 2x2 Grid Layout) */}
         <View style={styles.metaGrid}>
           <View style={styles.metaItem}>
-            <Text style={styles.metaLabel}>VEHICLE</Text>
+            <Text style={styles.metaLabel}>🚗 VEHICLE</Text>
             <Text style={styles.metaVal}>{item.vehicleNumber || 'TS07WJ2099'}</Text>
           </View>
           <View style={styles.metaItem}>
-            <Text style={styles.metaLabel}>PLAN / DURATION</Text>
+            <Text style={styles.metaLabel}>⏱️ PLAN / DURATION</Text>
             <Text style={styles.metaVal}>
               {item.bookingType === 'daily'
                 ? '1 Day Flat'
@@ -602,11 +635,11 @@ export default function BookingsScreen({ navigation }) {
             </Text>
           </View>
           <View style={styles.metaItem}>
-            <Text style={styles.metaLabel}>TOTAL FEE</Text>
+            <Text style={styles.metaLabel}>💰 TOTAL FEE</Text>
             <Text style={[styles.metaVal, { color: COLORS.primary, fontSize: 14 }]}>₹{item.totalAmount || 0}</Text>
           </View>
           <View style={styles.metaItem}>
-            <Text style={styles.metaLabel}>SESSION START</Text>
+            <Text style={styles.metaLabel}>🕒 SESSION START</Text>
             <Text style={styles.metaVal}>
               {new Date(item.checkInTime || item.startTime || item.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
             </Text>
@@ -1011,24 +1044,28 @@ const styles = StyleSheet.create({
   },
   metaGrid: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     justifyContent: 'space-between',
     backgroundColor: '#1e293b50',
     borderRadius: 12,
-    padding: 10,
+    padding: 12,
     marginBottom: 12,
+    rowGap: 10,
   },
   metaItem: {
-    alignItems: 'center',
+    width: '48%',
+    alignItems: 'flex-start',
   },
   metaLabel: {
     color: COLORS.textMuted,
-    fontSize: 9,
+    fontSize: 10,
     fontWeight: '700',
-    marginBottom: 2,
+    marginBottom: 3,
+    letterSpacing: 0.5,
   },
   metaVal: {
     color: COLORS.white,
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '800',
   },
 

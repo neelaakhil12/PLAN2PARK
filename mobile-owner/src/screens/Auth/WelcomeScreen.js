@@ -22,7 +22,7 @@ export default function WelcomeScreen({ navigation }) {
             resizeMode="contain"
           />
           <Text style={styles.brandTitle}>PlanToPark Owner</Text>
-          <Text style={styles.tagline}>List Your Parking Space or Land & Earn Smart.</Text>
+          <Text style={styles.tagline}>List Your Parking Space & Earn Smart.</Text>
         </View>
 
         <View style={styles.buttonContainer}>
