@@ -170,8 +170,8 @@ export default function OwnerHomeScreen({ navigation }) {
       {/* Header with notch padding */}
       <View style={[styles.header, { paddingTop: topPadding }]}>
         <View style={{ flex: 1, marginRight: 8 }}>
-          <Text style={[styles.headerTitle, isStorageOwner && { color: '#fbbf24' }]}>
-            {isStorageOwner ? 'Storage Land Owner 🏢' : 'Owner Dashboard 🅿️'}
+          <Text style={[styles.headerTitle, isStorageOwner && { color: '#fbbf24' }]} numberOfLines={1}>
+            {isStorageOwner ? 'Storage Land Owner' : 'Owner Dashboard'}
           </Text>
           <Text style={styles.headerSub}>Welcome, {user?.name || (isStorageOwner ? 'Land Owner' : 'Owner')}</Text>
         </View>
