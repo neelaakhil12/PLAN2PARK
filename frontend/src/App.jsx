@@ -88,9 +88,9 @@ const AppContent = () => {
                      ['/admin/login'].includes(location.pathname);
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900">
+    <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900 w-full max-w-full overflow-x-hidden">
       {showNavbar && <Navbar />}
-      <main className="flex-grow">
+      <main className="flex-grow w-full max-w-full overflow-x-hidden">
         <Routes>
           {/* Home */}
           <Route path="/" element={<Home />} />

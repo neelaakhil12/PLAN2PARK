@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 
 const Footer = () => {
   return (
-    <footer className="w-full bg-white border-t border-slate-200 py-10 px-6">
+    <footer className="w-full max-w-full bg-white border-t border-slate-200 py-10 px-4 sm:px-6 overflow-hidden">
       <div className="max-w-7xl mx-auto">
         <div className="flex flex-col md:flex-row justify-between gap-8 mb-8">
           <div>
@@ -32,9 +32,7 @@ const Footer = () => {
             <div>
               <h4 className="font-bold text-slate-800 mb-3">Company</h4>
               <ul className="space-y-2 text-slate-500">
-                <li><a href="#" className="hover:text-emerald-600 transition-colors">About Us</a></li>
-                <li><a href="#" className="hover:text-emerald-600 transition-colors">Blog</a></li>
-                <li><a href="#" className="hover:text-emerald-600 transition-colors">Careers</a></li>
+                <li><Link to="/about" className="hover:text-emerald-600 transition-colors">About Us</Link></li>
               </ul>
             </div>
             <div>

@@ -59,7 +59,7 @@ const OwnerLogin = () => {
             <span className="font-black text-2xl text-slate-900 tracking-tight">Plan<span className="text-blue-600">To</span>Park</span>
           </Link>
           <h1 className="text-2xl sm:text-3xl font-black text-slate-900 font-sans">
-            Host / Landowner Login
+            'I have parking' Login
           </h1>
           <p className="text-slate-500 text-xs sm:text-sm mt-1">
             Sign in to manage parking listings &amp; track earnings
@@ -85,7 +85,7 @@ const OwnerLogin = () => {
                   required
                   value={email}
                   onChange={e => setEmail(e.target.value)}
-                  placeholder="host@example.com"
+                  placeholder="owner@example.com"
                   className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl text-slate-800 placeholder-slate-300 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all text-sm"
                 />
               </div>

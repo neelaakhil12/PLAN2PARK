@@ -47,23 +47,23 @@ const Home = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 font-sans overflow-hidden" id="seo-home-landing">
+    <div className="min-h-screen bg-slate-50 font-sans w-full max-w-full overflow-x-hidden" id="seo-home-landing">
 
       {/* ── HERO ── */}
-      <section className="bg-white border-b border-slate-200/60 relative overflow-hidden">
+      <section className="bg-white border-b border-slate-200/60 relative overflow-hidden w-full">
         <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_15%_20%,rgba(16,185,129,0.06),transparent_60%)]" />
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-10 pb-14 relative z-10">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 sm:pt-10 pb-12 sm:pb-14 relative z-10 w-full overflow-hidden">
 
           {/* Two-column on lg+, stack on mobile */}
-          <div className="flex flex-col lg:flex-row items-center gap-10 lg:gap-14">
+          <div className="flex flex-col lg:flex-row items-center gap-8 lg:gap-14 w-full">
 
             {/* LEFT: text + search */}
-            <div className="w-full lg:flex-1 flex flex-col gap-5 text-center lg:text-left items-center lg:items-start">
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-orange-50 border border-orange-200 text-orange-700 animate-pulse">
-                <ShieldCheck className="h-3.5 w-3.5" /> INDIA'S MOST TRUSTED PARKING MARKETPLACE
+            <div className="w-full lg:flex-1 flex flex-col gap-5 text-center lg:text-left items-center lg:items-start max-w-full">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] sm:text-[11px] font-bold bg-orange-50 border border-orange-200 text-orange-700 animate-pulse max-w-full text-center">
+                <ShieldCheck className="h-3.5 w-3.5 shrink-0" /> INDIA'S MOST TRUSTED PARKING MARKETPLACE
               </span>
 
-              <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight text-slate-950 leading-[1.1] min-h-[5.5rem] sm:min-h-[7rem] lg:min-h-[8rem]">
+              <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black tracking-tight text-slate-950 leading-[1.15] min-h-[4.5rem] sm:min-h-[7rem] lg:min-h-[8rem] break-words">
 
                 <Typewriter text="Park Smart." speed={60} delay={800} /><br />
                 <span className="text-orange-500">
@@ -81,7 +81,7 @@ const Home = () => {
                   {/* Location row */}
                   <div className="flex items-center gap-3 px-4 py-3 border-b border-slate-100">
                     <MapPin className="h-4 w-4 text-emerald-500 shrink-0" />
-                    <div className="flex flex-col w-full text-left">
+                    <div className="flex flex-col w-full text-left min-w-0">
                       <span className="text-[9px] uppercase tracking-widest text-slate-400 font-black">Location</span>
                       <input
                         id="search-input-home"
@@ -89,20 +89,20 @@ const Home = () => {
                         value={search}
                         onChange={e => setSearch(e.target.value)}
                         placeholder="Enter city or locality…"
-                        className="text-sm font-semibold text-slate-800 placeholder-slate-400 bg-transparent focus:outline-none"
+                        className="text-sm font-semibold text-slate-800 placeholder-slate-400 bg-transparent focus:outline-none w-full min-w-0"
                       />
                     </div>
                   </div>
                   {/* Duration + CTA row */}
                   <div className="flex flex-col sm:flex-row gap-0">
-                    <div className="flex items-center gap-3 px-4 py-3 sm:border-r border-slate-100 flex-1">
+                    <div className="flex items-center gap-3 px-4 py-3 sm:border-r border-slate-100 flex-1 min-w-0">
                       <Clock className="h-4 w-4 text-emerald-500 shrink-0" />
-                      <div className="flex flex-col text-left">
+                      <div className="flex flex-col text-left min-w-0 flex-1">
                         <span className="text-[9px] uppercase tracking-widest text-slate-400 font-black">Duration</span>
                         <select
                           value={duration}
                           onChange={e => setDuration(e.target.value)}
-                          className="text-sm font-semibold text-slate-800 bg-transparent focus:outline-none cursor-pointer"
+                          className="text-sm font-semibold text-slate-800 bg-transparent focus:outline-none cursor-pointer w-full min-w-0"
                         >
                           {DURATIONS.map(d => <option key={d}>{d}</option>)}
                         </select>
@@ -120,8 +120,8 @@ const Home = () => {
                 </div>
 
                 {/* Trust strip */}
-                <div className="flex items-center justify-center lg:justify-start gap-3 text-xs text-slate-400 flex-wrap">
-                  <div className="flex -space-x-2">
+                <div className="flex items-center justify-center lg:justify-start gap-2.5 sm:gap-3 text-xs text-slate-400 flex-wrap text-center sm:text-left max-w-full">
+                  <div className="flex -space-x-2 shrink-0">
                     {['🚗', '🚙', '🛵'].map((e, i) => (
                       <div key={i} className="h-7 w-7 rounded-full bg-slate-100 border-2 border-white flex items-center justify-center text-sm shadow-sm">{e}</div>
                     ))}
@@ -132,19 +132,14 @@ const Home = () => {
             </div>
 
             {/* RIGHT: hero image */}
-            <div className="w-full lg:flex-1 max-w-lg lg:max-w-none mx-auto">
+            <div className="w-full lg:flex-1 max-w-lg lg:max-w-none mx-auto overflow-hidden">
               <ScrollReveal direction="left" delay={400}>
-                <div className="relative rounded-3xl overflow-hidden shadow-2xl border border-slate-100 group aspect-video lg:aspect-auto">
+                <div className="relative rounded-3xl overflow-hidden shadow-2xl border border-slate-200/80 group bg-slate-50">
                   <img
-                    src="/images/parking_hero.jpg"
-                    alt="Futuristic smart parking city illustration"
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+                    src="/images/parking_hero.png"
+                    alt="PlanToPark - Park Smart, Earn Smart"
+                    className="w-full h-auto object-cover group-hover:scale-[1.02] transition-transform duration-500"
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950/60 via-transparent to-transparent" />
-                  <div className="absolute bottom-4 left-4 right-4 text-left">
-                    <span className="bg-emerald-500 text-white text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full">India's Smart P2P Tech</span>
-                    <p className="text-sm font-bold text-white mt-2 leading-snug">Connecting underutilised garages to active commuters.</p>
-                  </div>
                 </div>
               </ScrollReveal>
             </div>

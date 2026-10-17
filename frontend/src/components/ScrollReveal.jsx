@@ -50,11 +50,13 @@ const ScrollReveal = ({
 
   const getTransform = () => {
     if (revealed) return 'translate(0, 0)';
+    // On small mobile screens, avoid horizontal translates that break viewport width
+    const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
     switch (direction) {
       case 'up': return `translateY(${distance}px)`;
       case 'down': return `translateY(-${distance}px)`;
-      case 'left': return `translateX(${distance}px)`;
-      case 'right': return `translateX(-${distance}px)`;
+      case 'left': return isMobile ? `translateY(${Math.min(distance, 20)}px)` : `translateX(${distance}px)`;
+      case 'right': return isMobile ? `translateY(${Math.min(distance, 20)}px)` : `translateX(-${distance}px)`;
       default: return 'none';
     }
   };
@@ -63,10 +65,11 @@ const ScrollReveal = ({
     opacity: revealed ? 1 : 0,
     transform: getTransform(),
     transition: `opacity ${duration}ms cubic-bezier(0.25, 1, 0.5, 1) ${delay}ms, transform ${duration}ms cubic-bezier(0.25, 1, 0.5, 1) ${delay}ms`,
+    maxWidth: '100%',
   };
 
   return (
-    <div ref={ref} style={style} className={className}>
+    <div ref={ref} style={style} className={`max-w-full ${className}`}>
       {children}
     </div>
   );

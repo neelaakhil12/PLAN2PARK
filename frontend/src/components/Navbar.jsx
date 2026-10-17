@@ -88,19 +88,19 @@ const Navbar = () => {
 
   return (
     <nav className="sticky top-0 z-50 w-full bg-white border-b border-slate-200 shadow-sm font-sans">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-stretch justify-between h-[60px]">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 flex items-center justify-between h-[60px] w-full">
 
         {/* ── LOGO ──────────────────────────────────────────────────────── */}
         <Link
           to={user ? `/${user.role}/dashboard` : '/'}
-          className="flex items-center gap-2.5 pr-5 mr-2 border-r border-slate-100 shrink-0"
+          className="flex items-center gap-2 sm:gap-2.5 sm:pr-4 sm:mr-2 sm:border-r sm:border-slate-100 shrink-0 min-w-0"
         >
-          <img src="/logo.png" alt="PlanToPark" className="h-9 w-9 object-contain rounded-lg drop-shadow-sm shrink-0" />
-          <div className="flex flex-col leading-tight">
-            <span className="font-extrabold text-[15.5px] text-slate-900 tracking-tight">
+          <img src="/logo.png" alt="PlanToPark" className="h-8 w-8 sm:h-9 sm:w-9 object-contain rounded-lg drop-shadow-sm shrink-0" />
+          <div className="flex flex-col leading-tight min-w-0">
+            <span className="font-extrabold text-[14.5px] sm:text-[15.5px] text-slate-900 tracking-tight whitespace-nowrap">
               Plan<span className="text-blue-600">to</span>Park
             </span>
-            <span className="text-[8.5px] uppercase tracking-widest text-slate-400 font-bold -mt-0.5">
+            <span className="text-[7.5px] sm:text-[8.5px] uppercase tracking-widest text-slate-400 font-bold -mt-0.5 whitespace-nowrap">
               Smart Park • Smart Earn
             </span>
           </div>
@@ -172,7 +172,7 @@ const Navbar = () => {
         <div className="flex-1" />
 
         {/* ── RIGHT SECTION ──────────────────────────────────────────── */}
-        <div className="flex items-center gap-1.5 sm:gap-2">
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           {user ? (
             <>
               {/* Role badge pill */}
@@ -187,10 +187,10 @@ const Navbar = () => {
               </span>
 
               {/* ── PROFILE DROPDOWN ──────────────────────────────────── */}
-              <div className="relative" ref={profileRef}>
+              <div className="relative shrink-0" ref={profileRef}>
                 <button
                   onClick={() => setProfileOpen(v => !v)}
-                  className="flex items-center gap-1.5 pl-1 pr-2 py-1 rounded-full border border-slate-200 hover:border-emerald-300 hover:bg-slate-50 transition-all"
+                  className="flex items-center gap-1 sm:gap-1.5 p-1 sm:pl-1 sm:pr-2 sm:py-1 rounded-full border border-slate-200 hover:border-emerald-300 hover:bg-slate-50 transition-all shrink-0 cursor-pointer"
                   aria-label="Profile menu"
                 >
                   {/* Avatar circle with image or initial */}
@@ -213,7 +213,7 @@ const Navbar = () => {
                 </button>
 
                 {profileOpen && (
-                  <div className="absolute right-0 mt-2 w-56 bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden z-50 animate-fadeIn">
+                  <div className="absolute right-0 mt-2 w-56 max-w-[calc(100vw-24px)] bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden z-50 animate-fadeIn">
                     {/* User info header */}
                     <div className="px-4 py-3.5 border-b border-slate-100 bg-slate-50/50">
                       <div className="flex items-center gap-2.5 mb-2">
@@ -276,7 +276,7 @@ const Navbar = () => {
               {(isSeeker || isOwner) && (
                 <button
                   onClick={() => setMobileOpen(v => !v)}
-                  className="md:hidden p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors ml-1"
+                  className="md:hidden p-1.5 sm:p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors shrink-0 cursor-pointer ml-0.5"
                   aria-label="Menu"
                 >
                   {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
@@ -285,22 +285,22 @@ const Navbar = () => {
             </>
           ) : (
             /* Not logged in */
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 sm:gap-2 shrink-0">
               <Link
                 to="/login"
-                className="text-slate-600 hover:text-slate-900 text-sm font-medium px-3.5 py-2 rounded-lg hover:bg-slate-100 transition-colors"
+                className="text-slate-600 hover:text-slate-900 text-xs sm:text-sm font-semibold px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-lg hover:bg-slate-100 transition-colors whitespace-nowrap"
               >
                 Sign In
               </Link>
               <Link
                 to="/register"
-                className="bg-emerald-500 hover:bg-emerald-600 text-white px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-bold transition-all shadow-sm whitespace-nowrap"
+                className="bg-emerald-500 hover:bg-emerald-600 text-white px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-bold transition-all shadow-sm whitespace-nowrap"
               >
                 Get Started
               </Link>
               <button
                 onClick={() => setMobileOpen(v => !v)}
-                className="md:hidden p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors ml-1"
+                className="md:hidden p-1.5 sm:p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors shrink-0 cursor-pointer"
                 aria-label="Menu"
               >
                 {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
