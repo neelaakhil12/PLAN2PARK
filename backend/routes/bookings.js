@@ -1756,14 +1756,15 @@ const cancelBookingHandler = async (req, res) => {
     let refundAmount = 0;
     let policyApplied = '';
 
-    const isPaidBooking = booking.paymentStatus === 'paid' || booking.status === 'paid' || wasCheckedIn || booking.status === 'allotted';
+    const grossAmount = Number(((booking.totalAmount || 0) + (booking.walletAmountUsed || 0)).toFixed(2));
+    const isPaidBooking = (booking.paymentStatus === 'paid' || (booking.walletAmountUsed || 0) > 0 || booking.status === 'paid' || wasCheckedIn || booking.status === 'allotted') && grossAmount > 0;
 
-    if (isPaidBooking && booking.totalAmount > 0) {
+    if (isPaidBooking) {
       const previousOwnerEarnings = booking.ownerEarnings || 0;
 
       if (!wasCheckedIn) {
         // ── PRE CHECK-IN: 100% FULL REFUND TO COMMUTER ──
-        refundAmount = booking.totalAmount;
+        refundAmount = grossAmount;
         policyApplied = 'pre_checkin_full';
         booking.refundStatus = 'full';
         booking.refundPolicyApplied = '100% Full Refund (Pre Check-In)';
@@ -1771,12 +1772,12 @@ const cancelBookingHandler = async (req, res) => {
         booking.ownerEarnings = 0;
       } else {
         // ── POST CHECK-IN: 20% PARTIAL REFUND TO COMMUTER (80% RETAINED) ──
-        refundAmount = Number((booking.totalAmount * 0.20).toFixed(2));
+        refundAmount = Number((grossAmount * 0.20).toFixed(2));
         policyApplied = 'post_checkin_20';
         booking.refundStatus = 'partial_20';
         booking.refundPolicyApplied = '20% Partial Refund (Post Check-In)';
 
-        const retainedTotal = Math.max(0, Number((booking.totalAmount - refundAmount).toFixed(2)));
+        const retainedTotal = Math.max(0, Number((grossAmount - refundAmount).toFixed(2)));
         const commissionRate = await getCommissionRate();
         const newAdminCommission = Math.round(retainedTotal * (commissionRate / 100) * 100) / 100;
         const newOwnerEarnings = Math.max(0, Math.round((retainedTotal - newAdminCommission) * 100) / 100);

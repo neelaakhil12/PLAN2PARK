@@ -5272,19 +5272,24 @@ const AdminDashboard = () => {
                               let adminRatePercent = commissionRate;
                               let hostRatePercent = 100 - commissionRate;
 
-                              if (isCancelled && b.refundPolicyApplied === 'full') {
+                              const isFullRefund = isCancelled && (b.refundStatus === 'full' || b.refundPolicyApplied === 'full' || (b.refundPolicyApplied && b.refundPolicyApplied.includes('100%')) || refundAmount >= grossAmount);
+
+                              const adminAmount = isFullRefund ? 0 : (b.adminCommission !== undefined ? b.adminCommission : 0);
+                              const ownerAmount = isFullRefund ? 0 : (b.ownerEarnings !== undefined ? b.ownerEarnings : 0);
+
+                              if (isFullRefund) {
                                 adminRatePercent = 0;
                                 hostRatePercent = 0;
-                              } else if (retainedGross > 0 && b.adminCommission > 0) {
-                                adminRatePercent = Math.round((b.adminCommission / retainedGross) * 100);
+                              } else if (retainedGross > 0 && adminAmount > 0) {
+                                adminRatePercent = Math.round((adminAmount / retainedGross) * 100);
                                 hostRatePercent = Math.max(0, 100 - adminRatePercent);
-                              } else if (grossAmount > 0 && b.adminCommission > 0) {
-                                adminRatePercent = Math.round((b.adminCommission / grossAmount) * 100);
+                              } else if (isCancelled) {
+                                adminRatePercent = 0;
+                                hostRatePercent = 0;
+                              } else if (grossAmount > 0 && adminAmount > 0) {
+                                adminRatePercent = Math.round((adminAmount / grossAmount) * 100);
                                 hostRatePercent = Math.max(0, 100 - adminRatePercent);
                               }
-
-                              const adminAmount = b.adminCommission !== undefined ? b.adminCommission : 0;
-                              const ownerAmount = b.ownerEarnings !== undefined ? b.ownerEarnings : 0;
 
                               return (
                                 <tr key={b._id} className="hover:bg-slate-50/80 transition-colors">
@@ -5350,24 +5355,28 @@ const AdminDashboard = () => {
                                       {/* Refund Details for Cancelled Bookings */}
                                       {isCancelled && (
                                         <div className="mt-1">
-                                          {b.refundPolicyApplied === 'half' ? (
+                                          {isFullRefund || refundAmount >= grossAmount ? (
+                                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-md">
+                                              <span>₹{refundAmount > 0 ? refundAmount : grossAmount} Refunded</span>
+                                              <span className="text-rose-500">(100% Policy)</span>
+                                            </span>
+                                          ) : b.refundStatus === 'partial_20' || (b.refundPolicyApplied && b.refundPolicyApplied.includes('20%')) ? (
+                                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md">
+                                              <span>₹{refundAmount} Refunded</span>
+                                              <span className="text-amber-500">(20% Policy)</span>
+                                            </span>
+                                          ) : b.refundPolicyApplied === 'half' ? (
                                             <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md">
                                               <span>₹{refundAmount} Refunded</span>
                                               <span className="text-amber-500">(50% Policy)</span>
                                             </span>
-                                          ) : b.refundPolicyApplied === 'full' ? (
+                                          ) : refundAmount > 0 ? (
                                             <span className="inline-flex items-center gap-1 text-[10px] font-bold text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-md">
                                               <span>₹{refundAmount} Refunded</span>
-                                              <span className="text-rose-500">(100% Policy)</span>
-                                            </span>
-                                          ) : b.refundPolicyApplied === 'none' ? (
-                                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-purple-700 bg-purple-50 border border-purple-200 px-2 py-0.5 rounded-md">
-                                              <span>No Refund</span>
-                                              <span className="text-purple-500">(0% Policy)</span>
                                             </span>
                                           ) : (
-                                            <span className="text-[10px] font-bold text-rose-600">
-                                              ₹{refundAmount} Refunded
+                                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-slate-500 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-md">
+                                              <span>No Refund</span>
                                             </span>
                                           )}
                                         </div>
