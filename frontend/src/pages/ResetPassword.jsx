@@ -10,6 +10,8 @@ const ResetPassword = () => {
   const initialEmail = searchParams.get('email') || '';
   const initialCode = searchParams.get('code') || '';
   const token = searchParams.get('token') || '';
+  const role = searchParams.get('role') || '';
+  const targetLogin = role === 'admin' ? '/admin/login' : (role === 'owner' ? '/owner/login' : '/seeker/login');
 
   const [email, setEmail] = useState(initialEmail);
   const [otpCode, setOtpCode] = useState(initialCode);
@@ -56,8 +58,8 @@ const ResetPassword = () => {
 
       setSuccess(data.message || 'Password updated successfully!');
       setTimeout(() => {
-        navigate('/login');
-      }, 2500);
+        navigate(targetLogin);
+      }, 2000);
     } catch (err) {
       setError(err.message || 'Could not reset password. Please check your OTP code.');
     } finally {
@@ -196,7 +198,7 @@ const ResetPassword = () => {
 
           <p className="text-center text-sm text-slate-500 mt-6">
             Remembered your password?{' '}
-            <Link to="/login" className="text-emerald-600 font-bold hover:underline">
+            <Link to={targetLogin} className="text-emerald-600 font-bold hover:underline">
               Back to Sign In
             </Link>
           </p>

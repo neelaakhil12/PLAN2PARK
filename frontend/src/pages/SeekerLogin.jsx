@@ -104,7 +104,7 @@ const SeekerLogin = () => {
             <div>
               <div className="flex items-center justify-between mb-1.5">
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-600">Password</label>
-                <Link to="/forgot-password?role=seeker" className="text-xs text-blue-600 hover:underline font-semibold">Forgot password?</Link>
+                <Link to="/seeker/forgot-password" className="text-xs text-blue-600 hover:underline font-semibold">Forgot password?</Link>
               </div>
               <div className="relative">
                 <Lock className="absolute left-3.5 top-3.5 h-4 w-4 text-slate-400" />

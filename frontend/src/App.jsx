@@ -8,6 +8,7 @@ import Home from './pages/Home';
 import SeekerLogin from './pages/SeekerLogin';
 import OwnerLogin from './pages/OwnerLogin';
 import AdminLogin from './pages/AdminLogin';
+import AdminForgotPassword from './pages/AdminForgotPassword';
 
 import SeekerRegister from './pages/SeekerRegister';
 import OwnerRegister from './pages/OwnerRegister';
@@ -103,6 +104,7 @@ const AppContent = () => {
           {/* Seeker Routes */}
           <Route path="/seeker/login" element={<SeekerLogin />} />
           <Route path="/seeker/register" element={<SeekerRegister />} />
+          <Route path="/seeker/forgot-password" element={<ForgotPassword />} />
           <Route path="/seeker/dashboard" element={
             <ProtectedRoute allowedRole="seeker" redirectPath="/seeker/login">
               <SeekerDashboard />
@@ -112,6 +114,7 @@ const AppContent = () => {
           {/* Owner Routes */}
           <Route path="/owner/login" element={<OwnerLogin />} />
           <Route path="/owner/register" element={<OwnerRegister />} />
+          <Route path="/owner/forgot-password" element={<ForgotPassword />} />
           <Route path="/owner/*" element={
             <ProtectedRoute allowedRole="owner" redirectPath="/owner/login">
               <OwnerDashboard />
@@ -120,6 +123,7 @@ const AppContent = () => {
 
           {/* Admin Routes */}
           <Route path="/admin/login" element={<AdminLogin />} />
+          <Route path="/admin/forgot-password" element={<AdminForgotPassword />} />
           <Route path="/admin/*" element={
             <ProtectedRoute allowedRole="admin" redirectPath="/admin/login">
               <AdminDashboard />

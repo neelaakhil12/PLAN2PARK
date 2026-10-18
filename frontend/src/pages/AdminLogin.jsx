@@ -75,7 +75,7 @@ const AdminLogin = () => {
             <div>
               <div className="flex items-center justify-between mb-2">
                 <label className="block text-sm font-bold text-slate-700">Security Password</label>
-                <Link to="/forgot-password?role=admin" className="text-xs text-rose-600 hover:underline font-bold">Forgot password?</Link>
+                <Link to="/admin/forgot-password" className="text-xs text-rose-600 hover:underline font-bold">Forgot password?</Link>
               </div>
               <div className="relative group">
                 <Lock className="absolute left-4 top-3.5 h-5 w-5 text-slate-400 group-focus-within:text-rose-500 transition-colors" />
