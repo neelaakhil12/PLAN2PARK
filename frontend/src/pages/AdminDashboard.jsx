@@ -5560,6 +5560,10 @@ const AdminDashboard = () => {
                                           </span>
                                         </div>
                                         <p className="text-[9px] font-bold text-rose-700/80 uppercase tracking-wider mt-0.5">Admin Reversal</p>
+                                        <div className="mt-1 pt-1 border-t border-rose-200/60 flex items-center justify-between text-[10px]">
+                                          <span className="text-slate-500 font-semibold">Retained:</span>
+                                          <span className="font-mono font-black text-emerald-700">₹{(tx.booking?.adminCommission !== undefined ? Number(tx.booking.adminCommission) : 0).toFixed(2)}</span>
+                                        </div>
                                       </div>
                                     </td>
 
@@ -5577,6 +5581,10 @@ const AdminDashboard = () => {
                                         <p className="text-[9px] font-bold text-rose-700/80 truncate max-w-[110px] mt-0.5" title={tx.spaceId?.ownerId?.name || 'Owner'}>
                                           {tx.spaceId?.ownerId?.name ? `Debit: ${tx.spaceId.ownerId.name}` : 'Owner Debit'}
                                         </p>
+                                        <div className="mt-1 pt-1 border-t border-rose-200/60 flex items-center justify-between text-[10px]">
+                                          <span className="text-slate-500 font-semibold">Retained:</span>
+                                          <span className="font-mono font-black text-indigo-700">₹{(tx.booking?.ownerEarnings !== undefined ? Number(tx.booking.ownerEarnings) : 0).toFixed(2)}</span>
+                                        </div>
                                       </div>
                                     </td>
 
@@ -6274,6 +6282,10 @@ const AdminDashboard = () => {
                   const commPercent = commissionRate || 15;
                   const initialCommission = grossAmount > 0 ? Number(((grossAmount * commPercent) / 100).toFixed(2)) : 0;
 
+                  const retainedCommission = (b.adminCommission !== undefined && b.adminCommission !== null && !isNaN(b.adminCommission))
+                    ? Number(b.adminCommission)
+                    : (isCancelled ? 0 : initialCommission);
+
                   // Credit event (when booking was confirmed/paid)
                   if (initialCommission > 0) {
                     totalCredits += initialCommission;
@@ -6286,6 +6298,7 @@ const AdminDashboard = () => {
                       commPercent,
                       grossAmount,
                       amount: initialCommission,
+                      retainedAmount: initialCommission,
                       commuter: b.seekerName || b.seekerId?.name || 'Commuter',
                       spaceTitle: b.spaceId?.title || 'Parking Space',
                       ownerName: b.spaceId?.ownerId?.name || 'Host',
@@ -6297,9 +6310,6 @@ const AdminDashboard = () => {
 
                   // Cancellation reversal event
                   if (isCancelled) {
-                    const retainedCommission = (b.adminCommission !== undefined && b.adminCommission !== null && !isNaN(b.adminCommission))
-                      ? Number(b.adminCommission)
-                      : 0;
                     const reversedAmount = Math.max(0, Number((initialCommission - retainedCommission).toFixed(2)));
                     const refundAmount = b.refundAmount !== undefined ? Number(b.refundAmount) : (grossAmount > 0 ? grossAmount : 0);
                     const refundPercent = grossAmount > 0 ? Math.round((refundAmount / grossAmount) * 100) : 0;
@@ -6321,6 +6331,7 @@ const AdminDashboard = () => {
                         refundPercent,
                         refundPolicyLabel,
                         amount: reversedAmount,
+                        retainedAmount: retainedCommission,
                         commuter: b.seekerName || b.seekerId?.name || 'Commuter',
                         spaceTitle: b.spaceId?.title || 'Parking Space',
                         ownerName: b.spaceId?.ownerId?.name || 'Host',
@@ -6457,12 +6468,13 @@ const AdminDashboard = () => {
                               <th className="px-5 py-4">Gross Fee</th>
                               <th className="px-5 py-4">Commission Rate</th>
                               <th className="px-5 py-4 text-right">Net Impact</th>
+                              <th className="px-5 py-4 text-right">Admin Retained</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-100">
                             {filteredTxs.length === 0 ? (
                               <tr>
-                                <td colSpan="6" className="text-center py-12 text-slate-400">
+                                <td colSpan="7" className="text-center py-12 text-slate-400">
                                   <Landmark className="h-8 w-8 mx-auto text-slate-300 mb-2" />
                                   <p className="font-bold text-slate-600">No transactions match this filter.</p>
                                 </td>
@@ -6545,6 +6557,25 @@ const AdminDashboard = () => {
                                       <span className={`text-sm font-black font-mono ${isCredit ? 'text-emerald-600' : 'text-rose-600'}`}>
                                         {isCredit ? '+' : '-'}₹{tx.amount.toFixed(2)}
                                       </span>
+                                    </td>
+                                    <td className="px-5 py-4 text-right">
+                                      {isCredit ? (
+                                        <div>
+                                          <span className="text-sm font-black font-mono text-emerald-600">
+                                            ₹{tx.retainedAmount.toFixed(2)}
+                                          </span>
+                                          <p className="text-[10px] font-bold text-slate-400 mt-0.5">Credited</p>
+                                        </div>
+                                      ) : (
+                                        <div>
+                                          <span className={`text-sm font-black font-mono ${tx.retainedAmount > 0 ? 'text-emerald-600' : 'text-slate-400'}`}>
+                                            ₹{tx.retainedAmount.toFixed(2)}
+                                          </span>
+                                          <p className={`text-[10px] font-black mt-0.5 ${tx.retainedAmount > 0 ? 'text-emerald-600' : 'text-slate-400'}`}>
+                                            {tx.retainedAmount > 0 ? 'Retained' : '0% Retained'}
+                                          </p>
+                                        </div>
+                                      )}
                                     </td>
                                   </tr>
                                 );
