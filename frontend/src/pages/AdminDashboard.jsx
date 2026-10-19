@@ -5126,44 +5126,129 @@ const AdminDashboard = () => {
 
               {/* ── VIEW: PLATFORM BOOKINGS ────────────────────────────────── */}
               {currentView === 'bookings' && (() => {
-                // Apply date, space, status, and search filters
-                const filteredBookings = bookings.filter(b => {
-                  const matchDate = filterDate ? new Date(b.createdAt).toISOString().split('T')[0] === filterDate : true;
-                  const matchSpace = filterSpaceId ? b.spaceId?._id === filterSpaceId : true;
+                const rate = commissionRate || 15;
+
+                // 1. Build discrete financial transaction items from bookings
+                const allTransactions = [];
+
+                bookings.forEach(b => {
+                  const grossAmount = Number(((b.totalAmount || 0) + (b.walletAmountUsed || 0)).toFixed(2));
+                  const initialAdminFee = Number(((grossAmount * rate) / 100).toFixed(2));
+                  const initialOwnerShare = Number((grossAmount - initialAdminFee).toFixed(2));
+                  const isCancelled = b.status === 'cancelled';
+                  const refundAmount = b.refundAmount !== undefined ? Number(b.refundAmount) : (isCancelled ? grossAmount : 0);
+
+                  // Credit / Payment Transaction (the original booking payment)
+                  if (grossAmount > 0 || b.paymentStatus === 'paid' || b.status !== 'pending') {
+                    allTransactions.push({
+                      _id: `${b._id}-pay`,
+                      bookingId: b._id,
+                      txType: 'payment',
+                      booking: b,
+                      seekerName: b.seekerName || 'Commuter',
+                      seekerContact: b.seekerContact || '',
+                      vehicleNumber: b.vehicleNumber || 'N/A',
+                      spaceId: b.spaceId,
+                      slotId: b.slotId,
+                      hours: b.hours,
+                      grossAmount: grossAmount,
+                      adminFee: initialAdminFee,
+                      adminRatePercent: rate,
+                      ownerPayout: initialOwnerShare,
+                      hostRatePercent: 100 - rate,
+                      status: isCancelled ? 'paid' : b.status,
+                      isCancelledOriginal: isCancelled,
+                      date: b.createdAt || b.startTime,
+                      isWalletPaid: (b.walletAmountUsed || 0) > 0,
+                      walletAmountUsed: b.walletAmountUsed || 0,
+                    });
+                  }
+
+                  // Debit / Refund Transaction (if booking was cancelled)
+                  if (isCancelled) {
+                    const retainedAdminFee = (b.adminCommission !== undefined && b.adminCommission !== null) ? Number(b.adminCommission) : 0;
+                    const retainedOwnerShare = (b.ownerEarnings !== undefined && b.ownerEarnings !== null) ? Number(b.ownerEarnings) : 0;
+                    const adminReversal = Math.max(0, Number((initialAdminFee - retainedAdminFee).toFixed(2)));
+                    const ownerDebit = Math.max(0, Number((initialOwnerShare - retainedOwnerShare).toFixed(2)));
+
+                    allTransactions.push({
+                      _id: `${b._id}-refund`,
+                      bookingId: b._id,
+                      txType: 'refund',
+                      booking: b,
+                      seekerName: b.seekerName || 'Commuter',
+                      seekerContact: b.seekerContact || '',
+                      vehicleNumber: b.vehicleNumber || 'N/A',
+                      spaceId: b.spaceId,
+                      slotId: b.slotId,
+                      hours: b.hours,
+                      grossAmount: refundAmount > 0 ? -refundAmount : 0,
+                      adminFee: adminReversal > 0 ? -adminReversal : 0,
+                      adminRatePercent: rate,
+                      ownerPayout: ownerDebit > 0 ? -ownerDebit : 0,
+                      hostRatePercent: 100 - rate,
+                      status: 'cancelled',
+                      refundPolicyApplied: b.refundPolicyApplied,
+                      refundStatus: b.refundStatus,
+                      refundAmount: refundAmount,
+                      date: b.cancellationDate || b.updatedAt || b.checkOutTime || b.createdAt,
+                      isWalletPaid: false,
+                    });
+                  }
+                });
+
+                // Unique spaces for filter dropdown
+                const uniqueSpaces = Array.from(new Map(bookings.filter(b => b.spaceId).map(b => [b.spaceId._id, b.spaceId])).values());
+
+                // KPI Summaries based on overall bookings
+                const totalGrossPaid = bookings.reduce((sum, b) => sum + ((b.totalAmount || 0) + (b.walletAmountUsed || 0)), 0);
+                const totalAdminCommission = bookings.reduce((sum, b) => sum + (b.adminCommission || 0), 0);
+                const totalHostPayout = bookings.reduce((sum, b) => sum + (b.ownerEarnings || 0), 0);
+                const totalRefundsGiven = bookings.reduce((sum, b) => sum + (b.refundAmount || 0), 0);
+
+                // Tab Counts
+                const tabCounts = {
+                  all: allTransactions.length,
+                  active: allTransactions.filter(tx => tx.txType === 'payment' && !tx.isCancelledOriginal && (tx.status === 'paid' || tx.status === 'allotted')).length,
+                  completed: allTransactions.filter(tx => tx.status === 'completed').length,
+                  cancelled: allTransactions.filter(tx => tx.txType === 'refund' || tx.status === 'cancelled').length,
+                };
+
+                // Apply date, space, status, and search filters to transactions
+                const filteredTransactions = allTransactions.filter(tx => {
+                  const matchDate = filterDate ? new Date(tx.date).toISOString().split('T')[0] === filterDate : true;
+                  const matchSpace = filterSpaceId ? tx.spaceId?._id === filterSpaceId : true;
                   const matchStatus = bookingStatusTab === 'all'
                     ? true
                     : bookingStatusTab === 'active'
-                    ? (b.status === 'paid' || b.status === 'allotted')
-                    : b.status === bookingStatusTab;
+                    ? (tx.txType === 'payment' && !tx.isCancelledOriginal && (tx.status === 'paid' || tx.status === 'allotted'))
+                    : bookingStatusTab === 'completed'
+                    ? tx.status === 'completed'
+                    : bookingStatusTab === 'cancelled'
+                    ? (tx.txType === 'refund' || tx.status === 'cancelled')
+                    : true;
 
                   const searchLower = bookingSearchQuery.trim().toLowerCase();
                   const matchSearch = !searchLower
                     ? true
-                    : (b.seekerName && b.seekerName.toLowerCase().includes(searchLower)) ||
-                      (b.vehicleNumber && b.vehicleNumber.toLowerCase().includes(searchLower)) ||
-                      (b.seekerContact && b.seekerContact.toLowerCase().includes(searchLower)) ||
-                      (b.slotId && b.slotId.toLowerCase().includes(searchLower)) ||
-                      (b.spaceId?.address && b.spaceId.address.toLowerCase().includes(searchLower)) ||
-                      (b.spaceId?.location && b.spaceId.location.toLowerCase().includes(searchLower));
+                    : (tx.seekerName && tx.seekerName.toLowerCase().includes(searchLower)) ||
+                      (tx.vehicleNumber && tx.vehicleNumber.toLowerCase().includes(searchLower)) ||
+                      (tx.seekerContact && tx.seekerContact.toLowerCase().includes(searchLower)) ||
+                      (tx.slotId && tx.slotId.toLowerCase().includes(searchLower)) ||
+                      (tx.spaceId?.address && tx.spaceId.address.toLowerCase().includes(searchLower)) ||
+                      (tx.spaceId?.location && tx.spaceId.location.toLowerCase().includes(searchLower));
 
                   return matchDate && matchSpace && matchStatus && matchSearch;
                 });
-                
-                const uniqueSpaces = Array.from(new Map(bookings.filter(b => b.spaceId).map(b => [b.spaceId._id, b.spaceId])).values());
 
-                // KPI Summaries based on filtered bookings
-                const totalGrossPaid = filteredBookings.reduce((sum, b) => sum + ((b.totalAmount || 0) + (b.walletAmountUsed || 0)), 0);
-                const totalAdminCommission = filteredBookings.reduce((sum, b) => sum + (b.adminCommission || 0), 0);
-                const totalHostPayout = filteredBookings.reduce((sum, b) => sum + (b.ownerEarnings || 0), 0);
-                const totalRefundsGiven = filteredBookings.reduce((sum, b) => sum + (b.refundAmount || 0), 0);
-
-                // Tab Counts
-                const tabCounts = {
-                  all: bookings.length,
-                  active: bookings.filter(b => b.status === 'paid' || b.status === 'allotted').length,
-                  completed: bookings.filter(b => b.status === 'completed').length,
-                  cancelled: bookings.filter(b => b.status === 'cancelled').length,
-                };
+                // Sort descending by date; if same timestamp, show refund above payment
+                filteredTransactions.sort((a, b) => {
+                  const diff = new Date(b.date) - new Date(a.date);
+                  if (diff !== 0) return diff;
+                  if (a.txType === 'refund' && b.txType === 'payment') return -1;
+                  if (a.txType === 'payment' && b.txType === 'refund') return 1;
+                  return 0;
+                });
 
                 const hasActiveFilters = Boolean(filterDate || filterSpaceId || bookingSearchQuery || bookingStatusTab !== 'all');
 
@@ -5177,7 +5262,7 @@ const AdminDashboard = () => {
                         <div>
                           <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Total Seeker Paid</p>
                           <h4 className="text-2xl font-black text-slate-900 mt-1">₹{totalGrossPaid.toLocaleString('en-IN')}</h4>
-                          <p className="text-[11px] text-slate-400 mt-0.5">Gross fees across {filteredBookings.length} bookings</p>
+                          <p className="text-[11px] text-slate-400 mt-0.5">Gross fees across {bookings.length} bookings</p>
                         </div>
                         <div className="h-12 w-12 rounded-2xl bg-amber-50 border border-amber-100 flex items-center justify-center shrink-0">
                           <DollarSign className="h-6 w-6 text-amber-600" />
@@ -5344,7 +5429,7 @@ const AdminDashboard = () => {
                         {/* Reset Filters & Count */}
                         <div className="flex items-center gap-3">
                           <span className="text-xs font-bold text-slate-500 bg-white border border-slate-200 px-3 py-1.5 rounded-xl shrink-0">
-                            Showing {filteredBookings.length} of {bookings.length}
+                            Showing {filteredTransactions.length} of {allTransactions.length} transactions
                           </span>
                           {hasActiveFilters && (
                             <button
@@ -5374,62 +5459,168 @@ const AdminDashboard = () => {
                               <th className="px-6 py-3.5">Admin Commission</th>
                               <th className="px-6 py-3.5">Space Owner Payout</th>
                               <th className="px-6 py-3.5">Status</th>
-                              <th className="px-6 py-3.5">Booking Date</th>
+                              <th className="px-6 py-3.5">Transaction Date</th>
                               <th className="px-6 py-3.5 text-right">Invoice</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
-                            {filteredBookings.length === 0 ? (
+                            {filteredTransactions.length === 0 ? (
                               <tr>
                                 <td colSpan="9" className="text-center py-16 text-slate-400">
                                   <div className="flex flex-col items-center justify-center">
                                     <ClipboardList className="h-10 w-10 text-slate-300 mb-2" />
-                                    <p className="font-bold text-slate-700 text-sm">No matching booking logs found</p>
+                                    <p className="font-bold text-slate-700 text-sm">No matching transactions found</p>
                                     <p className="text-xs text-slate-400 mt-1">Try adjusting your date, space, search keywords, or status tab.</p>
                                   </div>
                                 </td>
                               </tr>
-                            ) : filteredBookings.map(b => {
-                              const isCancelled = b.status === 'cancelled';
-                              const grossAmount = Number(((b.totalAmount || 0) + (b.walletAmountUsed || 0)).toFixed(2));
-                              const isWalletPaid = (b.walletAmountUsed || 0) > 0;
-                              const refundAmount = b.refundAmount || 0;
-                              const retainedGross = Math.max(0, grossAmount - refundAmount);
+                            ) : filteredTransactions.map(tx => {
+                              const isRefundTx = tx.txType === 'refund';
 
-                              // Dynamic commission and owner split percentages
-                              let adminRatePercent = commissionRate;
-                              let hostRatePercent = 100 - commissionRate;
+                              if (isRefundTx) {
+                                return (
+                                  <tr key={tx._id} className="bg-rose-50/25 hover:bg-rose-50/50 transition-colors border-l-4 border-l-rose-500">
+                                    {/* Commuter */}
+                                    <td className="px-6 py-4">
+                                      <div className="flex items-center gap-3">
+                                        <div className="h-9 w-9 rounded-full bg-rose-100 border border-rose-200 flex items-center justify-center text-xs font-black text-rose-700 shrink-0 shadow-xs">
+                                          ↩
+                                        </div>
+                                        <div>
+                                          <div className="flex items-center gap-1.5 flex-wrap">
+                                            <p className="font-bold text-slate-900 leading-tight">{tx.seekerName}</p>
+                                            <span className="text-[10px] font-black uppercase tracking-wider text-rose-700 bg-rose-100 border border-rose-200 px-1.5 py-0.2 rounded-md">
+                                              Refund
+                                            </span>
+                                          </div>
+                                          <p className="text-[11px] text-slate-400 font-mono mt-0.5">{tx.seekerContact || 'No contact'}</p>
+                                        </div>
+                                      </div>
+                                    </td>
 
-                              const isFullRefund = isCancelled && (b.refundStatus === 'full' || b.refundPolicyApplied === 'full' || (b.refundPolicyApplied && b.refundPolicyApplied.includes('100%')) || refundAmount >= grossAmount);
+                                    {/* Vehicle & Parking Space */}
+                                    <td className="px-6 py-4">
+                                      <div className="space-y-1">
+                                        <span className="font-mono font-black text-slate-800 text-xs px-2 py-0.5 rounded-md bg-slate-100 border border-slate-200 uppercase inline-block">
+                                          {tx.vehicleNumber}
+                                        </span>
+                                        <p className="font-bold text-slate-800 text-xs truncate max-w-[200px]" title={tx.spaceId?.address || 'Parking Spot'}>
+                                          {tx.spaceId?.address || 'Address Deleted'}
+                                        </p>
+                                        <p className="text-[10px] text-slate-400 truncate max-w-[200px]">{tx.spaceId?.location || 'Location'}</p>
+                                      </div>
+                                    </td>
 
-                              const adminAmount = isFullRefund ? 0 : (b.adminCommission !== undefined ? b.adminCommission : 0);
-                              const ownerAmount = isFullRefund ? 0 : (b.ownerEarnings !== undefined ? b.ownerEarnings : 0);
+                                    {/* Slot */}
+                                    <td className="px-6 py-4">
+                                      {tx.slotId ? (
+                                        <span className="bg-slate-100 text-slate-600 border border-slate-200 px-2.5 py-1 rounded-xl text-xs font-black font-mono shadow-xs">
+                                          {tx.slotId}
+                                        </span>
+                                      ) : (
+                                        <span className="text-amber-600 bg-amber-50 border border-amber-200/60 px-2 py-0.5 rounded-lg font-bold text-[11px]">
+                                          Unallotted
+                                        </span>
+                                      )}
+                                    </td>
 
-                              if (isFullRefund) {
-                                adminRatePercent = 0;
-                                hostRatePercent = 0;
-                              } else if (retainedGross > 0 && adminAmount > 0) {
-                                adminRatePercent = Math.round((adminAmount / retainedGross) * 100);
-                                hostRatePercent = Math.max(0, 100 - adminRatePercent);
-                              } else if (isCancelled) {
-                                adminRatePercent = 0;
-                                hostRatePercent = 0;
-                              } else if (grossAmount > 0 && adminAmount > 0) {
-                                adminRatePercent = Math.round((adminAmount / grossAmount) * 100);
-                                hostRatePercent = Math.max(0, 100 - adminRatePercent);
+                                    {/* Seeker Paid (Gross & Refund) */}
+                                    <td className="px-6 py-4">
+                                      <div>
+                                        <div className="flex items-baseline gap-1.5 flex-wrap">
+                                          <span className="text-sm font-black text-rose-600">
+                                            {tx.grossAmount < 0 ? `-₹${Math.abs(tx.grossAmount)}` : '₹0'}
+                                          </span>
+                                          <span className="text-[10px] text-rose-500 font-bold uppercase">(Refund)</span>
+                                        </div>
+                                        <div className="mt-1">
+                                          {tx.refundAmount > 0 ? (
+                                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-rose-700 bg-rose-100/90 border border-rose-200 px-2 py-0.5 rounded-md">
+                                              <span>₹{tx.refundAmount} to Wallet</span>
+                                              {tx.refundPolicyApplied && <span className="text-rose-600">({tx.refundPolicyApplied})</span>}
+                                            </span>
+                                          ) : (
+                                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-slate-500 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-md">
+                                              <span>No Refund (0%)</span>
+                                            </span>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </td>
+
+                                    {/* Admin Commission Reversal */}
+                                    <td className="px-6 py-4">
+                                      <div className="bg-rose-50 border border-rose-200/80 rounded-2xl px-3 py-2 inline-block min-w-[110px]">
+                                        <div className="flex items-center justify-between gap-2">
+                                          <span className="text-xs font-black text-rose-600">
+                                            {tx.adminFee < 0 ? `-₹${Math.abs(tx.adminFee)}` : '₹0'}
+                                          </span>
+                                          <span className="text-[10px] font-black bg-rose-600 text-white px-1.5 py-0.2 rounded-md">
+                                            -{tx.adminRatePercent}%
+                                          </span>
+                                        </div>
+                                        <p className="text-[9px] font-bold text-rose-700/80 uppercase tracking-wider mt-0.5">Admin Reversal</p>
+                                      </div>
+                                    </td>
+
+                                    {/* Space Owner Debit */}
+                                    <td className="px-6 py-4">
+                                      <div className="bg-rose-50 border border-rose-200/80 rounded-2xl px-3 py-2 inline-block min-w-[120px]">
+                                        <div className="flex items-center justify-between gap-2">
+                                          <span className="text-xs font-black text-rose-600">
+                                            {tx.ownerPayout < 0 ? `-₹${Math.abs(tx.ownerPayout)}` : '₹0'}
+                                          </span>
+                                          <span className="text-[10px] font-black bg-rose-600 text-white px-1.5 py-0.2 rounded-md">
+                                            -{tx.hostRatePercent}%
+                                          </span>
+                                        </div>
+                                        <p className="text-[9px] font-bold text-rose-700/80 truncate max-w-[110px] mt-0.5" title={tx.spaceId?.ownerId?.name || 'Owner'}>
+                                          {tx.spaceId?.ownerId?.name ? `Debit: ${tx.spaceId.ownerId.name}` : 'Owner Debit'}
+                                        </p>
+                                      </div>
+                                    </td>
+
+                                    {/* Status */}
+                                    <td className="px-6 py-4">
+                                      <StatusBadge status="cancelled" />
+                                    </td>
+
+                                    {/* Transaction Date */}
+                                    <td className="px-6 py-4">
+                                      <p className="text-xs font-bold text-slate-700">
+                                        {new Date(tx.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                      </p>
+                                      <p className="text-[10px] text-slate-400 font-medium">
+                                        {new Date(tx.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                      </p>
+                                    </td>
+
+                                    {/* Action / Invoice */}
+                                    <td className="px-6 py-4 text-right">
+                                      <button
+                                        onClick={() => setViewingInvoiceId(tx.bookingId)}
+                                        className="inline-flex items-center gap-1 text-xs font-bold text-rose-600 hover:text-rose-800 bg-rose-50 hover:bg-rose-100 border border-rose-200 px-3 py-1.5 rounded-xl transition shadow-xs active:scale-95 cursor-pointer"
+                                      >
+                                        <FileText className="h-3.5 w-3.5" />
+                                        <span>Slip</span>
+                                      </button>
+                                    </td>
+                                  </tr>
+                                );
                               }
 
+                              // Payment / Credit Row
                               return (
-                                <tr key={b._id} className="hover:bg-slate-50/80 transition-colors">
+                                <tr key={tx._id} className="hover:bg-slate-50/80 transition-colors">
                                   {/* Commuter */}
                                   <td className="px-6 py-4">
                                     <div className="flex items-center gap-3">
                                       <div className="h-9 w-9 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-xs font-black text-slate-700 shrink-0">
-                                        {(b.seekerName || 'U').charAt(0).toUpperCase()}
+                                        {(tx.seekerName || 'U').charAt(0).toUpperCase()}
                                       </div>
                                       <div>
-                                        <p className="font-bold text-slate-900 leading-tight">{b.seekerName || 'Commuter'}</p>
-                                        <p className="text-[11px] text-slate-400 font-mono mt-0.5">{b.seekerContact || 'No contact'}</p>
+                                        <p className="font-bold text-slate-900 leading-tight">{tx.seekerName}</p>
+                                        <p className="text-[11px] text-slate-400 font-mono mt-0.5">{tx.seekerContact || 'No contact'}</p>
                                       </div>
                                     </div>
                                   </td>
@@ -5438,20 +5629,20 @@ const AdminDashboard = () => {
                                   <td className="px-6 py-4">
                                     <div className="space-y-1">
                                       <span className="font-mono font-black text-slate-800 text-xs px-2 py-0.5 rounded-md bg-slate-100 border border-slate-200 uppercase inline-block">
-                                        {b.vehicleNumber}
+                                        {tx.vehicleNumber}
                                       </span>
-                                      <p className="font-bold text-slate-800 text-xs truncate max-w-[200px]" title={b.spaceId?.address || 'Parking Spot'}>
-                                        {b.spaceId?.address || 'Address Deleted'}
+                                      <p className="font-bold text-slate-800 text-xs truncate max-w-[200px]" title={tx.spaceId?.address || 'Parking Spot'}>
+                                        {tx.spaceId?.address || 'Address Deleted'}
                                       </p>
-                                      <p className="text-[10px] text-slate-400 truncate max-w-[200px]">{b.spaceId?.location || 'Location'}</p>
+                                      <p className="text-[10px] text-slate-400 truncate max-w-[200px]">{tx.spaceId?.location || 'Location'}</p>
                                     </div>
                                   </td>
 
                                   {/* Slot */}
                                   <td className="px-6 py-4">
-                                    {b.slotId ? (
+                                    {tx.slotId ? (
                                       <span className="bg-emerald-50 text-emerald-800 border border-emerald-200 px-2.5 py-1 rounded-xl text-xs font-black font-mono shadow-xs">
-                                        {b.slotId}
+                                        {tx.slotId}
                                       </span>
                                     ) : (
                                       <span className="text-amber-600 bg-amber-50 border border-amber-200/60 px-2 py-0.5 rounded-lg font-bold text-[11px]">
@@ -5464,49 +5655,19 @@ const AdminDashboard = () => {
                                   <td className="px-6 py-4">
                                     <div>
                                       <div className="flex items-baseline gap-1.5 flex-wrap">
-                                        <span className={`text-sm font-black ${isCancelled ? 'line-through text-slate-400' : 'text-slate-900'}`}>
-                                          ₹{grossAmount}
+                                        <span className="text-sm font-black text-slate-900">
+                                          ₹{tx.grossAmount}
                                         </span>
-                                        <span className="text-[11px] text-slate-400 font-medium">({b.hours} hrs)</span>
+                                        <span className="text-[11px] text-slate-400 font-medium">({tx.hours} hrs)</span>
                                       </div>
 
                                       {/* Wallet Payment Indicator Badge */}
-                                      {isWalletPaid && (
+                                      {tx.isWalletPaid && (
                                         <div className="mt-1">
                                           <span className="inline-flex items-center gap-1 text-[10px] font-black px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 border border-purple-200 shadow-xs">
                                             <span>💳 WALLET</span>
-                                            {b.totalAmount > 0 && <span className="font-semibold text-purple-600 text-[9px]">(₹{b.walletAmountUsed})</span>}
+                                            {tx.walletAmountUsed > 0 && <span className="font-semibold text-purple-600 text-[9px]">(₹{tx.walletAmountUsed})</span>}
                                           </span>
-                                        </div>
-                                      )}
-
-                                      {/* Refund Details for Cancelled Bookings */}
-                                      {isCancelled && (
-                                        <div className="mt-1">
-                                          {isFullRefund || refundAmount >= grossAmount ? (
-                                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-md">
-                                              <span>₹{refundAmount > 0 ? refundAmount : grossAmount} Refunded</span>
-                                              <span className="text-rose-500">(100% Policy)</span>
-                                            </span>
-                                          ) : b.refundStatus === 'partial_20' || (b.refundPolicyApplied && b.refundPolicyApplied.includes('20%')) ? (
-                                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md">
-                                              <span>₹{refundAmount} Refunded</span>
-                                              <span className="text-amber-500">(20% Policy)</span>
-                                            </span>
-                                          ) : b.refundPolicyApplied === 'half' ? (
-                                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md">
-                                              <span>₹{refundAmount} Refunded</span>
-                                              <span className="text-amber-500">(50% Policy)</span>
-                                            </span>
-                                          ) : refundAmount > 0 ? (
-                                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-md">
-                                              <span>₹{refundAmount} Refunded</span>
-                                            </span>
-                                          ) : (
-                                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-slate-500 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-md">
-                                              <span>No Refund</span>
-                                            </span>
-                                          )}
                                         </div>
                                       )}
                                     </div>
@@ -5516,9 +5677,9 @@ const AdminDashboard = () => {
                                   <td className="px-6 py-4">
                                     <div className="bg-emerald-50/80 border border-emerald-200/80 rounded-2xl px-3 py-2 inline-block min-w-[110px]">
                                       <div className="flex items-center justify-between gap-2">
-                                        <span className="text-xs font-black text-emerald-700">₹{adminAmount}</span>
+                                        <span className="text-xs font-black text-emerald-700">₹{tx.adminFee}</span>
                                         <span className="text-[10px] font-black bg-emerald-600 text-white px-1.5 py-0.2 rounded-md">
-                                          {adminRatePercent}%
+                                          {tx.adminRatePercent}%
                                         </span>
                                       </div>
                                       <p className="text-[9px] font-bold text-emerald-800/70 uppercase tracking-wider mt-0.5">Admin Fee</p>
@@ -5529,38 +5690,38 @@ const AdminDashboard = () => {
                                   <td className="px-6 py-4">
                                     <div className="bg-indigo-50/80 border border-indigo-200/80 rounded-2xl px-3 py-2 inline-block min-w-[120px]">
                                       <div className="flex items-center justify-between gap-2">
-                                        <span className="text-xs font-black text-indigo-700">₹{ownerAmount}</span>
+                                        <span className="text-xs font-black text-indigo-700">₹{tx.ownerPayout}</span>
                                         <span className="text-[10px] font-black bg-indigo-600 text-white px-1.5 py-0.2 rounded-md">
-                                          {hostRatePercent}%
+                                          {tx.hostRatePercent}%
                                         </span>
                                       </div>
-                                      <p className="text-[9px] font-bold text-indigo-800/70 truncate max-w-[110px] mt-0.5" title={b.spaceId?.ownerId?.name || 'Owner'}>
-                                        {b.spaceId?.ownerId?.name ? `Host: ${b.spaceId.ownerId.name}` : 'Host Share'}
+                                      <p className="text-[9px] font-bold text-indigo-800/70 truncate max-w-[110px] mt-0.5" title={tx.spaceId?.ownerId?.name || 'Owner'}>
+                                        {tx.spaceId?.ownerId?.name ? `Host: ${tx.spaceId.ownerId.name}` : 'Host Share'}
                                       </p>
                                     </div>
                                   </td>
 
                                   {/* Status */}
                                   <td className="px-6 py-4">
-                                    <StatusBadge status={b.status} />
+                                    <StatusBadge status={tx.status} />
                                   </td>
 
                                   {/* Booking Date */}
                                   <td className="px-6 py-4">
                                     <p className="text-xs font-bold text-slate-700">
-                                      {new Date(b.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                      {new Date(tx.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
                                     </p>
                                     <p className="text-[10px] text-slate-400 font-medium">
-                                      {new Date(b.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                      {new Date(tx.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                     </p>
                                   </td>
 
                                   {/* Action / Invoice */}
                                   <td className="px-6 py-4 text-right">
-                                    {(b.paymentStatus === 'paid' || b.invoiceId || b.totalAmount > 0) && (
+                                    {(tx.booking.paymentStatus === 'paid' || tx.booking.invoiceId || tx.grossAmount > 0) && (
                                       <button
-                                        onClick={() => setViewingInvoiceId(b._id)}
-                                        className="inline-flex items-center gap-1 text-xs font-bold text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 border border-blue-200 px-3 py-1.5 rounded-xl transition shadow-xs active:scale-95"
+                                        onClick={() => setViewingInvoiceId(tx.bookingId)}
+                                        className="inline-flex items-center gap-1 text-xs font-bold text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 border border-blue-200 px-3 py-1.5 rounded-xl transition shadow-xs active:scale-95 cursor-pointer"
                                       >
                                         <FileText className="h-3.5 w-3.5" />
                                         <span>Invoice</span>
@@ -6104,23 +6265,18 @@ const AdminDashboard = () => {
                 let totalReversals = 0;
 
                 bookings.forEach((b) => {
-                  const grossAmount = (b.totalAmount || 0) + (b.walletAmountUsed || 0);
+                  const grossAmount = Number(((b.totalAmount || 0) + (b.walletAmountUsed || 0)).toFixed(2));
                   const isCancelled = b.status === 'cancelled';
                   const isPaid = b.paymentStatus === 'paid' || b.status === 'paid' || b.status === 'checked_in' || b.status === 'completed' || isCancelled;
 
                   if (!isPaid && grossAmount <= 0) return;
 
-                  const commissionAmount = (b.adminCommission !== undefined && b.adminCommission !== null && !isNaN(b.adminCommission) && Number(b.adminCommission) > 0)
-                    ? Number(b.adminCommission)
-                    : (grossAmount > 0 ? (grossAmount * (commissionRate || 15)) / 100 : 0);
-
-                  const commPercent = grossAmount > 0 && commissionAmount > 0
-                    ? Math.round((commissionAmount / grossAmount) * 100)
-                    : (commissionRate || 15);
+                  const commPercent = commissionRate || 15;
+                  const initialCommission = grossAmount > 0 ? Number(((grossAmount * commPercent) / 100).toFixed(2)) : 0;
 
                   // Credit event (when booking was confirmed/paid)
-                  if (commissionAmount > 0) {
-                    totalCredits += commissionAmount;
+                  if (initialCommission > 0) {
+                    totalCredits += initialCommission;
                     treasuryTxs.push({
                       id: `${b._id}-credit`,
                       bookingId: b._id,
@@ -6129,7 +6285,7 @@ const AdminDashboard = () => {
                       title: `Platform Commission Credit (${commPercent}%)`,
                       commPercent,
                       grossAmount,
-                      amount: commissionAmount,
+                      amount: initialCommission,
                       commuter: b.seekerName || b.seekerId?.name || 'Commuter',
                       spaceTitle: b.spaceId?.title || 'Parking Space',
                       ownerName: b.spaceId?.ownerId?.name || 'Host',
@@ -6141,8 +6297,15 @@ const AdminDashboard = () => {
 
                   // Cancellation reversal event
                   if (isCancelled) {
-                    const wasCheckedIn = Boolean(b.wasCheckedIn) || (b.checkInTime && !b.checkOutTime) || b.status === 'checked_in';
-                    const reversedAmount = wasCheckedIn ? 0 : commissionAmount;
+                    const retainedCommission = (b.adminCommission !== undefined && b.adminCommission !== null && !isNaN(b.adminCommission))
+                      ? Number(b.adminCommission)
+                      : 0;
+                    const reversedAmount = Math.max(0, Number((initialCommission - retainedCommission).toFixed(2)));
+                    const refundAmount = b.refundAmount !== undefined ? Number(b.refundAmount) : (grossAmount > 0 ? grossAmount : 0);
+                    const refundPercent = grossAmount > 0 ? Math.round((refundAmount / grossAmount) * 100) : 0;
+                    const refundPolicyLabel = b.refundPolicyApplied
+                      ? b.refundPolicyApplied
+                      : (b.refundStatus === 'partial_20' ? '20% Policy' : (b.refundStatus === 'full' ? '100% Policy' : (refundAmount > 0 ? `₹${refundAmount} Refund` : 'Cancellation')));
 
                     if (reversedAmount > 0) {
                       totalReversals += reversedAmount;
@@ -6151,15 +6314,18 @@ const AdminDashboard = () => {
                         bookingId: b._id,
                         bookingCode: b._id.toString().slice(-6).toUpperCase(),
                         type: 'reversal',
-                        title: `Cancellation Commission Reversal (${commPercent}% Refund)`,
+                        title: `Cancellation Commission Reversal (${refundPercent > 0 ? `${refundPercent}% Refund Policy` : refundPolicyLabel})`,
                         commPercent,
                         grossAmount,
+                        refundAmount,
+                        refundPercent,
+                        refundPolicyLabel,
                         amount: reversedAmount,
                         commuter: b.seekerName || b.seekerId?.name || 'Commuter',
                         spaceTitle: b.spaceId?.title || 'Parking Space',
                         ownerName: b.spaceId?.ownerId?.name || 'Host',
                         paymentMethod: 'Reversed to Seeker Wallet',
-                        date: b.updatedAt || b.createdAt,
+                        date: b.cancellationDate || b.updatedAt || b.createdAt,
                         status: 'reversed',
                       });
                     }
@@ -6305,18 +6471,25 @@ const AdminDashboard = () => {
                               filteredTxs.map((tx) => {
                                 const isCredit = tx.type === 'credit';
                                 return (
-                                  <tr key={tx.id} className="hover:bg-slate-50/60 transition-colors">
+                                  <tr key={tx.id} className={`transition-colors ${isCredit ? 'hover:bg-slate-50/60' : 'bg-rose-50/20 hover:bg-rose-50/40 border-l-4 border-l-rose-500'}`}>
                                     <td className="px-5 py-4">
                                       <div className="flex items-center gap-3">
-                                        <div className={`h-8 w-8 rounded-xl flex items-center justify-center font-bold text-sm shrink-0 border ${
+                                        <div className={`h-8 w-8 rounded-xl flex items-center justify-center font-bold text-sm shrink-0 border shadow-xs ${
                                           isCredit
                                             ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                                            : 'bg-rose-50 text-rose-700 border-rose-200'
+                                            : 'bg-rose-100 text-rose-700 border-rose-200'
                                         }`}>
                                           {isCredit ? '↓' : '↑'}
                                         </div>
                                         <div>
-                                          <p className="font-extrabold text-slate-900 leading-snug">{tx.title}</p>
+                                          <div className="flex items-center gap-1.5 flex-wrap">
+                                            <p className="font-extrabold text-slate-900 leading-snug">{tx.title}</p>
+                                            {!isCredit && (
+                                              <span className="text-[9px] font-black uppercase tracking-wider text-rose-700 bg-rose-100 border border-rose-200 px-1.5 py-0.2 rounded">
+                                                Debit / Reversal
+                                              </span>
+                                            )}
+                                          </div>
                                           <p className="text-[11px] text-slate-400 font-medium">
                                             {new Date(tx.date).toLocaleString('en-IN', {
                                               day: 'numeric',
@@ -6338,13 +6511,35 @@ const AdminDashboard = () => {
                                       <p className="text-[11px] text-slate-500 font-medium mt-0.5">Host: {tx.ownerName}</p>
                                     </td>
                                     <td className="px-5 py-4">
-                                      <p className="font-mono font-bold text-slate-900">₹{tx.grossAmount}</p>
-                                      <span className="text-[10px] text-slate-400 font-semibold">{tx.paymentMethod}</span>
+                                      {isCredit ? (
+                                        <>
+                                          <p className="font-mono font-bold text-slate-900">₹{tx.grossAmount}</p>
+                                          <span className="text-[10px] text-slate-400 font-semibold">{tx.paymentMethod}</span>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <p className="font-mono font-bold text-rose-600">-₹{tx.refundAmount || tx.grossAmount}</p>
+                                          <span className="text-[10px] text-rose-600 font-bold">
+                                            {tx.refundPercent > 0 ? `${tx.refundPercent}% Commuter Refund` : 'Commuter Refund'}
+                                          </span>
+                                        </>
+                                      )}
                                     </td>
                                     <td className="px-5 py-4">
-                                      <span className="bg-purple-50 text-purple-700 border border-purple-200 text-[10px] font-black px-2 py-0.5 rounded-md">
-                                        {tx.commPercent}% Platform Fee
-                                      </span>
+                                      {isCredit ? (
+                                        <span className="bg-purple-50 text-purple-700 border border-purple-200 text-[10px] font-black px-2 py-0.5 rounded-md">
+                                          {tx.commPercent}% Platform Fee
+                                        </span>
+                                      ) : (
+                                        <div className="flex flex-col items-start gap-1">
+                                          <span className="bg-rose-50 text-rose-700 border border-rose-200 text-[10px] font-black px-2 py-0.5 rounded-md">
+                                            -{tx.commPercent}% Fee Reversal
+                                          </span>
+                                          <span className="text-[9px] font-bold text-rose-500">
+                                            {tx.refundPercent > 0 ? `(${tx.refundPercent}% Policy)` : tx.refundPolicyLabel}
+                                          </span>
+                                        </div>
+                                      )}
                                     </td>
                                     <td className="px-5 py-4 text-right">
                                       <span className={`text-sm font-black font-mono ${isCredit ? 'text-emerald-600' : 'text-rose-600'}`}>

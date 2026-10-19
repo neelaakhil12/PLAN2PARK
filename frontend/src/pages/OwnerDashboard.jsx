@@ -89,6 +89,7 @@ const OwnerDashboard = () => {
     hasEvCharger: false,
     hasCctv: false,
     isCovered: false,
+    isActive: true,
     imageUrl: '',
     imageFile: null,
     images: [],
@@ -532,15 +533,16 @@ const OwnerDashboard = () => {
       pincode: spot.pincode || '500097',
       googleMapsLink: spot.locationLink || spot.googleMapsLink || '',
       totalSlots: String(spot.totalSlots || (spot.slots ? spot.slots.length : 5)),
-      pricePerHour: String(spot.pricePerHour !== undefined ? spot.pricePerHour : (spot.hourlyRate || 50)),
-      pricePerDay: String(spot.pricePerDay || 400),
-      pricePerWeek: String(spot.pricePerWeek || 2000),
-      pricePerMonth: String(spot.pricePerMonth || 6000),
+      pricePerHour: String(hourly),
+      pricePerDay: String(spot.pricePerDay || (Number(hourly) * 8)),
+      pricePerWeek: String(spot.pricePerWeek || (Number(hourly) * 8 * 6)),
+      pricePerMonth: String(spot.pricePerMonth || (Number(hourly) * 8 * 25)),
       maxWalletDiscount: String(spot.maxWalletDiscount ?? 10),
-      cancellationPolicy: spot.cancellationPolicy || 'full',
+      cancellationPolicy: 'full',
       hasEvCharger: !!spot.hasEvCharger,
       hasCctv: !!spot.hasCctv,
       isCovered: !!spot.isCovered,
+      isActive: spot.isActive !== false,
       imageUrl: spot.image || (Array.isArray(spot.images) && spot.images.length > 0 ? spot.images[0] : ''),
       imageFile: null,
       images: Array.isArray(spot.images) && spot.images.length > 0 ? spot.images : (spot.image ? [spot.image] : []),
@@ -793,15 +795,23 @@ const OwnerDashboard = () => {
           isGated: true
         }));
       } else {
-        fd.append('pricePerHour', Number(spotForm.pricePerHour || 50));
-        fd.append('totalSlots', Number(spotForm.totalSlots || 5));
+        const hourly = Number(spotForm.pricePerHour || 50);
+        const daily = spotForm.pricePerDay ? Number(spotForm.pricePerDay) : Math.round(hourly * 8);
+        const monthly = spotForm.pricePerMonth ? Number(spotForm.pricePerMonth) : Math.round(hourly * 8 * 25);
+        const slotsCount = Number(spotForm.totalSlots || 5);
+
+        fd.append('pricePerHour', hourly);
+        fd.append('hourlyRate', hourly);
+        fd.append('totalSlots', slotsCount);
+        fd.append('totalSpots', slotsCount);
+        fd.append('pricePerDay', daily);
+        fd.append('pricePerWeek', Number(spotForm.pricePerWeek || (hourly * 8 * 6)));
+        fd.append('pricePerMonth', monthly);
       }
 
-      fd.append('pricePerDay', Number(spotForm.pricePerDay || 400));
-      fd.append('pricePerWeek', Number(spotForm.pricePerWeek || 2000));
-      fd.append('pricePerMonth', Number(spotForm.pricePerMonth || 6000));
       fd.append('maxWalletDiscount', Number(spotForm.maxWalletDiscount ?? 10));
-      fd.append('cancellationPolicy', spotForm.cancellationPolicy || 'full');
+      fd.append('cancellationPolicy', 'full');
+      fd.append('isActive', spotForm.isActive !== false);
       fd.append('hasEvCharger', user?.accountCategory === 'vehicle_storage_owner' ? false : spotForm.hasEvCharger);
       fd.append('hasCctv', spotForm.hasCctv);
       fd.append('isCovered', spotForm.isCovered);
@@ -1106,9 +1116,14 @@ const OwnerDashboard = () => {
                                 Monthly: <span className="text-amber-600 font-black">₹{spot.monthlyStorageRate || 1500}/car</span> • {spotSlots} slots
                               </p>
                             ) : (
-                              <p className="text-xs font-bold text-slate-700 mt-2">
-                                Rate: <span className="text-blue-600 font-extrabold">₹{spotRate}/hr</span> • {spotSlots} slots {spot.hasEvCharger ? '• ⚡ EV' : ''}
-                              </p>
+                              <div className="mt-2 space-y-1">
+                                <p className="text-xs font-bold text-slate-700">
+                                  Hourly: <span className="text-blue-600 font-extrabold">₹{spotRate}/hr</span> • Daily: <span className="text-emerald-600 font-extrabold">₹{spot.pricePerDay || (spotRate * 8)}/day</span> • Monthly: <span className="text-purple-600 font-extrabold">₹{spot.pricePerMonth || (spotRate * 8 * 25)}/mo</span>
+                                </p>
+                                <p className="text-xs font-semibold text-slate-500">
+                                  Capacity: <span className="font-extrabold text-slate-800">{spotSlots} Slots</span> {spot.hasEvCharger ? '• ⚡ EV Available' : ''}
+                                </p>
+                              </div>
                             )}
                           </div>
                         </div>
@@ -1952,119 +1967,77 @@ const OwnerDashboard = () => {
                   </div>
                 </>
               ) : (
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-2">
-                    <label className="block text-xs font-extrabold text-slate-600 uppercase tracking-wider">Hourly Rate (₹)</label>
-                    <input
-                      type="number"
-                      required
-                      min={5}
-                      placeholder="e.g. 50"
-                      value={spotForm.pricePerHour}
-                      onChange={e => setSpotForm(p => ({ ...p, pricePerHour: e.target.value }))}
-                      className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-black text-slate-800 focus:outline-none focus:border-blue-500 focus:bg-white transition-colors"
-                    />
+                <>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <label className="block text-xs font-extrabold text-slate-600 uppercase tracking-wider">Hourly Rate (₹)</label>
+                      <input
+                        type="number"
+                        required
+                        min={5}
+                        placeholder="e.g. 50"
+                        value={spotForm.pricePerHour}
+                        onChange={e => {
+                          const val = e.target.value;
+                          setSpotForm(p => {
+                            const num = Number(val);
+                            const updates = { pricePerHour: val };
+                            if (!p.pricePerDay || p.pricePerDay === String(Math.round(Number(p.pricePerHour || 0) * 8))) {
+                              updates.pricePerDay = val ? String(Math.round(num * 8)) : '';
+                            }
+                            if (!p.pricePerMonth || p.pricePerMonth === String(Math.round(Number(p.pricePerHour || 0) * 8 * 25))) {
+                              updates.pricePerMonth = val ? String(Math.round(num * 8 * 25)) : '';
+                            }
+                            return { ...p, ...updates };
+                          });
+                        }}
+                        className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-black text-slate-800 focus:outline-none focus:border-blue-500 focus:bg-white transition-colors"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="block text-xs font-extrabold text-slate-600 uppercase tracking-wider">Total Capacity (Slots)</label>
+                      <input
+                        type="number"
+                        required
+                        min={1}
+                        max={100}
+                        placeholder="e.g. 5"
+                        value={spotForm.totalSlots}
+                        onChange={e => setSpotForm(p => ({ ...p, totalSlots: e.target.value }))}
+                        className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-black text-slate-800 focus:outline-none focus:border-blue-500 focus:bg-white transition-colors"
+                      />
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    <label className="block text-xs font-extrabold text-slate-600 uppercase tracking-wider">Total Capacity (Slots)</label>
-                    <input
-                      type="number"
-                      required
-                      min={1}
-                      max={50}
-                      placeholder="e.g. 5"
-                      value={spotForm.totalSlots}
-                      onChange={e => setSpotForm(p => ({ ...p, totalSlots: e.target.value }))}
-                      className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-black text-slate-800 focus:outline-none focus:border-blue-500 focus:bg-white transition-colors"
-                    />
+
+                  {/* Daily & Monthly Tier Pricing Inputs (Matching Owner App 1:1) */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <label className="block text-xs font-extrabold text-slate-600 uppercase tracking-wider">Daily Rate (₹/day)</label>
+                      <input
+                        type="number"
+                        min={10}
+                        placeholder="e.g. 400"
+                        value={spotForm.pricePerDay}
+                        onChange={e => setSpotForm(p => ({ ...p, pricePerDay: e.target.value }))}
+                        className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-black text-slate-800 focus:outline-none focus:border-blue-500 focus:bg-white transition-colors"
+                      />
+                      <p className="text-[11px] text-slate-400 font-semibold">24-hour flat booking</p>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="block text-xs font-extrabold text-slate-600 uppercase tracking-wider">Monthly Rate (₹/mo)</label>
+                      <input
+                        type="number"
+                        min={100}
+                        placeholder="e.g. 6000"
+                        value={spotForm.pricePerMonth}
+                        onChange={e => setSpotForm(p => ({ ...p, pricePerMonth: e.target.value }))}
+                        className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-black text-slate-800 focus:outline-none focus:border-blue-500 focus:bg-white transition-colors"
+                      />
+                      <p className="text-[11px] text-slate-400 font-semibold">30-day monthly pass</p>
+                    </div>
                   </div>
-                </div>
+                </>
               )}
-
-              {/* 6. Cancellation & Refund Policy - full width */}
-              <div className="space-y-3 pt-2 md:col-span-2">
-                <div className="flex items-center gap-2">
-                  <span className="text-base">🛡️</span>
-                  <div>
-                    <p className="text-xs font-extrabold text-slate-700 uppercase tracking-wider">Cancellation &amp; Refund Policy</p>
-                    <p className="text-xs text-slate-500">Select refund amount seeker receives if they cancel:</p>
-                  </div>
-                </div>
-
-                <div className="space-y-2.5">
-                  {/* Option 1: 100% Full Refund */}
-                  <div
-                    onClick={() => setSpotForm(p => ({ ...p, cancellationPolicy: 'full' }))}
-                    className={`p-4 rounded-2xl border cursor-pointer transition-all flex items-start justify-between gap-3 ${
-                      spotForm.cancellationPolicy === 'full'
-                        ? 'bg-emerald-50/80 border-emerald-500 ring-1 ring-emerald-500 text-slate-900'
-                        : 'bg-slate-50 border-slate-200 hover:border-slate-300 text-slate-700'
-                    }`}
-                  >
-                    <div>
-                      <p className="text-sm font-black text-slate-900 flex items-center gap-2">
-                        🟢 100% Full Refund
-                      </p>
-                      <p className="text-xs text-slate-500 mt-0.5 font-medium">
-                        Seeker receives full 100% paid amount credited to wallet
-                      </p>
-                    </div>
-                    <div className={`h-5 w-5 rounded-full border-2 flex items-center justify-center shrink-0 mt-0.5 ${
-                      spotForm.cancellationPolicy === 'full' ? 'border-emerald-500 bg-emerald-500' : 'border-slate-300 bg-white'
-                    }`}>
-                      {spotForm.cancellationPolicy === 'full' && <div className="h-2 w-2 rounded-full bg-white" />}
-                    </div>
-                  </div>
-
-                  {/* Option 2: 50% Half Refund */}
-                  <div
-                    onClick={() => setSpotForm(p => ({ ...p, cancellationPolicy: 'half' }))}
-                    className={`p-4 rounded-2xl border cursor-pointer transition-all flex items-start justify-between gap-3 ${
-                      spotForm.cancellationPolicy === 'half'
-                        ? 'bg-amber-50/80 border-amber-500 ring-1 ring-amber-500 text-slate-900'
-                        : 'bg-slate-50 border-slate-200 hover:border-slate-300 text-slate-700'
-                    }`}
-                  >
-                    <div>
-                      <p className="text-sm font-black text-slate-900 flex items-center gap-2">
-                        🟡 50% Half Refund
-                      </p>
-                      <p className="text-xs text-slate-500 mt-0.5 font-medium">
-                        Seeker receives 50% refund; you keep 50% compensation
-                      </p>
-                    </div>
-                    <div className={`h-5 w-5 rounded-full border-2 flex items-center justify-center shrink-0 mt-0.5 ${
-                      spotForm.cancellationPolicy === 'half' ? 'border-amber-500 bg-amber-500' : 'border-slate-300 bg-white'
-                    }`}>
-                      {spotForm.cancellationPolicy === 'half' && <div className="h-2 w-2 rounded-full bg-white" />}
-                    </div>
-                  </div>
-
-                  {/* Option 3: 0% No Refund */}
-                  <div
-                    onClick={() => setSpotForm(p => ({ ...p, cancellationPolicy: 'none' }))}
-                    className={`p-4 rounded-2xl border cursor-pointer transition-all flex items-start justify-between gap-3 ${
-                      spotForm.cancellationPolicy === 'none'
-                        ? 'bg-rose-50/80 border-rose-500 ring-1 ring-rose-500 text-slate-900'
-                        : 'bg-slate-50 border-slate-200 hover:border-slate-300 text-slate-700'
-                    }`}
-                  >
-                    <div>
-                      <p className="text-sm font-black text-slate-900 flex items-center gap-2">
-                        🔴 0% No Refund
-                      </p>
-                      <p className="text-xs text-slate-500 mt-0.5 font-medium">
-                        Strict non-refundable booking
-                      </p>
-                    </div>
-                    <div className={`h-5 w-5 rounded-full border-2 flex items-center justify-center shrink-0 mt-0.5 ${
-                      spotForm.cancellationPolicy === 'none' ? 'border-rose-500 bg-rose-500' : 'border-slate-300 bg-white'
-                    }`}>
-                      {spotForm.cancellationPolicy === 'none' && <div className="h-2 w-2 rounded-full bg-white" />}
-                    </div>
-                  </div>
-                </div>
-              </div>
 
               {/* 7. Max Wallet Money Usable per Booking (₹) */}
               <div className="space-y-2 pt-2">
@@ -2197,6 +2170,39 @@ const OwnerDashboard = () => {
                     </button>
                     <span className={`text-xs font-extrabold uppercase ${spotForm.hasEvCharger ? 'text-emerald-700' : 'text-slate-400'}`}>
                       {spotForm.hasEvCharger ? 'ON' : 'OFF'}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* Spot Availability Status Switch Toggle (When Editing Spot) */}
+              {editingSpot && (
+                <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-extrabold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                      🟢 Spot Availability Status
+                    </p>
+                    <p className="text-xs text-slate-500 mt-0.5 font-medium">
+                      Is this spot open &amp; accepting seeker bookings?
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setSpotForm(p => ({ ...p, isActive: !p.isActive }))}
+                      className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                        spotForm.isActive !== false ? 'bg-emerald-500' : 'bg-slate-300'
+                      }`}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                          spotForm.isActive !== false ? 'translate-x-5' : 'translate-x-0'
+                        }`}
+                      />
+                    </button>
+                    <span className={`text-xs font-extrabold uppercase ${spotForm.isActive !== false ? 'text-emerald-700' : 'text-slate-400'}`}>
+                      {spotForm.isActive !== false ? 'ONLINE' : 'CLOSED'}
                     </span>
                   </div>
                 </div>
