@@ -162,7 +162,7 @@ const SeekerDashboard = () => {
   const [compDescription, setCompDescription] = useState('');
 
   // Profile setup forms
-  const [profileForm, setProfileForm] = useState({ name: user?.name || '', contact: user?.contact || '', password: '', profileImage: user?.profileImage || '', driverLicenseNumber: user?.driverLicenseNumber || '', driverLicenseImage: user?.driverLicenseImage || '' });
+  const [profileForm, setProfileForm] = useState({ name: user?.name || '', contact: user?.contact || '', profileImage: user?.profileImage || '', driverLicenseNumber: user?.driverLicenseNumber || '', driverLicenseImage: user?.driverLicenseImage || '' });
   const [newPlate, setNewPlate] = useState('');
   const [newType, setNewType] = useState('4-wheeler');
   const [newModel, setNewModel] = useState('');
@@ -3708,8 +3708,17 @@ const SeekerDashboard = () => {
               {/* Edit Profile Button */}
               <button
                 type="button"
-                onClick={() => setShowEditProfileModal(true)}
-                className="w-full sm:w-auto px-8 py-3 bg-slate-900 hover:bg-slate-800 text-white font-extrabold text-xs rounded-2xl transition-all shadow-md flex items-center justify-center gap-2"
+                onClick={() => {
+                  setProfileForm({
+                    name: user?.name || '',
+                    contact: user?.contact || user?.phone || '',
+                    profileImage: user?.profileImage || '',
+                    driverLicenseNumber: user?.driverLicenseNumber || '',
+                    driverLicenseImage: user?.driverLicenseImage || ''
+                  });
+                  setShowEditProfileModal(true);
+                }}
+                className="w-full sm:w-auto px-8 py-3 bg-slate-900 hover:bg-slate-800 text-white font-extrabold text-xs rounded-2xl transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer"
               >
                 ✏️ Edit Profile Details
               </button>
@@ -3950,7 +3959,7 @@ const SeekerDashboard = () => {
               </button>
 
               <h3 className="text-xl font-black text-slate-900 mb-1">Edit Profile Details</h3>
-              <p className="text-slate-400 text-xs mb-6">Update your account information, contact, and security settings.</p>
+              <p className="text-slate-400 text-xs mb-6">Update your account information, contact, and profile photo.</p>
 
               <form onSubmit={async (e) => {
                 await handleProfileSubmit(e);
@@ -3993,19 +4002,6 @@ const SeekerDashboard = () => {
                       }
                     }}
                     className="w-full px-4 py-2 border border-slate-200 rounded-xl text-xs bg-slate-50"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-600 uppercase mb-1.5">
-                    New Password <span className="text-slate-400 normal-case font-normal">(leave blank to keep unchanged)</span>
-                  </label>
-                  <input
-                    type="password"
-                    placeholder="••••••••"
-                    value={profileForm.password}
-                    onChange={e => setProfileForm(p => ({ ...p, password: e.target.value }))}
-                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 focus:outline-none focus:border-emerald-500"
                   />
                 </div>
 
