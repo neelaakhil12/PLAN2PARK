@@ -24,13 +24,11 @@
         "backgroundColor": "#0f172a"
       },
       "package": "com.plantopark.seeker",
+      "versionCode": 2,
       "permissions": [
         "android.permission.ACCESS_FINE_LOCATION",
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.CAMERA",
-        "android.permission.READ_EXTERNAL_STORAGE",
-        "android.permission.WRITE_EXTERNAL_STORAGE",
-        "android.permission.READ_MEDIA_IMAGES",
         "android.permission.RECORD_AUDIO",
         "android.permission.POST_NOTIFICATIONS",
         "android.permission.VIBRATE"
@@ -60,10 +58,11 @@
       [
         "expo-build-properties",
         {
-          "android": {
-            "kotlinVersion": "1.9.25",
-            "usesCleartextTraffic": true
-          }
+          "compileSdkVersion": 36,
+          "targetSdkVersion": 36,
+          "buildToolsVersion": "36.0.0",
+          "kotlinVersion": "1.9.25",
+          "usesCleartextTraffic": true
         }
       ],
       [
