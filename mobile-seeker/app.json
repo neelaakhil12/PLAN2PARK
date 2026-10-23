@@ -24,7 +24,7 @@
         "backgroundColor": "#0f172a"
       },
       "package": "com.plantopark.seeker",
-      "versionCode": 3,
+      "versionCode": 4,
       "permissions": [
         "android.permission.ACCESS_FINE_LOCATION",
         "android.permission.ACCESS_COARSE_LOCATION",
