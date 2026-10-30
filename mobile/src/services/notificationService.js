@@ -1,13 +1,17 @@
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
+import Constants from 'expo-constants';
 import { getBaseApiUrl, COMMON_HEADERS } from '../config/api';
 
-// Configure foreground notification behavior (alert, sound, badge)
+// Configure foreground notification behavior (alert, banner, list, sound, badge)
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
+    shouldShowBanner: true,
+    shouldShowList: true,
     shouldPlaySound: true,
     shouldSetBadge: true,
+    priority: Notifications.AndroidNotificationPriority.MAX,
   }),
 });
 
@@ -16,15 +20,53 @@ Notifications.setNotificationHandler({
  */
 export async function setupNotificationChannels() {
   if (Platform.OS === 'android') {
-    await Notifications.setNotificationChannelAsync('default', {
-      name: 'PlanToPark Alerts',
-      importance: Notifications.AndroidImportance.MAX,
-      vibrationPattern: [0, 250, 250, 250],
-      lightColor: '#10b981',
-      sound: 'default',
-      enableVibrate: true,
-      showBadge: true,
-    });
+    try {
+      // Clean up previous cached channels so Android recreates with custom car horn sound
+      await Notifications.deleteNotificationChannelAsync('plantopark_alerts_v2').catch(() => {});
+      await Notifications.deleteNotificationChannelAsync('plantopark_alerts').catch(() => {});
+    } catch (_) {}
+
+    try {
+      await Notifications.setNotificationChannelAsync('plantopark_horn_v3', {
+        name: 'PlanToPark Horn Alerts',
+        importance: Notifications.AndroidImportance.MAX,
+        vibrationPattern: [0, 250, 250, 250],
+        lightColor: '#10b981',
+        sound: 'car_horn.wav',
+        audioAttributes: {
+          usage: Notifications.AndroidAudioUsage.NOTIFICATION_EVENT,
+          contentType: Notifications.AndroidAudioContentType.SONIFICATION,
+          flags: {
+            enforceAudibility: true,
+          },
+        },
+        enableVibrate: true,
+        showBadge: true,
+        lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+        bypassDnd: true,
+      });
+    } catch (e) {
+      console.warn('Horn channel creation notice:', e?.message);
+    }
+
+    try {
+      await Notifications.setNotificationChannelAsync('default', {
+        name: 'PlanToPark Default',
+        importance: Notifications.AndroidImportance.MAX,
+        vibrationPattern: [0, 250, 250, 250],
+        lightColor: '#10b981',
+        sound: 'car_horn.wav',
+        audioAttributes: {
+          usage: Notifications.AndroidAudioUsage.NOTIFICATION_EVENT,
+          contentType: Notifications.AndroidAudioContentType.SONIFICATION,
+        },
+        enableVibrate: true,
+        showBadge: true,
+        lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+      });
+    } catch (e) {
+      console.warn('Default channel creation notice:', e?.message);
+    }
   }
 }
 
@@ -48,8 +90,15 @@ export async function registerForPushNotificationsAsync(authToken) {
       return null;
     }
 
-    // Fetch Expo Push Token
-    const tokenData = await Notifications.getExpoPushTokenAsync().catch((err) => {
+    // Fetch Expo Push Token with EAS Project ID
+    const projectId =
+      Constants?.expoConfig?.extra?.eas?.projectId ??
+      Constants?.easConfig?.projectId ??
+      '503958ef-bf1d-4ed5-93b2-5d0fb8bddc7c';
+
+    const tokenData = await Notifications.getExpoPushTokenAsync({
+      projectId,
+    }).catch((err) => {
       console.log('Failed to fetch Expo push token (may be Expo Go / Simulator):', err.message);
       return null;
     });
@@ -91,19 +140,38 @@ export async function registerForPushNotificationsAsync(authToken) {
 export async function triggerExternalNotification({ title, body, data = {} }) {
   try {
     await setupNotificationChannels();
+    const { status } = await Notifications.getPermissionsAsync();
+    if (status !== 'granted') {
+      await Notifications.requestPermissionsAsync();
+    }
+
     await Notifications.scheduleNotificationAsync({
       content: {
         title,
         body,
         data,
-        sound: 'default',
-        channelId: 'default',
+        sound: 'car_horn.wav',
+        channelId: 'plantopark_horn_v3',
         priority: Notifications.AndroidNotificationPriority.MAX,
       },
-      trigger: null, // null trigger presents notification IMMEDIATELY in notification tray
+      trigger: null,
     });
   } catch (err) {
-    console.warn('Failed to trigger external device notification:', err.message);
+    console.warn('Primary external notification failed, retrying on fallback channel:', err?.message);
+    try {
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title,
+          body,
+          data,
+          channelId: 'default',
+          priority: Notifications.AndroidNotificationPriority.MAX,
+        },
+        trigger: null,
+      });
+    } catch (fallbackErr) {
+      console.warn('Fallback external notification failed:', fallbackErr?.message);
+    }
   }
 }
 

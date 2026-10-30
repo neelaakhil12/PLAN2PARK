@@ -43,3 +43,7 @@ inspect_live.js
 set_password.js
 image.png
 image copy.png
+
+# Backups and screenshots
+_archive/
+image copy*.png

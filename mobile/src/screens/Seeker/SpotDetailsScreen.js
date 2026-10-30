@@ -110,7 +110,7 @@ const generateRazorpayHtml = (booking, orderData, user, space, finalPrice) => {
 <body>
   <div class="spinner"></div>
   <div class="title">PlanToPark Secure Checkout</div>
-  <div class="amount">₹${finalPrice || booking?.totalAmount || 0}.00</div>
+  <div class="amount">₹${Number(finalPrice || booking?.totalAmount || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}</div>
   <div id="subText" class="sub">Launching Razorpay Payment Sheet...</div>
   <button id="retryBtn" class="btn" onclick="tryOpenRazorpay()">Open Payment Window</button>
 
@@ -1201,7 +1201,7 @@ export default function SpotDetailsScreen({ route, navigation }) {
                     Use PlanToPark Wallet (-₹{walletDiscount})
                   </Text>
                   <Text style={styles.walletOptionSub}>
-                    Available Balance: ₹{walletBalance}.00 • Max ₹{maxWalletAllowed} usable
+                    Available Balance: ₹{Number(walletBalance || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })} • Max ₹{maxWalletAllowed} usable
                   </Text>
                 </View>
               </View>
@@ -1223,7 +1223,7 @@ export default function SpotDetailsScreen({ route, navigation }) {
                   ⚡ Wallet Money Applied
                 </Text>
                 <Text style={[styles.priceVal, { color: '#10b981', fontWeight: '800' }]}>
-                  - ₹{walletDiscount}.00
+                  - ₹{Number(walletDiscount || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}
                 </Text>
               </View>
             )}
@@ -1257,7 +1257,7 @@ export default function SpotDetailsScreen({ route, navigation }) {
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.rzpBrandTitle}>Razorpay Secure Checkout</Text>
-                  <Text style={styles.rzpBrandSub}>Total: ₹{finalPayablePrice}.00 • 256-bit Encrypted</Text>
+                  <Text style={styles.rzpBrandSub}>Total: ₹{Number(finalPayablePrice || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })} • 256-bit Encrypted</Text>
                 </View>
               </View>
 

@@ -1,8 +1,8 @@
 {
   "expo": {
-    "name": "PlanToPark Owner",
-    "slug": "plantopark-owner",
-    "scheme": "plantopark-owner",
+    "name": "PlanToPark",
+    "slug": "plantopark",
+    "scheme": "plantopark",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -23,14 +23,12 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0f172a"
       },
-      "package": "com.plantopark.owner",
+      "package": "com.plantopark.app",
+      "versionCode": 5,
       "permissions": [
         "android.permission.ACCESS_FINE_LOCATION",
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.CAMERA",
-        "android.permission.READ_EXTERNAL_STORAGE",
-        "android.permission.WRITE_EXTERNAL_STORAGE",
-        "android.permission.READ_MEDIA_IMAGES",
         "android.permission.RECORD_AUDIO",
         "android.permission.POST_NOTIFICATIONS",
         "android.permission.VIBRATE"
@@ -42,25 +40,28 @@
     "plugins": [
       "@react-native-google-signin/google-signin",
       [
-        "expo-location",
-        {
-          "locationAlwaysAndWhenInUsePermission": "PlanToPark needs access to your location to auto-detect your parking space address and coordinates."
-        }
-      ],
-      [
         "expo-notifications",
         {
           "icon": "./assets/icon.png",
-          "color": "#3b82f6",
+          "color": "#10b981",
           "sounds": [
             "./assets/sounds/car_horn.wav"
           ]
         }
       ],
       [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "PlanToPark needs access to your location to find and display parking spots near you."
+        }
+      ],
+      [
         "expo-build-properties",
         {
           "android": {
+            "compileSdkVersion": 36,
+            "targetSdkVersion": 36,
+            "buildToolsVersion": "36.0.0",
             "kotlinVersion": "1.9.25",
             "usesCleartextTraffic": true
           }
@@ -73,6 +74,11 @@
         }
       ]
     ],
-    "owner": "student15s-team"
+    "owner": "student14s-team",
+    "extra": {
+      "eas": {
+        "projectId": "c24f8685-e59a-47d2-8023-7f20f8ffe22d"
+      }
+    }
   }
 }

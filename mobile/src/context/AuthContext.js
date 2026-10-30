@@ -77,12 +77,11 @@ export const AuthProvider = ({ children }) => {
       email: data.email,
       role: data.role || role,
       accountCategory: data.accountCategory || category || 'standard',
-      landAcres: data.landAcres || 0,
-      fencingType: data.fencingType || '',
-      hasSecurityGuards: data.hasSecurityGuards || false,
+      organizationName: data.organizationName || '',
       contact: data.contact,
       status: data.status,
       profileImage: data.profileImage || '',
+      vehicles: data.vehicles || [],
       isEmailVerified: data.isEmailVerified,
       isNewlyRegistered: false,
     };
@@ -113,7 +112,10 @@ export const AuthProvider = ({ children }) => {
     const data = await res.json();
 
     if (!res.ok) {
-      throw new Error(data.message || 'Signup failed');
+      const error = new Error(data.message || 'Signup failed');
+      error.isEmailVerified = data.isEmailVerified;
+      error.email = data.email;
+      throw error;
     }
 
     if (data.token) {
@@ -123,12 +125,11 @@ export const AuthProvider = ({ children }) => {
         email: data.email,
         role: data.role || role,
         accountCategory: data.accountCategory || extraData.accountCategory || 'standard',
-        landAcres: data.landAcres || extraData.landAcres || 0,
-        fencingType: data.fencingType || extraData.fencingType || '',
-        hasSecurityGuards: data.hasSecurityGuards || extraData.hasSecurityGuards || false,
+        organizationName: data.organizationName || extraData.organizationName || '',
         contact: data.contact,
         status: data.status,
         profileImage: data.profileImage || '',
+        vehicles: data.vehicles || [],
         isEmailVerified: data.isEmailVerified,
         isNewlyRegistered: true,
       };
@@ -145,13 +146,17 @@ export const AuthProvider = ({ children }) => {
     const baseUrl = await getBaseApiUrl();
     const currentToken = token || (await AsyncStorage.getItem('user_token'));
 
-    const updatedVehicles = profileData.vehicleNumber
-      ? [{ plateNumber: profileData.vehicleNumber, vehicleType: 'Car' }]
-      : (user?.vehicles && user.vehicles.length > 0 ? user.vehicles : [{ plateNumber: 'TS 07 AB 1234', vehicleType: 'Car' }]);
+    const plateToSave = (profileData.vehicleNumber || profileData.vehiclePlateNumber || profileData.plateNumber || '').trim().toUpperCase();
+
+    const updatedVehicles = plateToSave
+      ? [{ plateNumber: plateToSave, vehicleType: profileData.vehicleType || 'Car' }]
+      : (user?.vehicles && user.vehicles.length > 0 ? user.vehicles : []);
 
     const localUpdatedUser = {
       ...user,
       ...profileData,
+      vehicleNumber: plateToSave || user?.vehicleNumber || (updatedVehicles[0]?.plateNumber) || '',
+      vehiclePlateNumber: plateToSave || user?.vehiclePlateNumber || (updatedVehicles[0]?.plateNumber) || '',
       contact: profileData.contact || user?.contact,
       vehicles: updatedVehicles,
       profileImage: profileData.passPhoto || profileData.profileImage || user?.profileImage,
@@ -194,10 +199,98 @@ export const AuthProvider = ({ children }) => {
     return localUpdatedUser;
   };
 
+  const googleLogin = async (role, token) => {
+    const baseUrl = await getBaseApiUrl();
+    const endpoint = `${baseUrl}/auth/google/login`;
+
+    let res;
+    try {
+      res = await fetch(endpoint, {
+        method: 'POST',
+        headers: COMMON_HEADERS,
+        body: JSON.stringify({ role, credential: token, idToken: token, accessToken: token }),
+      });
+    } catch (netErr) {
+      throw new Error('Cannot connect to server. Please check your internet connection.');
+    }
+
+    const data = await res.json();
+    if (!res.ok) {
+      const error = new Error(data.message || 'Google login failed');
+      error.notFound = data.notFound;
+      error.email = data.email;
+      error.name = data.name;
+      throw error;
+    }
+
+    const userData = {
+      _id: data._id,
+      name: data.name,
+      email: data.email,
+      role: data.role || role,
+      accountCategory: data.accountCategory || 'standard',
+      contact: data.contact,
+      status: data.status,
+      profileImage: data.profileImage || '',
+      vehicles: data.vehicles || [],
+    };
+
+    setToken(data.token);
+    setUser(userData);
+    await AsyncStorage.setItem('user_token', data.token);
+    await AsyncStorage.setItem('user_data', JSON.stringify(userData));
+
+    return userData;
+  };
+
+  const googleRegister = async (role, token, contact = '') => {
+    const baseUrl = await getBaseApiUrl();
+    const endpoint = `${baseUrl}/auth/google/register`;
+
+    let res;
+    try {
+      res = await fetch(endpoint, {
+        method: 'POST',
+        headers: COMMON_HEADERS,
+        body: JSON.stringify({ role, credential: token, idToken: token, accessToken: token, contact }),
+      });
+    } catch (netErr) {
+      throw new Error('Cannot connect to server. Please check your internet connection.');
+    }
+
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.message || 'Google registration failed');
+    }
+
+    const userData = {
+      _id: data._id,
+      name: data.name,
+      email: data.email,
+      role: data.role || role,
+      accountCategory: data.accountCategory || 'standard',
+      contact: data.contact,
+      status: data.status,
+      profileImage: data.profileImage || '',
+      vehicles: data.vehicles || [],
+    };
+
+    setToken(data.token);
+    setUser(userData);
+    await AsyncStorage.setItem('user_token', data.token);
+    await AsyncStorage.setItem('user_data', JSON.stringify(userData));
+
+    return userData;
+  };
+
   const logout = async () => {
     try {
       await AsyncStorage.removeItem('user_token');
       await AsyncStorage.removeItem('user_data');
+      try {
+        const { GoogleSignin } = require('@react-native-google-signin/google-signin');
+        await GoogleSignin.signOut();
+      } catch (gErr) {}
     } catch (e) {
       console.error(e);
     }
@@ -207,7 +300,7 @@ export const AuthProvider = ({ children }) => {
 
   return (
     <AuthContext.Provider
-      value={{ user, token, loading, loginForRole, signupForRole, updateProfile, logout, setUser }}
+      value={{ user, token, loading, loginForRole, signupForRole, googleLogin, googleRegister, updateProfile, logout, setUser }}
     >
       {children}
     </AuthContext.Provider>

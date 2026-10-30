@@ -144,17 +144,53 @@ const BANK_FINANCE_TOPIC_CATEGORIES = [
   },
 ];
 
+// Dynamically build topic categories by merging base categories with any new categories created in admin panel
+const buildTopicCategories = (faqsList = [], isBank = false) => {
+  const baseList = isBank ? BANK_FINANCE_TOPIC_CATEGORIES : SEEKER_TOPIC_CATEGORIES;
+  const categories = [...baseList];
+
+  // Discover all unique category names present in faqsList
+  const foundCategories = [...new Set(faqsList.map((f) => (f.category || 'General').trim()).filter(Boolean))];
+
+  foundCategories.forEach((rawCat) => {
+    const rawLower = rawCat.toLowerCase();
+    const alreadyExists = categories.some((c) => {
+      const cLower = c.title.toLowerCase();
+      return cLower === rawLower || cLower.includes(rawLower) || rawLower.includes(cLower);
+    });
+
+    if (!alreadyExists) {
+      categories.push({
+        id: `custom_${rawLower.replace(/[^a-z0-9]/g, '_')}`,
+        title: rawCat,
+        description: `${faqsList.filter((f) => (f.category || 'General').trim().toLowerCase() === rawLower).length} questions available`,
+        questionIds: [],
+      });
+    }
+  });
+
+  // Only return categories that actually have at least 1 matching question
+  return categories.filter((cat) => {
+    const catLower = (cat.title || '').toLowerCase();
+    return faqsList.some((f) => {
+      const fCatLower = (f.category || 'General').trim().toLowerCase();
+      const idMatch = cat.questionIds?.includes(f.id) || cat.questionIds?.includes(f.faqId);
+      const catMatch = fCatLower === catLower || catLower.includes(fCatLower) || fCatLower.includes(catLower);
+      return idMatch || catMatch;
+    });
+  });
+};
+
 const BOT_NAME = 'Agent PlanToPark';
 
 export default function HelpAssistantScreen({ navigation }) {
   const { user } = useContext(AuthContext);
   const isBankSeeker = user?.accountCategory === 'bank_finance_seeker' || user?.accountCategory?.includes('bank');
 
-  const topicCategories = isBankSeeker ? BANK_FINANCE_TOPIC_CATEGORIES : SEEKER_TOPIC_CATEGORIES;
   const initialFaqs = isBankSeeker ? bankFinanceFaqs : seekerFaqs;
-
   const [ticketId] = useState(generateTicketId);
   const [faqs, setFaqs] = useState(initialFaqs);
+  const [topicCategories, setTopicCategories] = useState(() => buildTopicCategories(initialFaqs, isBankSeeker));
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [isChatEnded, setIsChatEnded] = useState(false);
@@ -165,40 +201,59 @@ export default function HelpAssistantScreen({ navigation }) {
     ? "Hello! Welcome to PlanToPark Bank & Finance Support. I'm Agent PlanToPark, here to assist with your vehicle storage yard requests."
     : "Hello! Welcome to PlanToPark Support. I'm Agent PlanToPark, here to assist you.";
 
-  const [messages, setMessages] = useState(() => [
-    {
-      id: 'greeting-1',
-      sender: 'bot',
-      botName: BOT_NAME,
-      text: greetingText,
-      timestamp: formatTime(),
-    },
-    {
-      id: 'greeting-2',
-      sender: 'bot',
-      botName: BOT_NAME,
-      text: "Can you specify what you need help with from the options below?",
-      timestamp: formatTime(),
-      options: topicCategories.map((cat) => ({
-        id: cat.id,
-        label: cat.title,
-        payload: { type: 'SELECT_TOPIC', topic: cat },
-      })),
-      active: true,
-    },
-  ]);
+  const [messages, setMessages] = useState(() => {
+    const initialCats = buildTopicCategories(initialFaqs, isBankSeeker);
+    return [
+      {
+        id: 'greeting-1',
+        sender: 'bot',
+        botName: BOT_NAME,
+        text: greetingText,
+        timestamp: formatTime(),
+      },
+      {
+        id: 'greeting-2',
+        sender: 'bot',
+        botName: BOT_NAME,
+        text: "Can you specify what you need help with from the options below?",
+        timestamp: formatTime(),
+        options: initialCats.map((cat) => ({
+          id: cat.id,
+          label: cat.title,
+          payload: { type: 'SELECT_TOPIC', topic: cat },
+        })),
+        active: true,
+      },
+    ];
+  });
 
   // Fetch live FAQs from backend (filtered by audience) so admin edits reflect immediately
   useEffect(() => {
     (async () => {
       try {
         const audienceParam = isBankSeeker ? 'bank_finance' : 'parking_seeker';
-        const url = `${endpoints.getFaqs}?audience=${audienceParam}`;
+        const url = `${endpoints.getFaqs}?audience=${audienceParam}&t=${Date.now()}`;
         const res = await fetch(url);
         if (res.ok) {
           const data = await res.json();
           if (Array.isArray(data) && data.length > 0) {
             setFaqs(data);
+            const dynamicCategories = buildTopicCategories(data, isBankSeeker);
+            setTopicCategories(dynamicCategories);
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id.startsWith('greeting-2') && m.active
+                  ? {
+                      ...m,
+                      options: dynamicCategories.map((cat) => ({
+                        id: cat.id,
+                        label: cat.title,
+                        payload: { type: 'SELECT_TOPIC', topic: cat },
+                      })),
+                    }
+                  : m
+              )
+            );
           }
         }
       } catch (err) {
@@ -357,14 +412,27 @@ export default function HelpAssistantScreen({ navigation }) {
         const topic = payload.topic;
 
         // Get questions belonging to this topic (by ID, faqId, or category name matching)
+        const topicTitle = (topic.title || '').trim().toLowerCase();
         const topicQuestions = faqs.filter((f) => {
+          const fCat = (f.category || 'General').trim().toLowerCase();
           const idMatch = topic.questionIds?.includes(f.id) || topic.questionIds?.includes(f.faqId);
-          const catMatch = f.category && topic.title && f.category.toLowerCase() === topic.title.toLowerCase();
+          const catMatch = fCat === topicTitle || topicTitle.includes(fCat) || fCat.includes(topicTitle);
           return idMatch || catMatch;
         });
 
-        const questionOptions = topicQuestions.map((q) => ({
-          id: `q_${q.id || q._id}`,
+        // Deduplicate questions by question text
+        const uniqueTopicQuestions = [];
+        const seenQuestions = new Set();
+        for (const q of topicQuestions) {
+          const key = (q.question || '').trim().toLowerCase();
+          if (!seenQuestions.has(key)) {
+            seenQuestions.add(key);
+            uniqueTopicQuestions.push(q);
+          }
+        }
+
+        const questionOptions = uniqueTopicQuestions.map((q) => ({
+          id: `q_${q.id || q._id || q.faqId}`,
           label: q.question,
           payload: { type: 'SELECT_QUESTION', questionItem: q, topic },
         }));

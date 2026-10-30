@@ -19,16 +19,16 @@ const DEFAULT_SUPPORT = {
   supportEmail: 'plantopark@gmail.com',
   supportWhatsapp: '+91 8919360467',
   supportHours: '24/7 Dedicated Support Desk',
-  storageYardSupportPhone: '+91 8919360467',
-  storageYardSupportEmail: 'plantopark@gmail.com',
-  ownerSupportPhone: '+91 8919360467',
-  ownerSupportEmail: 'plantopark@gmail.com',
+  supportResponseNote: 'Contact us through email. If you have any query, response will be received within 24 to 48 hours.',
+  seekerSupportPhone: '+91 8919360467',
+  seekerSupportEmail: 'plantopark@gmail.com',
+  bankFinanceSupportPhone: '+91 8919360467',
+  bankFinanceSupportEmail: 'plantopark@gmail.com',
 };
 
-export default function SupportModal({ visible, onClose, isStorageYard = false }) {
+export default function SupportModal({ visible, onClose, isBankFinance = false }) {
   const [supportData, setSupportData] = useState(DEFAULT_SUPPORT);
   const [loading, setLoading] = useState(false);
-  const [copiedField, setCopiedField] = useState(null);
 
   useEffect(() => {
     if (visible) {
@@ -38,7 +38,7 @@ export default function SupportModal({ visible, onClose, isStorageYard = false }
 
   const fetchSupportData = async () => {
     try {
-      const res = await fetch(`${API_URL}/settings/support`);
+      const res = await fetch(`${API_URL}/settings/support?t=${Date.now()}`);
       if (res.ok) {
         const data = await res.json();
         setSupportData(prev => ({ ...prev, ...data }));
@@ -48,36 +48,17 @@ export default function SupportModal({ visible, onClose, isStorageYard = false }
     }
   };
 
-  const activePhone = supportData.supportPhone ||
-    (isStorageYard
-      ? (supportData.storageYardSupportPhone || supportData.supportPhone)
-      : (supportData.ownerSupportPhone || supportData.supportPhone));
-
   const activeEmail = supportData.supportEmail ||
-    (isStorageYard
-      ? (supportData.storageYardSupportEmail || supportData.supportEmail)
-      : (supportData.ownerSupportEmail || supportData.supportEmail));
-
-  const activeWhatsapp = supportData.supportWhatsapp || activePhone;
-
-  const handleCall = () => {
-    const cleanNumber = activePhone.replace(/[^\d+]/g, '');
-    Linking.openURL(`tel:${cleanNumber}`).catch(() => {
-      alert(`PlanToPark Support Phone: ${activePhone}`);
-    });
-  };
+    (isBankFinance
+      ? (supportData.bankFinanceSupportEmail || supportData.supportEmail)
+      : (supportData.seekerSupportEmail || supportData.supportEmail));
 
   const handleEmail = () => {
-    Linking.openURL(`mailto:${activeEmail}?subject=Support Request - PlanToPark Host Desk`).catch(() => {
+    const subject = isBankFinance
+      ? 'Bank Recovery Fleet Support - PlanToPark Help Desk'
+      : 'Parking Support Inquiry - PlanToPark Help Desk';
+    Linking.openURL(`mailto:${activeEmail}?subject=${encodeURIComponent(subject)}`).catch(() => {
       alert(`PlanToPark Support Email: ${activeEmail}`);
-    });
-  };
-
-  const handleWhatsapp = () => {
-    const cleanNumber = activeWhatsapp.replace(/[^\d]/g, '');
-    const url = `https://wa.me/${cleanNumber}?text=Hello%20PlanToPark%20Support%2C%20I%20am%20a%20host%20requesting%20assistance.`;
-    Linking.openURL(url).catch(() => {
-      alert(`WhatsApp Number: ${activeWhatsapp}`);
     });
   };
 
@@ -93,7 +74,7 @@ export default function SupportModal({ visible, onClose, isStorageYard = false }
                 <Text style={styles.badgeTxt}>OFFICIAL HELPDESK</Text>
               </View>
               <Text style={styles.title}>
-                {isStorageYard ? '🚜 Storage Yard Help Desk' : '✉️ Customer Support Desk'}
+                {isBankFinance ? '🏦 Bank & Fleet Support Desk' : '✉️ Customer Support Desk'}
               </Text>
               <Text style={styles.subtitle}>
                 Official PlanToPark Support • Email Assistance
@@ -105,11 +86,13 @@ export default function SupportModal({ visible, onClose, isStorageYard = false }
           </View>
 
           <ScrollView style={styles.body} showsVerticalScrollIndicator={false}>
-            {/* Main Call-to-Action Card */}
+            {/* Main Action Card */}
             <View style={styles.priorityCard}>
               <Text style={styles.priorityTitle}>Need Help or Have a Query?</Text>
               <Text style={styles.priorityDesc}>
-                Connect directly with the PlanToPark platform management and operations desk for spot listings, vehicle repossession holding, gate inquiries, or wallet payouts.
+                {isBankFinance
+                  ? 'Connect with dedicated bank liaison officers for staging yard inquiries, impounded vehicle release passes, and corporate billing.'
+                  : 'Connect directly with the PlanToPark support desk for parking spot directions, gate access issues, booking assistance, or refund requests.'}
               </Text>
 
               {/* Email Button */}
@@ -252,7 +235,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   actionBtnPrimary: {
-    backgroundColor: '#3b82f6',
+    backgroundColor: '#2563eb',
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 12,

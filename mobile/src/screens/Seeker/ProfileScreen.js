@@ -175,13 +175,20 @@ export default function ProfileScreen({ navigation }) {
         {!isBankUser ? (
           <>
             <Text style={styles.sectionTitle}>Saved Vehicle Details</Text>
-            <View style={styles.itemCard}>
+            <TouchableOpacity
+              style={styles.itemCard}
+              onPress={() => setShowEditModal(true)}
+              activeOpacity={0.8}
+            >
               <View style={styles.vehRow}>
                 <Text style={styles.itemTitle}>🚗 {primaryVehicle.plateNumber}</Text>
-                <Text style={styles.primaryTag}>PRIMARY</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Text style={styles.primaryTag}>PRIMARY</Text>
+                  <Text style={{ fontSize: 13, color: '#38bdf8', fontWeight: '700' }}>✏️ Edit</Text>
+                </View>
               </View>
-              <Text style={styles.itemSub}>{primaryVehicle.vehicleType || 'Car'} • Active Parking License</Text>
-            </View>
+              <Text style={styles.itemSub}>{primaryVehicle.vehicleType || 'Car'} • Auto-fills when booking spots</Text>
+            </TouchableOpacity>
           </>
         ) : (
           <>

@@ -25,6 +25,7 @@ export default function ProfileScreen() {
   const { user, updateProfile, logout } = useContext(AuthContext);
   const [showTermsModal, setShowTermsModal] = useState(false);
   const [showSupportModal, setShowSupportModal] = useState(false);
+
   const isStorageOwner =
     user?.accountCategory === 'vehicle_storage_owner' ||
     (user?.name && user.name.toLowerCase().includes('storage'));

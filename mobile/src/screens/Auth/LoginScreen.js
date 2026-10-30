@@ -14,43 +14,25 @@ import { AuthContext } from '../../context/AuthContext';
 import { COLORS } from '../../theme/colors';
 import Button from '../../components/Button';
 import Header from '../../components/Header';
+import GoogleSignInButton from '../../components/GoogleSignInButton';
 
 export default function LoginScreen({ route, navigation }) {
-  const initialRole = route.params?.role || 'owner';
-  const initialCategory = route.params?.category || (initialRole === 'owner' ? 'vehicle_storage_owner' : 'standard');
-  const [currentCategory, setCurrentCategory] = useState(initialCategory);
-  const role = (currentCategory === 'bank_finance_seeker') ? 'seeker' : (currentCategory === 'vehicle_storage_owner' ? 'owner' : initialRole);
+  const { loginForRole, googleLogin } = useContext(AuthContext);
 
-  const { loginForRole } = useContext(AuthContext);
+  const role = route?.params?.role === 'owner' ? 'owner' : 'seeker';
+  const category = route?.params?.category || 'standard';
 
-  const [email, setEmail] = useState(role === 'admin' ? 'plantopark@gmail.com' : '');
-  const [password, setPassword] = useState(role === 'admin' ? 'Plan2park@12' : '');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
-  const isStorageOwner = currentCategory === 'vehicle_storage_owner';
-  const isBankSeeker = currentCategory === 'bank_finance_seeker';
-
-  const roleTitle = isStorageOwner
-    ? 'Vehicle Storage Login'
-    : isBankSeeker
-    ? 'Banks & Finance Login'
-    : role === 'seeker'
-    ? 'Seeker Login'
-    : role === 'owner'
-    ? 'Owner Login'
-    : 'Admin Login';
-
-  const themeColor = isStorageOwner
-    ? COLORS.storageAccent
-    : isBankSeeker
-    ? COLORS.bankAccent
-    : role === 'seeker'
-    ? COLORS.seekerAccent
-    : role === 'owner'
-    ? COLORS.ownerAccent
-    : COLORS.adminAccent;
+  const isOwner = role === 'owner';
+  const themeColor = isOwner ? COLORS.ownerAccent : COLORS.seekerAccent;
+  const roleTitle = isOwner ? 'Space Owner Login' : 'Parking Seeker Login';
+  const roleBadgeTxt = isOwner ? '🅿️ SPACE OWNER PORTAL' : '🚗 PARKING SEEKER PORTAL';
+  const portalSubtitle = isOwner ? 'I Have Parking' : 'I Want Parking';
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -62,7 +44,7 @@ export default function LoginScreen({ route, navigation }) {
     setLoading(true);
     setErrorMsg('');
     try {
-      await loginForRole(role, email.trim(), password, currentCategory);
+      await loginForRole(role, email.trim(), password, category);
     } catch (err) {
       const msg = err.message || 'Invalid credentials';
       setErrorMsg(msg);
@@ -72,144 +54,80 @@ export default function LoginScreen({ route, navigation }) {
     }
   };
 
+  const handleGoogleSuccess = async (googleToken) => {
+    setLoading(true);
+    setErrorMsg('');
+    try {
+      await googleLogin(role, googleToken);
+    } catch (err) {
+      if (err.notFound) {
+        Alert.alert(
+          'No Account Found',
+          isOwner
+            ? 'No space owner account found with this Google email. Please sign up first.'
+            : 'No parking seeker account found with this Google email. Please sign up first.',
+          [
+            {
+              text: 'Sign Up',
+              onPress: () =>
+                navigation.navigate('Register', {
+                  role,
+                  category,
+                  email: err.email,
+                  name: err.name,
+                }),
+            },
+            { text: 'Cancel', style: 'cancel' },
+          ]
+        );
+      } else {
+        const msg = err.message || 'Google sign-in failed';
+        setErrorMsg(msg);
+        Alert.alert('Google Sign-In Failed', msg);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
-      <Header title={roleTitle} subtitle="PlanToPark Mobile" onBack={() => navigation.goBack()} />
+      <Header
+        title={roleTitle}
+        subtitle={portalSubtitle}
+        onBack={() => navigation.goBack()}
+      />
 
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <View style={styles.badgeRow}>
           <View style={[styles.roleBadge, { backgroundColor: themeColor }]}>
-            <Text style={styles.roleBadgeTxt}>
-              {isStorageOwner
-                ? '🏢 VEHICLE STORAGE (1+ ACRE)'
-                : isBankSeeker
-                ? '🏦 BANKS & AUTO FINANCE'
-                : role.toUpperCase()}
-            </Text>
+            <Text style={styles.roleBadgeTxt}>{roleBadgeTxt}</Text>
           </View>
         </View>
 
-        {/* Quick Portal Switcher */}
-        {role !== 'admin' && (
-          <View style={{ flexDirection: 'row', gap: 6, marginBottom: 14 }}>
-            <TouchableOpacity
-              style={{
-                flex: 1,
-                paddingVertical: 7,
-                paddingHorizontal: 4,
-                borderRadius: 8,
-                alignItems: 'center',
-                backgroundColor: currentCategory === 'standard' ? COLORS.ownerAccent : '#1e293b',
-              }}
-              onPress={() => setCurrentCategory('standard')}
-            >
-              <Text style={{ fontSize: 11, fontWeight: '700', color: '#ffffff' }}>
-                🅿️ Space Owner
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={{
-                flex: 1.2,
-                paddingVertical: 7,
-                paddingHorizontal: 4,
-                borderRadius: 8,
-                alignItems: 'center',
-                backgroundColor: isStorageOwner ? COLORS.storageAccent : '#1e293b',
-              }}
-              onPress={() => setCurrentCategory('vehicle_storage_owner')}
-            >
-              <Text style={{ fontSize: 11, fontWeight: '700', color: isStorageOwner ? '#000000' : '#ffffff' }}>
-                🏢 Storage (1+ Ac)
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={{
-                flex: 1.1,
-                paddingVertical: 7,
-                paddingHorizontal: 4,
-                borderRadius: 8,
-                alignItems: 'center',
-                backgroundColor: isBankSeeker ? COLORS.bankAccent : '#1e293b',
-              }}
-              onPress={() => setCurrentCategory('bank_finance_seeker')}
-            >
-              <Text style={{ fontSize: 11, fontWeight: '700', color: '#ffffff' }}>
-                🏦 Banks & Repo
-              </Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        <Text style={styles.heading}>
-          {isStorageOwner ? 'Vehicle Storage Partner 🏢' : isBankSeeker ? 'Bank & Auto Finance 🏦' : 'Welcome Back 👋'}
-        </Text>
+        <Text style={styles.heading}>Welcome Back 👋</Text>
         <Text style={styles.subheading}>
-          {isStorageOwner
-            ? 'Monetize 1+ Acre secure land for seized and financed vehicle storage'
-            : isBankSeeker
-            ? 'Search & reserve secured 1+ Acre stockyards for repossessed vehicles'
-            : 'Enter your credentials to access your account'}
+          {isOwner
+            ? 'Log in to manage your spaces, incoming bookings, and payouts.'
+            : 'Log in to find, navigate, and reserve verified parking spots.'}
         </Text>
 
-        {/* ⚠️ Mandatory 1 Acre Policy Warning for Vehicle Storage */}
-        {isStorageOwner && (
-          <View style={{
-            backgroundColor: 'rgba(245, 158, 11, 0.12)',
-            borderWidth: 1.5,
-            borderColor: COLORS.storageAccent,
-            borderRadius: 14,
-            padding: 12,
-            marginBottom: 16,
-          }}>
-            <Text style={{ color: COLORS.storageAccent, fontWeight: '900', fontSize: 12, marginBottom: 4 }}>
-              ⚠️ MANDATORY 1 ACRE LAND REQUIREMENT
-            </Text>
-            <Text style={{ color: '#cbd5e1', fontSize: 11, lineHeight: 16 }}>
-              A minimum of 1.0 Acre (43,560 sq ft) of secure, gated/fenced land is strictly required to register and list as an authorized Vehicle Storage Yard for banks and auto finance companies.
-            </Text>
+        {/* Platform Notice */}
+        <View style={styles.warningBox}>
+          <View style={styles.warningHeader}>
+            <Ionicons name="warning" size={15} color="#fbbf24" style={{ marginRight: 6 }} />
+            <Text style={styles.warningTitle}>IMPORTANT PLATFORM NOTICE</Text>
           </View>
-        )}
-
-        {/* ⚠️ Mandatory Platform Disclaimer for Parking Seeker */}
-        {role === 'seeker' && (
-          <View style={{
-            backgroundColor: 'rgba(245, 158, 11, 0.12)',
-            borderWidth: 1.5,
-            borderColor: '#f59e0b',
-            borderRadius: 14,
-            padding: 12,
-            marginBottom: 16,
-          }}>
-            <Text style={{ color: '#fbbf24', fontWeight: '900', fontSize: 12, marginBottom: 4 }}>
-              ⚠️ IMPORTANT PLATFORM NOTICE
-            </Text>
-            <Text style={{ color: '#fef3c7', fontSize: 11.5, lineHeight: 17, fontWeight: '500' }}>
-              Plan To Park acts only as a technology platform connecting parking providers and vehicle owners. Plan to park is not responsible for any kind of disturbances like theft, dent, fight between space owner and vehicle owner. Both should coordinate each other.
-            </Text>
-          </View>
-        )}
+          <Text style={styles.warningText}>
+            Plan To Park acts only as a technology platform connecting parking providers and vehicle owners. Plan to park is not responsible for any kind of disturbances like theft, dent, or fight between space owner and vehicle owner. Both should coordinate with each other.
+          </Text>
+        </View>
 
         {!!errorMsg && (
           <View style={styles.errorBox}>
             <Text style={styles.errorTitle}>⚠️ Login Failed</Text>
             <Text style={styles.errorText}>{errorMsg}</Text>
           </View>
-        )}
-
-        {role === 'admin' && (
-          <TouchableOpacity
-            style={styles.demoBox}
-            onPress={() => {
-              setEmail('plantopark@gmail.com');
-              setPassword('Plan2park@12');
-            }}
-          >
-            <Text style={styles.demoTitle}>💡 Default Admin Credentials</Text>
-            <Text style={styles.demoText}>Email: plantopark@gmail.com</Text>
-            <Text style={styles.demoText}>Password: Plan2park@12</Text>
-          </TouchableOpacity>
         )}
 
         <View style={styles.inputGroup}>
@@ -229,7 +147,7 @@ export default function LoginScreen({ route, navigation }) {
           <Text style={styles.label}>Password</Text>
           <View style={styles.passwordContainer}>
             <TextInput
-              style={[styles.input, { flex: 1, borderWidth: 0, paddingRight: 0 }]}
+              style={styles.passwordInput}
               placeholder="••••••••"
               placeholderTextColor={COLORS.textMuted}
               value={password}
@@ -257,23 +175,54 @@ export default function LoginScreen({ route, navigation }) {
         </View>
 
         <Button
-          title={`Sign In as ${role.charAt(0).toUpperCase() + role.slice(1)}`}
+          title={loading ? 'Signing in...' : isOwner ? 'Sign In as Space Owner' : 'Sign In as Parking Seeker'}
           onPress={handleLogin}
-          loading={loading}
-          variant={role === 'admin' ? 'admin' : 'primary'}
-          style={{ marginTop: 12 }}
+          disabled={loading}
+          style={[styles.submitBtn, { backgroundColor: themeColor }]}
         />
 
-        {role !== 'admin' && (
-          <View style={styles.signupRow}>
-            <Text style={styles.signupText}>Don't have an account? </Text>
-            <TouchableOpacity onPress={() => navigation.navigate('Register', { role, category: currentCategory })}>
-              <Text style={[styles.signupLink, { color: themeColor }]}>
-                {isStorageOwner ? 'Register 1+ Acre Land' : isBankSeeker ? 'Register Bank / Repo Dept' : 'Sign Up'}
-              </Text>
-            </TouchableOpacity>
-          </View>
-        )}
+        {/* Google Sign In */}
+        <GoogleSignInButton
+          onAuthSuccess={handleGoogleSuccess}
+          text={`Sign in with Google (${isOwner ? 'Owner' : 'Seeker'})`}
+          disabled={loading}
+        />
+
+        {/* Register Link */}
+        <View style={styles.footerRow}>
+          <Text style={styles.footerTxt}>Don't have an account? </Text>
+          <TouchableOpacity
+            onPress={() =>
+              navigation.navigate('Register', {
+                role,
+                category,
+              })
+            }
+          >
+            <Text style={[styles.footerLink, { color: themeColor }]}>
+              {isOwner ? 'Sign Up as Space Owner' : 'Sign Up as Parking Seeker'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Quick Portal Switch */}
+        <View style={styles.switchBox}>
+          <TouchableOpacity
+            style={styles.switchBtn}
+            onPress={() =>
+              navigation.replace('Login', {
+                role: isOwner ? 'seeker' : 'owner',
+                category: 'standard',
+              })
+            }
+          >
+            <Text style={styles.switchTxt}>
+              {isOwner
+                ? '🚗 Want to find parking instead? Switch to Seeker Login'
+                : '🅿️ Have parking space to list? Switch to Owner Login'}
+            </Text>
+          </TouchableOpacity>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -286,112 +235,150 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 24,
-    paddingBottom: 40,
+    paddingTop: 14,
   },
   badgeRow: {
+    flexDirection: 'row',
     marginBottom: 12,
   },
   roleBadge: {
-    alignSelf: 'flex-start',
     paddingHorizontal: 12,
-    paddingVertical: 4,
+    paddingVertical: 5,
     borderRadius: 8,
   },
   roleBadgeTxt: {
-    color: COLORS.white,
+    color: '#ffffff',
     fontWeight: '800',
-    fontSize: 12,
+    fontSize: 11,
+    letterSpacing: 0.5,
   },
   heading: {
     fontSize: 26,
     fontWeight: '800',
     color: COLORS.white,
-  },
-  subheading: {
-    fontSize: 14,
-    color: COLORS.textMuted,
-    marginTop: 4,
-    marginBottom: 24,
-  },
-  demoBox: {
-    backgroundColor: '#1e293b',
-    borderWidth: 1,
-    borderColor: COLORS.adminAccent,
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 20,
-  },
-  demoTitle: {
-    color: COLORS.adminAccent,
-    fontWeight: '700',
-    marginBottom: 4,
-  },
-  demoText: {
-    color: COLORS.textLight,
-    fontSize: 12,
-  },
-  inputGroup: {
-    marginBottom: 18,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: COLORS.white,
     marginBottom: 6,
   },
-  input: {
-    backgroundColor: COLORS.cardBg,
-    borderWidth: 1,
-    borderColor: COLORS.borderDark,
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    color: COLORS.white,
-    fontSize: 15,
-  },
-  signupRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginTop: 20,
-  },
-  signupText: {
+  subheading: {
+    fontSize: 13.5,
     color: COLORS.textMuted,
-    fontSize: 14,
+    marginBottom: 18,
+    lineHeight: 19,
   },
-  signupLink: {
-    fontWeight: '700',
-    fontSize: 14,
+  warningBox: {
+    backgroundColor: 'rgba(245, 158, 11, 0.12)',
+    borderWidth: 1,
+    borderColor: '#f59e0b',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 16,
+  },
+  warningHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  warningTitle: {
+    color: '#fbbf24',
+    fontSize: 11.5,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+  },
+  warningText: {
+    color: '#fef3c7',
+    fontSize: 11.5,
+    lineHeight: 16,
   },
   errorBox: {
-    backgroundColor: '#450a0a',
+    backgroundColor: 'rgba(239, 68, 68, 0.15)',
     borderWidth: 1,
     borderColor: '#ef4444',
     borderRadius: 12,
-    padding: 14,
-    marginBottom: 20,
+    padding: 12,
+    marginBottom: 16,
   },
   errorTitle: {
-    color: '#f87171',
+    color: '#fca5a5',
     fontWeight: '700',
-    fontSize: 14,
-    marginBottom: 4,
+    fontSize: 13,
+    marginBottom: 2,
   },
   errorText: {
-    color: '#fca5a5',
-    fontSize: 13,
+    color: '#fee2e2',
+    fontSize: 12,
+  },
+  inputGroup: {
+    marginBottom: 16,
+  },
+  label: {
+    fontSize: 13.5,
+    fontWeight: '600',
+    color: COLORS.white,
+    marginBottom: 8,
+  },
+  input: {
+    backgroundColor: COLORS.cardBg,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: COLORS.borderDark,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    color: COLORS.white,
+    fontSize: 15,
   },
   passwordContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: COLORS.cardBg,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: COLORS.borderDark,
-    borderRadius: 12,
-    paddingRight: 10,
+  },
+  passwordInput: {
+    flex: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    color: COLORS.white,
+    fontSize: 15,
   },
   eyeBtn: {
-    padding: 8,
+    paddingHorizontal: 12,
+  },
+  submitBtn: {
+    marginTop: 6,
+    borderRadius: 14,
+    paddingVertical: 14,
+  },
+  footerRow: {
+    flexDirection: 'row',
     justifyContent: 'center',
+    marginTop: 18,
     alignItems: 'center',
+    flexWrap: 'wrap',
+  },
+  footerTxt: {
+    color: COLORS.textMuted,
+    fontSize: 13.5,
+  },
+  footerLink: {
+    fontWeight: '700',
+    fontSize: 13.5,
+  },
+  switchBox: {
+    marginTop: 22,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.08)',
+    alignItems: 'center',
+  },
+  switchBtn: {
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+  },
+  switchTxt: {
+    color: '#cbd5e1',
+    fontSize: 12.5,
+    fontWeight: '600',
   },
 });
