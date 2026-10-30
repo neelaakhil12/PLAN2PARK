@@ -53,12 +53,14 @@ const { OAuth2Client } = require('google-auth-library');
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '908977180-dkg2d8h9109b4tvsnaf51scbmi4l09or.apps.googleusercontent.com';
 const GOOGLE_SEEKER_ANDROID_CLIENT_ID = process.env.GOOGLE_SEEKER_ANDROID_CLIENT_ID || '908977180-sei0dnkqlig3ljr093imk5s0n3jalu0e.apps.googleusercontent.com';
 const GOOGLE_OWNER_ANDROID_CLIENT_ID = process.env.GOOGLE_OWNER_ANDROID_CLIENT_ID || '908977180-1t50tibmdnuji3t4d4rn0ic9f7rdrbut.apps.googleusercontent.com';
+const GOOGLE_APP_ANDROID_CLIENT_ID = process.env.GOOGLE_APP_ANDROID_CLIENT_ID || '908977180-jb4d7cdokpsgmr4sm2mnb0orcqim28nv.apps.googleusercontent.com';
 const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
 
 const ALLOWED_GOOGLE_AUDIENCES = [
   GOOGLE_CLIENT_ID,
   GOOGLE_SEEKER_ANDROID_CLIENT_ID,
   GOOGLE_OWNER_ANDROID_CLIENT_ID,
+  GOOGLE_APP_ANDROID_CLIENT_ID,
 ];
 
 async function verifyGoogleToken(token) {
