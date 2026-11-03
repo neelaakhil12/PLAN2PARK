@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "PlanToPark",
-    "slug": "plantopark-seeker",
+    "slug": "plantopark",
     "scheme": "plantopark",
     "version": "1.0.0",
     "orientation": "portrait",
