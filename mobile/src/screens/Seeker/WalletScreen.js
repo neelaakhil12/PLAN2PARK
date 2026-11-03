@@ -136,6 +136,7 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 16,
+    paddingBottom: 110,
   },
   balanceCard: {
     backgroundColor: COLORS.primary,

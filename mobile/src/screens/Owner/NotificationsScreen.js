@@ -449,7 +449,7 @@ const styles = StyleSheet.create({
   },
   listContent: {
     padding: 14,
-    paddingBottom: 40,
+    paddingBottom: 110,
   },
   swipeContainer: {
     position: 'relative',

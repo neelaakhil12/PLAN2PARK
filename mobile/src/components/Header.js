@@ -6,8 +6,13 @@ import { COLORS } from '../theme/colors';
 export default function Header({ title, subtitle, rightElement, onBack }) {
   const insets = useSafeAreaInsets();
   
-  // Clean, compact top padding compatible with all Android devices and iOS notches
-  const totalTopPadding = Platform.OS === 'android' ? 12 : Math.max(insets.top, 14);
+  // Reliable top padding compatible with all Android devices (notches, hole-punch cameras, edge-to-edge) and iOS notches
+  const safeTop = Math.max(
+    insets?.top || 0,
+    Platform.OS === 'android' ? (StatusBar.currentHeight || 24) : 0,
+    14
+  );
+  const totalTopPadding = safeTop + 8;
 
   return (
     <View style={[styles.headerContainer, { paddingTop: totalTopPadding }]}>

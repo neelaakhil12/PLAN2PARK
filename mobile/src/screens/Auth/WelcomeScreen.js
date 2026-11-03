@@ -6,14 +6,30 @@ import {
   Image,
   TouchableOpacity,
   ScrollView,
+  Platform,
+  StatusBar,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS } from '../../theme/colors';
 
 export default function WelcomeScreen({ navigation }) {
+  const insets = useSafeAreaInsets();
+  const topPadding = Math.max(
+    insets?.top || 0,
+    Platform.OS === 'android' ? (StatusBar.currentHeight || 24) : 0,
+    14
+  ) + 8;
+  const bottomPadding = Math.max(insets?.bottom || 0, 16);
+
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+    <SafeAreaView style={styles.container} edges={['left', 'right']}>
+      <ScrollView
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingTop: topPadding, paddingBottom: bottomPadding },
+        ]}
+        showsVerticalScrollIndicator={false}
+      >
         {/* Brand Header */}
         <View style={styles.logoContainer}>
           <Image

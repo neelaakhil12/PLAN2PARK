@@ -63,7 +63,11 @@ const VEHICLE_FILTER_OPTIONS = [
 export default function SeekerHomeScreen({ navigation }) {
   const { user, token, updateProfile, logout } = useContext(AuthContext);
   const insets = useSafeAreaInsets();
-  const topPadding = Platform.OS === 'android' ? 12 : Math.max(insets.top, 12);
+  const topPadding = Math.max(
+    insets.top || 0,
+    Platform.OS === 'android' ? (StatusBar.currentHeight || 24) : 0,
+    14
+  ) + 8;
 
   const [spaces, setSpaces] = useState([]);
   const [unreadNotifs, setUnreadNotifs] = useState(0);

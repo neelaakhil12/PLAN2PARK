@@ -23,7 +23,11 @@ export default function OwnerHomeScreen({ navigation }) {
   const { user, token, logout } = useContext(AuthContext);
   const isFocused = useIsFocused();
   const insets = useSafeAreaInsets();
-  const topPadding = Platform.OS === 'android' ? 12 : Math.max(insets.top, 12);
+  const topPadding = Math.max(
+    insets.top || 0,
+    Platform.OS === 'android' ? (StatusBar.currentHeight || 24) : 0,
+    14
+  ) + 8;
 
   const [spots, setSpots] = useState([]);
   const [recentBookings, setRecentBookings] = useState([]);
@@ -198,7 +202,7 @@ export default function OwnerHomeScreen({ navigation }) {
       </View>
 
       <ScrollView
-        contentContainerStyle={[styles.content, { paddingBottom: 40 + insets.bottom }]}
+        contentContainerStyle={[styles.content, { paddingBottom: 110 + insets.bottom }]}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}

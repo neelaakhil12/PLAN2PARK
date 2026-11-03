@@ -25,7 +25,11 @@ export default function WalletScreen({ navigation }) {
   const { user, token } = useContext(AuthContext);
   const isFocused = useIsFocused();
   const insets = useSafeAreaInsets();
-  const topPadding = Platform.OS === 'android' ? 0 : Math.max(insets.top, 0);
+  const topPadding = Math.max(
+    insets.top || 0,
+    Platform.OS === 'android' ? (StatusBar.currentHeight || 24) : 0,
+    14
+  ) + 8;
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -953,7 +957,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 16,
-    paddingBottom: 40,
+    paddingBottom: 110,
   },
   heroCard: {
     backgroundColor: '#131b2e',

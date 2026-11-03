@@ -102,7 +102,7 @@ function AppContent() {
 
   const content = (
     <NavigationContainer ref={navigationRef}>
-      <StatusBar style="light" backgroundColor="#0f172a" translucent={false} />
+      <StatusBar style="light" backgroundColor="transparent" translucent={true} />
       <AppNavigator />
     </NavigationContainer>
   );

@@ -37,6 +37,9 @@ const Tab = createBottomTabNavigator();
 // 🚗 SEEKER TAB NAVIGATOR
 function SeekerTabs() {
   const insets = useSafeAreaInsets();
+  const bottomInset = insets?.bottom || 0;
+  const bottomBarPadding = Math.max(bottomInset, Platform.OS === 'android' ? 12 : 8);
+  const barHeight = 62 + bottomBarPadding;
 
   return (
     <Tab.Navigator
@@ -45,8 +48,9 @@ function SeekerTabs() {
         tabBarStyle: [
           styles.tabBar,
           {
-            height: 68 + Math.max(insets.bottom, Platform.OS === 'android' ? 8 : 0),
-            paddingBottom: Math.max(insets.bottom, Platform.OS === 'web' ? 12 : 8),
+            height: barHeight,
+            paddingBottom: bottomBarPadding,
+            paddingTop: 8,
           },
         ],
         tabBarActiveTintColor: COLORS.seekerAccent,
@@ -99,6 +103,9 @@ function SeekerStack() {
 // 🅿️ OWNER TAB NAVIGATOR
 function OwnerTabs() {
   const insets = useSafeAreaInsets();
+  const bottomInset = insets?.bottom || 0;
+  const bottomBarPadding = Math.max(bottomInset, Platform.OS === 'android' ? 12 : 8);
+  const barHeight = 62 + bottomBarPadding;
 
   return (
     <Tab.Navigator
@@ -107,8 +114,9 @@ function OwnerTabs() {
         tabBarStyle: [
           styles.tabBar,
           {
-            height: 68 + Math.max(insets.bottom, Platform.OS === 'android' ? 8 : 0),
-            paddingBottom: Math.max(insets.bottom, Platform.OS === 'web' ? 12 : 8),
+            height: barHeight,
+            paddingBottom: bottomBarPadding,
+            paddingTop: 8,
           },
         ],
         tabBarActiveTintColor: COLORS.ownerAccent,

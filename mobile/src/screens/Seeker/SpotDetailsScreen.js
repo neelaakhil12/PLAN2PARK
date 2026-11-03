@@ -1779,6 +1779,7 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 16,
+    paddingBottom: 110,
   },
   spotCard: {
     backgroundColor: COLORS.cardBg,

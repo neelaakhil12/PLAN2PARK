@@ -13,6 +13,8 @@ import {
   KeyboardAvoidingView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { StatusBar } from 'react-native';
 import { AuthContext } from '../../context/AuthContext';
 import { seekerFaqs } from '../../data/seekerFaqs';
 import { bankFinanceFaqs } from '../../data/bankFinanceFaqs';
@@ -184,6 +186,8 @@ const buildTopicCategories = (faqsList = [], isBank = false) => {
 const BOT_NAME = 'Agent PlanToPark';
 
 export default function HelpAssistantScreen({ navigation }) {
+  const insets = useSafeAreaInsets();
+  const topPadding = Math.max(insets?.top || 0, Platform.OS === 'android' ? (StatusBar.currentHeight || 24) : 0, 14) + 8;
   const { user } = useContext(AuthContext);
   const isBankSeeker = user?.accountCategory === 'bank_finance_seeker' || user?.accountCategory?.includes('bank');
 
@@ -629,7 +633,7 @@ export default function HelpAssistantScreen({ navigation }) {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         {/* ─── Header ─── */}
-        <View style={styles.header}>
+        <View style={[styles.header, { paddingTop: topPadding }]}>
           <View style={styles.headerLeft}>
             <TouchableOpacity
               style={styles.backBtn}
