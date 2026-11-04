@@ -6632,174 +6632,180 @@ const AdminDashboard = () => {
 
       {/* ── APPROVE PAYOUT & UPLOAD RECEIPT MODAL ───────────────────────── */}
       {approvingPayout && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 overflow-y-auto">
-          <div className="w-full max-w-lg bg-white rounded-3xl shadow-2xl p-6 sm:p-8 relative text-left my-8">
-            <button
-              onClick={() => {
-                setApprovingPayout(null);
-                setPayoutReceiptFile(null);
-                setPayoutReceiptPreview('');
-              }}
-              className="absolute top-5 right-5 text-slate-400 hover:text-slate-700"
-            >
-              <X className="h-6 w-6" />
-            </button>
-
-            <div className="flex items-center gap-3 mb-4">
-              <div className="h-12 w-12 bg-emerald-50 rounded-2xl flex items-center justify-center border border-emerald-200">
-                <CheckCircle className="h-6 w-6 text-emerald-600" />
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-3 sm:p-4">
+          <div className="w-full max-w-lg bg-white rounded-3xl shadow-2xl relative text-left max-h-[92vh] flex flex-col overflow-hidden my-auto">
+            {/* Modal Header (Fixed at top, never cut off) */}
+            <div className="p-5 sm:p-6 pb-4 border-b border-slate-100 flex items-center justify-between shrink-0 bg-white">
+              <div className="flex items-center gap-3">
+                <div className="h-11 w-11 bg-emerald-50 rounded-2xl flex items-center justify-center border border-emerald-200 shrink-0">
+                  <CheckCircle className="h-6 w-6 text-emerald-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg sm:text-xl font-black text-slate-900 leading-tight">Approve &amp; Clear Payout</h3>
+                  <p className="text-xs text-slate-400 mt-0.5">Upload payment proof screenshot and enter UTR reference.</p>
+                </div>
               </div>
-              <div>
-                <h3 className="text-xl font-black text-slate-900">Approve &amp; Clear Payout</h3>
-                <p className="text-xs text-slate-400">Upload payment proof screenshot and enter UTR reference.</p>
-              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setApprovingPayout(null);
+                  setPayoutReceiptFile(null);
+                  setPayoutReceiptPreview('');
+                }}
+                className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition"
+              >
+                <X className="h-5 w-5" />
+              </button>
             </div>
 
-            {/* Payout Details Summary Card */}
-            <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 mb-5 space-y-2">
-              <div className="flex justify-between items-center pb-2 border-b border-slate-200/60">
-                <span className="text-xs text-slate-500 font-bold">Owner:</span>
-                <span className="text-xs font-black text-slate-800">{approvingPayout.ownerId?.name || 'Owner'}</span>
-              </div>
-              <div className="flex justify-between items-center pb-2 border-b border-slate-200/60">
-                <span className="text-xs text-slate-500 font-bold">Payout Amount:</span>
-                <span className="text-base font-black text-emerald-600">₹{Number(approvingPayout.amount).toLocaleString('en-IN')}</span>
-              </div>
-              <div className="flex justify-between items-start pb-2 border-b border-slate-200/60">
-                <span className="text-xs text-slate-500 font-bold">Transfer Mode:</span>
-                <span className="text-xs font-black uppercase tracking-wider text-slate-800">
-                  {approvingPayout.payoutMethod === 'upi' ? 'UPI Transfer' : 'Bank NEFT/IMPS'}
-                </span>
-              </div>
-              <div>
-                <span className="text-[11px] text-slate-400 uppercase font-black tracking-wider block mb-1">
-                  Destination Info:
-                </span>
-                {approvingPayout.payoutMethod === 'upi' ? (
-                  <div className="bg-white p-2 rounded-xl border border-slate-200 text-xs font-mono font-bold text-slate-800">
-                    UPI ID: {approvingPayout.payoutDetails?.upiId || 'N/A'}
+            {/* Modal Form with Scrollable Content & Sticky Footer */}
+            <form onSubmit={handleApprovePayoutSubmit} className="flex-1 flex flex-col min-h-0">
+              <div className="p-5 sm:p-6 space-y-4 overflow-y-auto flex-1">
+                {/* Payout Details Summary Card */}
+                <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 space-y-2">
+                  <div className="flex justify-between items-center pb-2 border-b border-slate-200/60">
+                    <span className="text-xs text-slate-500 font-bold">Owner:</span>
+                    <span className="text-xs font-black text-slate-800">{approvingPayout.ownerId?.name || 'Owner'}</span>
                   </div>
-                ) : (
-                  <div className="bg-white p-2.5 rounded-xl border border-slate-200 text-xs space-y-0.5">
-                    <p><span className="text-slate-400">A/C:</span> <strong className="font-mono">{approvingPayout.payoutDetails?.accountNumber}</strong></p>
-                    <p><span className="text-slate-400">IFSC:</span> <strong className="font-mono">{approvingPayout.payoutDetails?.ifscCode}</strong></p>
-                    <p><span className="text-slate-400">Holder:</span> <strong className="text-slate-800">{approvingPayout.payoutDetails?.accountName || approvingPayout.payoutDetails?.accountHolderName || approvingPayout.ownerId?.name || '—'}</strong></p>
+                  <div className="flex justify-between items-center pb-2 border-b border-slate-200/60">
+                    <span className="text-xs text-slate-500 font-bold">Payout Amount:</span>
+                    <span className="text-base font-black text-emerald-600">₹{Number(approvingPayout.amount).toLocaleString('en-IN')}</span>
                   </div>
-                )}
-              </div>
-
-              {approvingPayout.ownerQrCodeImage && (
-                <div className="mt-3 pt-3 border-t border-slate-200/60 flex items-center gap-3">
-                  <div
-                    className="relative group cursor-pointer shrink-0"
-                    onClick={() => setViewingReceiptUrl(approvingPayout.ownerQrCodeImage.startsWith('http') ? approvingPayout.ownerQrCodeImage : `${API_URL}${approvingPayout.ownerQrCodeImage}`)}
-                    title="Click to view full size"
-                  >
-                    <img
-                      src={approvingPayout.ownerQrCodeImage.startsWith('http') ? approvingPayout.ownerQrCodeImage : `${API_URL}${approvingPayout.ownerQrCodeImage}`}
-                      alt="Owner QR Code"
-                      className="h-20 w-20 object-contain rounded-xl border border-purple-200 bg-white p-1 shadow-sm hover:scale-105 transition"
-                    />
-                    <div className="absolute inset-0 bg-black/40 rounded-xl opacity-0 group-hover:opacity-100 flex items-center justify-center transition">
-                      <Eye className="h-5 w-5 text-white" />
-                    </div>
+                  <div className="flex justify-between items-start pb-2 border-b border-slate-200/60">
+                    <span className="text-xs text-slate-500 font-bold">Transfer Mode:</span>
+                    <span className="text-xs font-black uppercase tracking-wider text-slate-800">
+                      {approvingPayout.payoutMethod === 'upi' ? 'UPI Transfer' : 'Bank NEFT/IMPS'}
+                    </span>
                   </div>
                   <div>
-                    <span className="inline-flex items-center gap-1 text-[11px] font-extrabold text-purple-700 bg-purple-50 px-2 py-0.5 rounded border border-purple-200">
-                      <QrCode className="h-3 w-3" /> Owner's Payment QR
+                    <span className="text-[11px] text-slate-400 uppercase font-black tracking-wider block mb-1">
+                      Destination Info:
                     </span>
-                    <p className="text-[11px] text-slate-500 mt-1">
-                      Scan directly with PhonePe / GPay / Paytm to pay.
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => setViewingReceiptUrl(approvingPayout.ownerQrCodeImage.startsWith('http') ? approvingPayout.ownerQrCodeImage : `${API_URL}${approvingPayout.ownerQrCodeImage}`)}
-                      className="text-[11px] text-purple-600 font-bold hover:underline mt-0.5 inline-block"
-                    >
-                      Enlarge QR Screenshot
-                    </button>
+                    {approvingPayout.payoutMethod === 'upi' ? (
+                      <div className="bg-white p-2 rounded-xl border border-slate-200 text-xs font-mono font-bold text-slate-800">
+                        UPI ID: {approvingPayout.payoutDetails?.upiId || 'N/A'}
+                      </div>
+                    ) : (
+                      <div className="bg-white p-2.5 rounded-xl border border-slate-200 text-xs space-y-0.5">
+                        <p><span className="text-slate-400">A/C:</span> <strong className="font-mono">{approvingPayout.payoutDetails?.accountNumber}</strong></p>
+                        <p><span className="text-slate-400">IFSC:</span> <strong className="font-mono">{approvingPayout.payoutDetails?.ifscCode}</strong></p>
+                        <p><span className="text-slate-400">Holder:</span> <strong className="text-slate-800">{approvingPayout.payoutDetails?.accountName || approvingPayout.payoutDetails?.accountHolderName || approvingPayout.ownerId?.name || '—'}</strong></p>
+                      </div>
+                    )}
                   </div>
-                </div>
-              )}
-            </div>
 
-            <form onSubmit={handleApprovePayoutSubmit} className="space-y-4">
-              {/* UTR / Transaction Reference Input */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                  UTR / Reference Number <span className="text-rose-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={payoutUtr}
-                  onChange={(e) => setPayoutUtr(e.target.value)}
-                  placeholder="e.g. 427819381029 or UPI-REF-9921"
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-mono font-bold focus:outline-none focus:bg-white focus:border-emerald-500"
-                />
-              </div>
-
-              {/* Upload Screenshot / Receipt */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                  Proof of Payment Screenshot (PhonePe / GPay / Bank Receipt)
-                </label>
-                
-                {payoutReceiptPreview ? (
-                  <div className="relative border border-slate-200 rounded-2xl overflow-hidden bg-slate-100 p-2 flex items-center justify-between">
-                    <img src={payoutReceiptPreview} alt="Receipt Preview" className="h-20 w-20 object-cover rounded-xl" />
-                    <div className="flex-1 px-3">
-                      <p className="text-xs font-bold text-slate-700 truncate">{payoutReceiptFile?.name}</p>
-                      <p className="text-[10px] text-slate-400">{(payoutReceiptFile?.size / 1024).toFixed(1)} KB</p>
+                  {approvingPayout.ownerQrCodeImage && (
+                    <div className="mt-3 pt-3 border-t border-slate-200/60 flex items-center gap-3">
+                      <div
+                        className="relative group cursor-pointer shrink-0"
+                        onClick={() => setViewingReceiptUrl(approvingPayout.ownerQrCodeImage.startsWith('http') ? approvingPayout.ownerQrCodeImage : `${API_URL}${approvingPayout.ownerQrCodeImage}`)}
+                        title="Click to view full size"
+                      >
+                        <img
+                          src={approvingPayout.ownerQrCodeImage.startsWith('http') ? approvingPayout.ownerQrCodeImage : `${API_URL}${approvingPayout.ownerQrCodeImage}`}
+                          alt="Owner QR Code"
+                          className="h-20 w-20 object-contain rounded-xl border border-purple-200 bg-white p-1 shadow-sm hover:scale-105 transition"
+                        />
+                        <div className="absolute inset-0 bg-black/40 rounded-xl opacity-0 group-hover:opacity-100 flex items-center justify-center transition">
+                          <Eye className="h-5 w-5 text-white" />
+                        </div>
+                      </div>
+                      <div>
+                        <span className="inline-flex items-center gap-1 text-[11px] font-extrabold text-purple-700 bg-purple-50 px-2 py-0.5 rounded border border-purple-200">
+                          <QrCode className="h-3 w-3" /> Owner's Payment QR
+                        </span>
+                        <p className="text-[11px] text-slate-500 mt-1">
+                          Scan directly with PhonePe / GPay / Paytm to pay.
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => setViewingReceiptUrl(approvingPayout.ownerQrCodeImage.startsWith('http') ? approvingPayout.ownerQrCodeImage : `${API_URL}${approvingPayout.ownerQrCodeImage}`)}
+                          className="text-[11px] text-purple-600 font-bold hover:underline mt-0.5 inline-block"
+                        >
+                          Enlarge QR Screenshot
+                        </button>
+                      </div>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setPayoutReceiptFile(null);
-                        setPayoutReceiptPreview('');
-                      }}
-                      className="text-rose-500 hover:text-rose-700 p-2"
-                    >
-                      <X className="h-5 w-5" />
-                    </button>
-                  </div>
-                ) : (
-                  <label className="border-2 border-dashed border-slate-200 hover:border-emerald-400 bg-slate-50 hover:bg-emerald-50/20 rounded-2xl p-5 flex flex-col items-center justify-center cursor-pointer transition">
-                    <Upload className="h-7 w-7 text-slate-400 mb-1" />
-                    <span className="text-xs font-bold text-slate-700">Click to upload payment screenshot</span>
-                    <span className="text-[10px] text-slate-400 mt-0.5">PNG, JPG, JPEG accepted</span>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) {
-                          setPayoutReceiptFile(file);
-                          setPayoutReceiptPreview(URL.createObjectURL(file));
-                        }
-                      }}
-                    />
+                  )}
+                </div>
+
+                {/* UTR / Transaction Reference Input */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                    UTR / Reference Number <span className="text-rose-500">*</span>
                   </label>
-                )}
+                  <input
+                    type="text"
+                    required
+                    value={payoutUtr}
+                    onChange={(e) => setPayoutUtr(e.target.value)}
+                    placeholder="e.g. 427819381029 or UPI-REF-9921"
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-mono font-bold focus:outline-none focus:bg-white focus:border-emerald-500"
+                  />
+                </div>
+
+                {/* Upload Screenshot / Receipt */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                    Proof of Payment Screenshot (PhonePe / GPay / Bank Receipt)
+                  </label>
+                  
+                  {payoutReceiptPreview ? (
+                    <div className="relative border border-slate-200 rounded-2xl overflow-hidden bg-slate-100 p-2 flex items-center justify-between">
+                      <img src={payoutReceiptPreview} alt="Receipt Preview" className="h-20 w-20 object-cover rounded-xl" />
+                      <div className="flex-1 px-3">
+                        <p className="text-xs font-bold text-slate-700 truncate">{payoutReceiptFile?.name}</p>
+                        <p className="text-[10px] text-slate-400">{(payoutReceiptFile?.size / 1024).toFixed(1)} KB</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPayoutReceiptFile(null);
+                          setPayoutReceiptPreview('');
+                        }}
+                        className="text-rose-500 hover:text-rose-700 p-2"
+                      >
+                        <X className="h-5 w-5" />
+                      </button>
+                    </div>
+                  ) : (
+                    <label className="border-2 border-dashed border-slate-200 hover:border-emerald-400 bg-slate-50 hover:bg-emerald-50/20 rounded-2xl p-5 flex flex-col items-center justify-center cursor-pointer transition">
+                      <Upload className="h-7 w-7 text-slate-400 mb-1" />
+                      <span className="text-xs font-bold text-slate-700">Click to upload payment screenshot</span>
+                      <span className="text-[10px] text-slate-400 mt-0.5">PNG, JPG, JPEG accepted</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            setPayoutReceiptFile(file);
+                            setPayoutReceiptPreview(URL.createObjectURL(file));
+                          }
+                        }}
+                      />
+                    </label>
+                  )}
+                </div>
+
+                {/* Admin Notes */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                    Remarks / Notes (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={payoutNotes}
+                    onChange={(e) => setPayoutNotes(e.target.value)}
+                    placeholder="e.g. Cleared via PhonePe UPI transfer"
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:bg-white focus:border-emerald-500"
+                  />
+                </div>
               </div>
 
-              {/* Admin Notes */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                  Remarks / Notes (Optional)
-                </label>
-                <input
-                  type="text"
-                  value={payoutNotes}
-                  onChange={(e) => setPayoutNotes(e.target.value)}
-                  placeholder="e.g. Cleared via PhonePe UPI transfer"
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:bg-white focus:border-emerald-500"
-                />
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex items-center gap-3 pt-2">
+              {/* Action Buttons (Fixed at bottom, never cut off) */}
+              <div className="p-4 sm:p-5 border-t border-slate-100 bg-slate-50/90 rounded-b-3xl shrink-0 flex items-center gap-3">
                 <button
                   type="button"
                   onClick={() => {
@@ -6807,7 +6813,7 @@ const AdminDashboard = () => {
                     setPayoutReceiptFile(null);
                     setPayoutReceiptPreview('');
                   }}
-                  className="flex-1 py-3 px-4 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 transition"
+                  className="flex-1 py-3 px-4 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-100 transition"
                 >
                   Cancel
                 </button>
