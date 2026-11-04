@@ -12,6 +12,8 @@ import {
   ActivityIndicator,
   Platform,
   Image,
+  StatusBar,
+  KeyboardAvoidingView,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
@@ -19,10 +21,17 @@ import { AuthContext } from '../../context/AuthContext';
 import { endpoints, getBaseApiUrl, getImageUrl } from '../../config/api';
 import { COLORS } from '../../theme/colors';
 import Header from '../../components/Header';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Button from '../../components/Button';
 
 export default function AddSpotScreen({ route, navigation }) {
   const { token, user } = useContext(AuthContext);
+  const insets = useSafeAreaInsets();
+  const topPadding = Math.max(
+    insets?.top || 0,
+    Platform.OS === 'android' ? (StatusBar.currentHeight || 24) : 0,
+    14
+  ) + 8;
   const editingSpot = route?.params?.spot || null;
 
   const [spotImages, setSpotImages] = useState(
@@ -971,7 +980,15 @@ export default function AddSpotScreen({ route, navigation }) {
         onBack={() => navigation.goBack()}
       />
 
-      <ScrollView contentContainerStyle={styles.content}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <ScrollView
+          contentContainerStyle={[styles.content, { paddingBottom: 220 }]}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
         {/* Storage Owner Identity Banner - shown only to vehicle_storage_owner */}
         {user?.accountCategory === 'vehicle_storage_owner' && (
           <View style={{
@@ -1689,13 +1706,14 @@ export default function AddSpotScreen({ route, navigation }) {
             }}
           />
         </View>
-      </ScrollView>
+        </ScrollView>
+      </KeyboardAvoidingView>
 
       {/* WhatsApp-Style Send Location Overlay (web-safe, no Modal) */}
       {showLocationModal && (
         <View style={styles.waOverlay}>
           {/* Top WhatsApp Header */}
-          <View style={styles.waHeader}>
+          <View style={[styles.waHeader, { paddingTop: topPadding, paddingBottom: 14 }]}>
             <TouchableOpacity onPress={() => setShowLocationModal(false)} style={styles.waBackBtn}>
               <Text style={styles.waBackTxt}>←</Text>
             </TouchableOpacity>

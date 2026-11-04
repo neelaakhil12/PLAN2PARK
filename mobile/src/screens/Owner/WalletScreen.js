@@ -680,7 +680,11 @@ export default function WalletScreen({ navigation }) {
               </TouchableOpacity>
             </View>
 
-            <ScrollView showsVerticalScrollIndicator={false}>
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={{ paddingBottom: 160 }}
+              keyboardShouldPersistTaps="handled"
+            >
               <View style={styles.modalBalanceBox}>
                 <View>
                   <Text style={styles.modalBalanceLabel}>Available Balance</Text>

@@ -144,7 +144,7 @@ export default function ProfileEditorModal({
 
         <ScrollView
           style={styles.body}
-          contentContainerStyle={{ paddingBottom: 24 }}
+          contentContainerStyle={{ paddingBottom: 150 }}
           showsVerticalScrollIndicator={true}
           keyboardShouldPersistTaps="handled"
         >

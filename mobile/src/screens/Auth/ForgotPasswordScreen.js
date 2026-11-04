@@ -68,7 +68,12 @@ export default function ForgotPasswordScreen({ route, navigation }) {
     <SafeAreaView style={styles.container} edges={['bottom']}>
       <Header title="Forgot Password" subtitle="PlanToPark Mobile" onBack={() => navigation.goBack()} />
 
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <ScrollView
+          contentContainerStyle={[styles.content, { paddingBottom: 240 }]}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
         <Text style={styles.heading}>Reset Your Password 🔐</Text>
         <Text style={styles.subheading}>
           Enter your registered email address below. We will send a 6-digit OTP reset code to your mailbox.
@@ -114,7 +119,8 @@ export default function ForgotPasswordScreen({ route, navigation }) {
             <Text style={[styles.loginLink, { color: themeColor }]}>Back to Sign In</Text>
           </TouchableOpacity>
         </View>
-      </ScrollView>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }

@@ -98,7 +98,12 @@ export default function LoginScreen({ route, navigation }) {
         onBack={() => navigation.goBack()}
       />
 
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <ScrollView
+          contentContainerStyle={[styles.content, { paddingBottom: 220 }]}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
         <View style={styles.badgeRow}>
           <View style={[styles.roleBadge, { backgroundColor: themeColor }]}>
             <Text style={styles.roleBadgeTxt}>{roleBadgeTxt}</Text>
@@ -223,7 +228,8 @@ export default function LoginScreen({ route, navigation }) {
             </Text>
           </TouchableOpacity>
         </View>
-      </ScrollView>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }

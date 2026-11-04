@@ -8,6 +8,7 @@ import {
   Alert,
   TouchableOpacity,
   Platform,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -91,7 +92,12 @@ export default function ResetPasswordScreen({ route, navigation }) {
     <SafeAreaView style={styles.container} edges={['bottom']}>
       <Header title="Set New Password" subtitle="PlanToPark Mobile" onBack={() => navigation.goBack()} />
 
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <ScrollView
+          contentContainerStyle={[styles.content, { paddingBottom: 240 }]}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
         <Text style={styles.heading}>Enter Reset Code 🔑</Text>
         <Text style={styles.subheading}>
           Check your email for the 6-digit verification code sent by PlanToPark and create a new password.
@@ -200,7 +206,8 @@ export default function ResetPasswordScreen({ route, navigation }) {
             <Text style={[styles.loginLink, { color: themeColor }]}>Back to Sign In</Text>
           </TouchableOpacity>
         </View>
-      </ScrollView>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
