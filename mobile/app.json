@@ -24,7 +24,7 @@
         "backgroundColor": "#0f172a"
       },
       "package": "com.plantopark.seeker",
-      "versionCode": 8,
+      "versionCode": 9,
       "permissions": [
         "android.permission.ACCESS_FINE_LOCATION",
         "android.permission.ACCESS_COARSE_LOCATION",
@@ -59,10 +59,9 @@
         "expo-build-properties",
         {
           "android": {
-            "compileSdkVersion": 35,
-            "targetSdkVersion": 34,
-            "buildToolsVersion": "35.0.0",
-            "kotlinVersion": "1.9.25",
+            "compileSdkVersion": 36,
+            "targetSdkVersion": 36,
+            "buildToolsVersion": "36.0.0",
             "usesCleartextTraffic": true
           }
         }
@@ -72,7 +71,10 @@
         {
           "photosPermission": "PlanToPark needs access to your photo library to select profile and spot photos."
         }
-      ]
+      ],
+      "expo-asset",
+      "expo-font",
+      "expo-web-browser"
     ],
     "owner": "student222s-team",
     "extra": {
