@@ -2412,14 +2412,14 @@ const OwnerDashboard = () => {
                   </span>
                   <div
                     className="inline-flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 font-black text-xs px-3.5 py-1 rounded-full border border-slate-300 font-mono tracking-wider cursor-pointer shadow-sm transition-all"
-                    title="Click to copy Customer ID"
+                    title="Click to copy Owner ID"
                     onClick={() => {
                       const id = user?.uniqueId || 'OW000000';
                       navigator.clipboard?.writeText(id);
-                      alert(`Customer ID copied: ${id}`);
+                      alert(`Owner ID copied: ${id}`);
                     }}
                   >
-                    <span>🆔 Customer ID:</span>
+                    <span>🆔 Owner ID:</span>
                     <span className="text-indigo-700 font-black">{user?.uniqueId || 'OW000000'}</span>
                     <span className="text-[10px] text-slate-400">📋</span>
                   </div>

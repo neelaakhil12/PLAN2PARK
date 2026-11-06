@@ -37,12 +37,15 @@ export const AuthProvider = ({ children }) => {
       });
       const data = await res.json();
       if (res.ok) {
-        setUser((prev) => ({
-          ...(prev || {}),
-          ...data,
-          uniqueId: data.uniqueId || prev?.uniqueId,
-        }));
-        await AsyncStorage.setItem('user_data', JSON.stringify(data));
+        setUser((prev) => {
+          const merged = {
+            ...(prev || {}),
+            ...data,
+            uniqueId: data.uniqueId || prev?.uniqueId || '',
+          };
+          AsyncStorage.setItem('user_data', JSON.stringify(merged)).catch(() => {});
+          return merged;
+        });
       } else {
         logout();
       }

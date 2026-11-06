@@ -783,6 +783,7 @@ router.put('/profile', protect, async (req, res) => {
     const updatedUser = await user.save();
     res.json({
       _id: updatedUser._id,
+      uniqueId: updatedUser.uniqueId,
       name: updatedUser.name,
       email: updatedUser.email,
       role: updatedUser.role,

@@ -21,7 +21,6 @@ import ProfileEditorModal from '../../components/ProfileEditorModal';
 import TermsModal from '../../components/TermsModal';
 import SupportModal from '../../components/SupportModal';
 import { Linking } from 'react-native';
-import * as Clipboard from 'expo-clipboard';
 
 export default function ProfileScreen({ navigation }) {
   const { user, token, updateProfile, logout, fetchProfile } = useContext(AuthContext);
@@ -163,9 +162,9 @@ export default function ProfileScreen({ navigation }) {
           <Text style={styles.userEmail}>{user?.email || 'seeker@example.com'}</Text>
           <Text style={styles.userPhone}>📞 {user?.contact || 'Not provided'}</Text>
 
-          {/* Customer Unique ID matching Admin Panel */}
+          {/* Seeker Unique ID matching Admin Panel */}
           <View style={styles.customerIdChip}>
-            <Text style={styles.customerIdLabel}>CUSTOMER ID</Text>
+            <Text style={styles.customerIdLabel}>SEEKER ID</Text>
             <Text style={styles.customerIdValue}>{user?.uniqueId || 'PS000000'}</Text>
           </View>
 

@@ -20,7 +20,6 @@ import Button from '../../components/Button';
 import TermsModal from '../../components/TermsModal';
 import SupportModal from '../../components/SupportModal';
 import { Linking } from 'react-native';
-import * as Clipboard from 'expo-clipboard';
 
 export default function ProfileScreen() {
   const { user, token, updateProfile, logout, fetchProfile } = useContext(AuthContext);
@@ -152,9 +151,9 @@ export default function ProfileScreen() {
             <Text style={styles.userPhone}>📞 {user.contact}</Text>
           ) : null}
 
-          {/* Owner Customer Unique ID matching Admin Panel */}
+          {/* Owner Unique ID matching Admin Panel */}
           <View style={styles.customerIdChip}>
-            <Text style={styles.customerIdLabel}>CUSTOMER ID</Text>
+            <Text style={styles.customerIdLabel}>OWNER ID</Text>
             <Text style={styles.customerIdValue}>{user?.uniqueId || 'OW000000'}</Text>
           </View>
 
