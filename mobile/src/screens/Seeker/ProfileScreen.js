@@ -21,6 +21,7 @@ import ProfileEditorModal from '../../components/ProfileEditorModal';
 import TermsModal from '../../components/TermsModal';
 import SupportModal from '../../components/SupportModal';
 import { Linking } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 
 export default function ProfileScreen({ navigation }) {
   const { user, updateProfile, logout } = useContext(AuthContext);
@@ -154,6 +155,29 @@ export default function ProfileScreen({ navigation }) {
           <Text style={styles.userName}>{user?.name || 'Parking Seeker'}</Text>
           <Text style={styles.userEmail}>{user?.email || 'seeker@example.com'}</Text>
           <Text style={styles.userPhone}>📞 {user?.contact || 'Not provided'}</Text>
+
+          {/* GoDaddy-style Seeker Customer Unique ID */}
+          <TouchableOpacity
+            style={styles.customerIdChip}
+            onPress={async () => {
+              const code = user?.uniqueId || 'PS000000';
+              try {
+                await Clipboard.setStringAsync(code);
+                Alert.alert('Copied! 📋', `Seeker Customer ID (${code}) copied to clipboard.`);
+              } catch (e) {
+                Alert.alert('Seeker ID', code);
+              }
+            }}
+            activeOpacity={0.8}
+          >
+            <View style={styles.customerIdLeft}>
+              <Text style={styles.customerIdLabel}>CUSTOMER ID</Text>
+              <Text style={styles.customerIdValue}>{user?.uniqueId || 'PS000000'}</Text>
+            </View>
+            <View style={styles.copyBadge}>
+              <Text style={styles.copyBadgeTxt}>Copy 📋</Text>
+            </View>
+          </TouchableOpacity>
 
           <View style={[styles.roleTag, isBankUser && { backgroundColor: '#0284c725', borderColor: '#0284c7' }]}>
             <Text style={[styles.roleTagTxt, isBankUser && { color: '#38bdf8' }]}>
@@ -477,5 +501,48 @@ const styles = StyleSheet.create({
     color: COLORS.white,
     fontSize: 14,
     fontWeight: '600',
+  },
+  customerIdChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#1e293b',
+    borderWidth: 1.5,
+    borderColor: '#10b981',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    marginTop: 10,
+    width: '100%',
+  },
+  customerIdLeft: {
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+  },
+  customerIdLabel: {
+    color: '#94a3b8',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 1,
+  },
+  customerIdValue: {
+    color: '#34d399',
+    fontSize: 16,
+    fontWeight: '900',
+    letterSpacing: 1.5,
+    marginTop: 2,
+  },
+  copyBadge: {
+    backgroundColor: 'rgba(16, 185, 129, 0.2)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#10b981',
+  },
+  copyBadgeTxt: {
+    color: '#6ee7b7',
+    fontSize: 12,
+    fontWeight: '700',
   },
 });

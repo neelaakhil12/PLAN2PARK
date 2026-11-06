@@ -924,4 +924,54 @@ router.get('/:id/available-slots-by-time', protect, async (req, res) => {
   }
 });
 
+// ─── POST /api/spaces/road-distances ──────────────────────────────────────────
+// Batch calculate accurate driving road distance & ETA via Google Distance Matrix API
+router.post('/road-distances', async (req, res) => {
+  const { origin, destinations } = req.body;
+  if (!origin || !origin.lat || !origin.lng || !Array.isArray(destinations) || destinations.length === 0) {
+    return res.status(400).json({ message: 'origin {lat, lng} and destinations array are required' });
+  }
+
+  const apiKey = process.env.GOOGLE_MAPS_API_KEY || 'AIzaSyDkSYnPhr-3QFIN8ynIL3uwoa-_bs1R_y0';
+
+  try {
+    const batch = destinations.slice(0, 25);
+    const destCoords = batch.map((d) => `${d.lat},${d.lng}`).join('|');
+    const url = `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${origin.lat},${origin.lng}&destinations=${encodeURIComponent(
+      destCoords
+    )}&mode=driving&key=${apiKey}`;
+
+    const fetchRes = await fetch(url);
+    const data = await fetchRes.json();
+
+    if (data.status !== 'OK' || !data.rows || !data.rows[0]) {
+      return res.status(400).json({
+        message: data.error_message || `Distance Matrix returned status: ${data.status}`,
+        details: data,
+      });
+    }
+
+    const results = {};
+    const elements = data.rows[0].elements || [];
+
+    batch.forEach((dest, index) => {
+      const el = elements[index];
+      if (el && el.status === 'OK' && el.distance) {
+        const roadDistanceKm = Math.round((el.distance.value / 1000) * 10) / 10;
+        results[dest.id] = {
+          roadDistanceKm,
+          roadDistanceText: el.distance.text,
+          roadDurationText: el.duration ? el.duration.text : '',
+          durationSeconds: el.duration ? el.duration.value : 0,
+        };
+      }
+    });
+
+    res.json({ success: true, results });
+  } catch (error) {
+    console.error('Road distance calculation error:', error);
+    res.status(500).json({ message: 'Failed to calculate road distances', error: error.message });
+  }
+});
+
 module.exports = router;

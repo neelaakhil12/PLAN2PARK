@@ -2406,9 +2406,24 @@ const OwnerDashboard = () => {
                 {user?.contact && (
                   <p className="text-xs text-emerald-600 font-extrabold mt-1">📞 {user.contact}</p>
                 )}
-                <span className="inline-block mt-3 bg-emerald-50 text-emerald-700 font-extrabold text-[11px] px-3.5 py-1 rounded-full border border-emerald-200 uppercase tracking-wider">
-                  PARKING SPACE OWNER
-                </span>
+                <div className="flex flex-wrap items-center justify-center gap-2 mt-3">
+                  <span className="bg-emerald-50 text-emerald-700 font-extrabold text-[11px] px-3.5 py-1 rounded-full border border-emerald-200 uppercase tracking-wider">
+                    PARKING SPACE OWNER
+                  </span>
+                  <div
+                    className="inline-flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 font-black text-xs px-3.5 py-1 rounded-full border border-slate-300 font-mono tracking-wider cursor-pointer shadow-sm transition-all"
+                    title="Click to copy Customer ID"
+                    onClick={() => {
+                      const id = user?.uniqueId || 'OW000000';
+                      navigator.clipboard?.writeText(id);
+                      alert(`Customer ID copied: ${id}`);
+                    }}
+                  >
+                    <span>🆔 Customer ID:</span>
+                    <span className="text-indigo-700 font-black">{user?.uniqueId || 'OW000000'}</span>
+                    <span className="text-[10px] text-slate-400">📋</span>
+                  </div>
+                </div>
 
                 <div className="mt-4">
                   <button

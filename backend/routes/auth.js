@@ -142,7 +142,8 @@ router.post('/google/login', async (req, res) => {
       });
     }
 
-    if (!user.uniqueId) {
+    const expectedPrefix = user.role === 'owner' ? 'OW' : 'PS';
+    if (!user.uniqueId || !user.uniqueId.startsWith(expectedPrefix) || user.uniqueId.length !== 8) {
       user.uniqueId = await generateUniqueId(user.role);
       await user.save();
     }
@@ -359,7 +360,7 @@ router.post('/seeker/login', async (req, res) => {
       return res.status(401).json({ message: 'Invalid email or password' });
     }
 
-    if (!user.uniqueId) {
+    if (!user.uniqueId || !user.uniqueId.startsWith('PS') || user.uniqueId.length !== 8) {
       user.uniqueId = await generateUniqueId('seeker');
       await user.save();
     }
@@ -419,7 +420,7 @@ router.post('/owner/login', async (req, res) => {
       return res.status(401).json({ message: 'Invalid email or password' });
     }
 
-    if (!user.uniqueId) {
+    if (!user.uniqueId || !user.uniqueId.startsWith('OW') || user.uniqueId.length !== 8) {
       user.uniqueId = await generateUniqueId('owner');
       await user.save();
     }
@@ -614,9 +615,12 @@ router.get('/profile', async (req, res) => {
       const decoded = jwt.verify(token, process.env.JWT_SECRET || 'plantoparksecretkey');
       const user = await User.findById(decoded.id).select('-password');
       if (user) {
-        if (!user.uniqueId && (user.role === 'owner' || user.role === 'seeker')) {
-          user.uniqueId = await generateUniqueId(user.role);
-          await user.save();
+        if (user.role === 'owner' || user.role === 'seeker') {
+          const expectedPrefix = user.role === 'owner' ? 'OW' : 'PS';
+          if (!user.uniqueId || !user.uniqueId.startsWith(expectedPrefix) || user.uniqueId.length !== 8) {
+            user.uniqueId = await generateUniqueId(user.role);
+            await user.save();
+          }
         }
         return res.json(user);
       }

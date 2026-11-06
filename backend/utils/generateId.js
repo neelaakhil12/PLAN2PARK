@@ -1,82 +1,77 @@
-const Counter = require('../models/Counter');
 const User = require('../models/User');
 
 /**
- * Generate sequential unique ID by filling the lowest available number:
- * Place Owner: PO000001, PO000002, etc.
- * Parking Seeker: VO000001, VO000002, etc.
+ * Generate Customer Unique ID like GoDaddy customer ID:
+ * - Place Owner: OW + 6 random digits (e.g. OW089192)
+ * - Parking Seeker: PS + 6 random digits (e.g. PS012456)
  * @param {'owner'|'seeker'} role
  * @returns {Promise<string>}
  */
 async function generateUniqueId(role) {
   const isOwner = role === 'owner';
-  const prefix = isOwner ? 'PO' : 'VO';
-  const counterId = isOwner ? 'owner_seq' : 'seeker_seq';
+  const prefix = isOwner ? 'OW' : 'PS';
 
-  // Find all existing uniqueIds for this role
-  const users = await User.find(
-    { role, uniqueId: { $regex: new RegExp(`^${prefix}\\d+$`) } },
-    { uniqueId: 1 }
-  );
+  let attempts = 0;
+  while (attempts < 100) {
+    attempts++;
+    // Generate 6 random digits (000000 - 999999)
+    const randomDigits = Math.floor(Math.random() * 1000000).toString().padStart(6, '0');
+    const candidateId = `${prefix}${randomDigits}`;
 
-  const usedSeqs = new Set();
-  users.forEach((u) => {
-    if (u.uniqueId) {
-      const num = parseInt(u.uniqueId.slice(prefix.length), 10);
-      if (!isNaN(num) && num > 0) {
-        usedSeqs.add(num);
-      }
+    // Ensure uniqueness in database
+    const existing = await User.findOne({ uniqueId: candidateId }, { _id: 1 });
+    if (!existing) {
+      return candidateId;
     }
-  });
-
-  // Find the smallest missing integer starting from 1 (fills any gaps)
-  let nextSeq = 1;
-  while (usedSeqs.has(nextSeq)) {
-    nextSeq++;
   }
 
-  const paddedNum = String(nextSeq).padStart(6, '0');
-  const uniqueId = `${prefix}${paddedNum}`;
-
-  // Update counter to at least the highest sequence number
-  const maxSeq = Math.max(nextSeq, ...Array.from(usedSeqs));
-  await Counter.findByIdAndUpdate(
-    counterId,
-    { seq: maxSeq },
-    { upsert: true }
-  );
-
-  return uniqueId;
+  // Fallback in astronomical case of 100 collisions: use timestamp slice
+  const timestampSuffix = Date.now().toString().slice(-6);
+  return `${prefix}${timestampSuffix}`;
 }
 
 /**
- * Re-sequence all users of given role chronologically (1..N) without gaps
- * and keep the counter in exact sync.
- * @param {'owner'|'seeker'} role
- * @returns {Promise<number>} count of users resequenced
+ * Migrate all existing users who have old IDs (PO..., VO...) or missing IDs
+ * to the new GoDaddy-style format:
+ * - Owner: OW + 6 random digits
+ * - Seeker: PS + 6 random digits
+ * @returns {Promise<{ ownerCount: number, seekerCount: number }>}
  */
-async function resequenceUniqueIds(role) {
-  const isOwner = role === 'owner';
-  const prefix = isOwner ? 'PO' : 'VO';
-  const counterId = isOwner ? 'owner_seq' : 'seeker_seq';
+async function migrateAllToNewUniqueIds() {
+  const users = await User.find({ role: { $in: ['owner', 'seeker'] } });
+  let ownerCount = 0;
+  let seekerCount = 0;
 
-  const users = await User.find({ role }).sort({ createdAt: 1, _id: 1 });
+  for (const user of users) {
+    const isOwner = user.role === 'owner';
+    const targetPrefix = isOwner ? 'OW' : 'PS';
 
-  for (let i = 0; i < users.length; i++) {
-    const seqNum = i + 1;
-    const expectedId = `${prefix}${String(seqNum).padStart(6, '0')}`;
-    if (users[i].uniqueId !== expectedId) {
-      await User.updateOne({ _id: users[i]._id }, { $set: { uniqueId: expectedId } });
+    // If missing or has legacy prefix (PO, VO, SO) or wrong length
+    const needsUpdate =
+      !user.uniqueId ||
+      !user.uniqueId.startsWith(targetPrefix) ||
+      user.uniqueId.length !== 8;
+
+    if (needsUpdate) {
+      const newUniqueId = await generateUniqueId(user.role);
+      await User.updateOne({ _id: user._id }, { $set: { uniqueId: newUniqueId } });
+      if (isOwner) ownerCount++;
+      else seekerCount++;
     }
   }
 
-  await Counter.findByIdAndUpdate(
-    counterId,
-    { seq: users.length },
-    { upsert: true }
-  );
-
-  return users.length;
+  return { ownerCount, seekerCount };
 }
 
-module.exports = { generateUniqueId, resequenceUniqueIds };
+/**
+ * Legacy support for backward compatibility with existing route imports
+ */
+async function resequenceUniqueIds(role) {
+  return (await migrateAllToNewUniqueIds())[role === 'owner' ? 'ownerCount' : 'seekerCount'];
+}
+
+module.exports = {
+  generateUniqueId,
+  migrateAllToNewUniqueIds,
+  resequenceUniqueIds,
+};

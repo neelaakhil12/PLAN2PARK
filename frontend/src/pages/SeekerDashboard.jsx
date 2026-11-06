@@ -3700,9 +3700,24 @@ const SeekerDashboard = () => {
                 <p className="text-slate-600 text-xs font-bold mt-1">📞 {user?.contact || user?.phone || '9989551305'}</p>
               </div>
 
-              {/* Role Tag */}
-              <div className="inline-flex items-center gap-1.5 bg-emerald-50 text-emerald-700 font-black text-[11px] px-4 py-1.5 rounded-full border border-emerald-200 tracking-wider uppercase">
-                PARKING SEEKER
+              {/* Role Tag & Customer ID */}
+              <div className="flex flex-wrap items-center justify-center gap-2 mt-2">
+                <div className="inline-flex items-center gap-1.5 bg-emerald-50 text-emerald-700 font-black text-[11px] px-4 py-1.5 rounded-full border border-emerald-200 tracking-wider uppercase">
+                  PARKING SEEKER
+                </div>
+                <div
+                  className="inline-flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 font-black text-xs px-3.5 py-1.5 rounded-full border border-slate-300 font-mono tracking-wider cursor-pointer shadow-sm transition-all"
+                  title="Click to copy Customer ID"
+                  onClick={() => {
+                    const id = user?.uniqueId || 'PS000000';
+                    navigator.clipboard?.writeText(id);
+                    alert(`Customer ID copied: ${id}`);
+                  }}
+                >
+                  <span>🆔 Customer ID:</span>
+                  <span className="text-emerald-700 font-black">{user?.uniqueId || 'PS000000'}</span>
+                  <span className="text-[10px] text-slate-400">📋</span>
+                </div>
               </div>
 
               {/* Edit Profile Button */}

@@ -24,23 +24,11 @@ import PinLocationModal from '../../components/PinLocationModal';
 import ProfileEditorModal from '../../components/ProfileEditorModal';
 import DynamicParkingMap, { getSpotDemand } from '../../components/DynamicParkingMap';
 import { getDetailedAddressFromCoords } from '../../utils/locationHelper';
-
-// Geocoding distance calculation helper (Haversine Formula)
-function calculateDistanceKm(lat1, lon1, lat2, lon2) {
-  if (!lat1 || !lon1 || !lat2 || !lon2) return null;
-  const R = 6371; // Earth radius in KM
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLon = ((lon2 - lon1) * Math.PI) / 180;
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos((lat1 * Math.PI) / 180) *
-      Math.cos((lat2 * Math.PI) / 180) *
-      Math.sin(dLon / 2) *
-      Math.sin(dLon / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  const dist = R * c;
-  return dist < 0.1 ? 0.1 : Math.round(dist * 10) / 10;
-}
+import {
+  calculateAirDistanceKm,
+  calculateEstimatedRoadKm,
+  fetchGoogleRoadDistances,
+} from '../../utils/distanceHelper';
 
 const RADIUS_OPTIONS = [
   { label: 'All', value: null, icon: '🌐' },
@@ -82,6 +70,7 @@ export default function SeekerHomeScreen({ navigation }) {
   );
   const [viewMode, setViewMode] = useState('map'); // 'map' or 'list'
   const [selectedMapSpot, setSelectedMapSpot] = useState(null);
+  const [roadDistanceMap, setRoadDistanceMap] = useState({});
 
   // Location pinning state
   const [pinnedLocation, setPinnedLocation] = useState('');
@@ -243,18 +232,67 @@ export default function SeekerHomeScreen({ navigation }) {
     setShowProfileModal(false);
   };
 
+  // Batch fetch accurate Google road distances whenever seekerCoords or spaces change
+  useEffect(() => {
+    if (!spaces || spaces.length === 0 || !seekerCoords || !seekerCoords.lat || !seekerCoords.lng) {
+      return;
+    }
+
+    let isMounted = true;
+    const destinations = [];
+
+    spaces.forEach((sp) => {
+      const sLat = sp.coordinates?.lat || sp.lat || (sp.location?.coordinates && sp.location.coordinates[1]);
+      const sLng = sp.coordinates?.lng || sp.lng || (sp.location?.coordinates && sp.location.coordinates[0]);
+      const id = sp._id || sp.id;
+      if (sLat && sLng && id) {
+        destinations.push({ id: String(id), lat: Number(sLat), lng: Number(sLng) });
+      }
+    });
+
+    if (destinations.length > 0) {
+      fetchGoogleRoadDistances(seekerCoords, destinations).then((roadResults) => {
+        if (isMounted && roadResults && Object.keys(roadResults).length > 0) {
+          setRoadDistanceMap((prev) => ({ ...prev, ...roadResults }));
+        }
+      });
+    }
+
+    return () => {
+      isMounted = false;
+    };
+  }, [spaces, seekerCoords]);
+
   // Determine if the logged-in seeker is a bank/finance user (used throughout)
   const isBankSeeker = user?.accountCategory === 'bank_finance_seeker';
 
-  // Process spaces with Geocoding distance calculation & proximity sorting
+  // Process spaces with Google Road distance calculation & proximity sorting
   const processedSpaces = spaces.map((space) => {
+    const sId = String(space._id || space.id || '');
     const sLat = space.coordinates?.lat || space.lat || (space.location?.coordinates && space.location.coordinates[1]);
     const sLng = space.coordinates?.lng || space.lng || (space.location?.coordinates && space.location.coordinates[0]);
-    const dist = calculateDistanceKm(seekerCoords.lat, seekerCoords.lng, sLat, sLng);
+
+    const roadInfo = roadDistanceMap[sId];
+    let dist = null;
+    let distBadge = 'Nearby';
+    let isRealRoad = false;
+
+    if (roadInfo && roadInfo.roadDistanceKm !== undefined) {
+      dist = roadInfo.roadDistanceKm;
+      const durationTxt = roadInfo.roadDurationText ? ` (${roadInfo.roadDurationText})` : '';
+      distBadge = `${roadInfo.roadDistanceText}${durationTxt}`;
+      isRealRoad = true;
+    } else {
+      // Immediate realistic road estimate (~1.18x air distance)
+      dist = calculateEstimatedRoadKm(seekerCoords.lat, seekerCoords.lng, sLat, sLng);
+      distBadge = dist !== null ? `${dist} km away` : 'Nearby';
+    }
+
     return {
       ...space,
       calculatedDist: dist !== null ? dist : 999,
-      distBadge: dist !== null ? `${dist} km away` : 'Nearby',
+      distBadge,
+      isRealRoad,
     };
   });
 

@@ -838,7 +838,11 @@ export default function SpotDetailsScreen({ route, navigation }) {
             <Text style={styles.gpsNavIcon}>🧭</Text>
             <View style={{ flex: 1 }}>
               <Text style={styles.gpsNavTitle}>Open Live Turn-by-Turn GPS Navigation</Text>
-              <Text style={styles.gpsNavSub}>Get instant driving directions on Google Maps</Text>
+              <Text style={styles.gpsNavSub}>
+                {space.distBadge
+                  ? `🚗 Road Distance: ${space.distBadge} • Tap for route`
+                  : 'Get instant driving directions on Google Maps'}
+              </Text>
             </View>
             <Text style={styles.gpsNavArrow}>→</Text>
           </TouchableOpacity>

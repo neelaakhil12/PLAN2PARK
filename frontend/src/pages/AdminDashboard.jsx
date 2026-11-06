@@ -2445,7 +2445,7 @@ const AdminDashboard = () => {
                                       </td>
                                       <td className="px-6 py-4">
                                         <span className="px-2.5 py-1 rounded-lg text-xs font-mono font-bold bg-amber-50 text-amber-700 border border-amber-200">
-                                          {owner.uniqueId || 'PO000001'}
+                                          {owner.uniqueId || 'OW000000'}
                                         </span>
                                       </td>
                                       <td className="px-6 py-4 text-slate-600 text-xs font-mono">
@@ -2547,7 +2547,7 @@ const AdminDashboard = () => {
                                       </td>
                                       <td className="px-6 py-4">
                                         <span className="px-2.5 py-1 rounded-lg text-xs font-mono font-bold bg-blue-50 text-blue-700 border border-blue-200">
-                                          {seeker.uniqueId || 'VO000001'}
+                                          {seeker.uniqueId || 'PS000000'}
                                         </span>
                                       </td>
                                       <td className="px-6 py-4 text-slate-600 text-xs font-mono">
@@ -3741,7 +3741,7 @@ const AdminDashboard = () => {
                                         ? 'bg-amber-50 text-amber-700 border border-amber-200'
                                         : 'bg-blue-50 text-blue-700 border border-blue-200'
                                     }`}>
-                                      {u.uniqueId || (u.role === 'owner' ? 'PO000001' : 'VO000001')}
+                                      {u.uniqueId || (u.role === 'owner' ? 'OW000000' : 'PS000000')}
                                     </span>
                                   </td>
                                   <td className="px-6 py-4 text-slate-600 text-xs font-mono">{u.contact || 'No phone'}</td>
@@ -3841,7 +3841,7 @@ const AdminDashboard = () => {
                                 <h3 className="font-black text-slate-900 text-xl">{owner.name}</h3>
                                 <StatusBadge status={owner.status} />
                                 <span className="px-2.5 py-0.5 rounded text-xs font-mono font-bold bg-amber-50 text-amber-700 border border-amber-200">
-                                  ID: {owner.uniqueId || 'PO000001'}
+                                  ID: {owner.uniqueId || 'OW000000'}
                                 </span>
                               </div>
                               <p className="text-xs text-slate-500 mt-1">
@@ -4090,7 +4090,7 @@ const AdminDashboard = () => {
                                     <div>
                                       <h4 className="font-extrabold text-slate-900 text-base leading-tight">{owner.name}</h4>
                                       <span className="inline-block mt-0.5 px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-50 text-amber-700 border border-amber-200">
-                                        ID: {owner.uniqueId || 'PO000001'}
+                                        ID: {owner.uniqueId || 'OW000000'}
                                       </span>
                                     </div>
                                   </div>
@@ -4240,7 +4240,7 @@ const AdminDashboard = () => {
                                 <h3 className="font-black text-slate-900 text-xl">{owner.name}</h3>
                                 <StatusBadge status={owner.status} />
                                 <span className="px-2.5 py-0.5 rounded text-xs font-mono font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                  ID: {owner.uniqueId || 'SO000001'}
+                                  ID: {owner.uniqueId || 'OW000000'}
                                 </span>
                               </div>
                               <p className="text-xs text-slate-500 mt-1">
@@ -4468,7 +4468,7 @@ const AdminDashboard = () => {
                                     <div>
                                       <h4 className="font-extrabold text-slate-900 text-base leading-tight">{owner.name}</h4>
                                       <span className="inline-block mt-0.5 px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                        ID: {owner.uniqueId || 'SO000001'}
+                                        ID: {owner.uniqueId || 'OW000000'}
                                       </span>
                                     </div>
                                   </div>
@@ -4578,7 +4578,7 @@ const AdminDashboard = () => {
                                 <h3 className="font-black text-slate-900 text-xl">{seeker.name}</h3>
                                 <StatusBadge status={seeker.status} />
                                 <span className="px-2.5 py-0.5 rounded text-xs font-mono font-bold bg-blue-50 text-blue-700 border border-blue-200">
-                                  ID: {seeker.uniqueId || 'VO000001'}
+                                  ID: {seeker.uniqueId || 'PS000000'}
                                 </span>
                               </div>
                               <p className="text-xs text-slate-500 mt-1">
@@ -4816,7 +4816,7 @@ const AdminDashboard = () => {
                                     </td>
                                     <td className="px-6 py-4">
                                       <span className="px-2.5 py-1 rounded-lg text-xs font-mono font-bold bg-blue-50 text-blue-700 border border-blue-200">
-                                        {seeker.uniqueId || 'VO000001'}
+                                        {seeker.uniqueId || 'PS000000'}
                                       </span>
                                     </td>
                                     <td className="px-6 py-4 text-slate-600 text-xs font-mono">
