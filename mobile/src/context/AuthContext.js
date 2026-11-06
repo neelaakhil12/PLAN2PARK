@@ -47,7 +47,7 @@ export const AuthProvider = ({ children }) => {
           return merged;
         });
       } else {
-        logout();
+        console.log('Profile fetch non-ok status:', res.status);
       }
     } catch (err) {
       console.log('Profile fetch error:', err.message);
