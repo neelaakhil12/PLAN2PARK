@@ -103,3 +103,4 @@ export async function fetchGoogleRoadDistances(origin, destinations) {
 
   return results;
 }
+
