@@ -23,9 +23,16 @@ import { Linking } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 
 export default function ProfileScreen() {
-  const { user, updateProfile, logout } = useContext(AuthContext);
+  const { user, token, updateProfile, logout, fetchProfile } = useContext(AuthContext);
   const [showTermsModal, setShowTermsModal] = useState(false);
   const [showSupportModal, setShowSupportModal] = useState(false);
+
+  // Automatically refresh profile on mount to guarantee real database uniqueId is loaded
+  useEffect(() => {
+    if (token && fetchProfile) {
+      fetchProfile(token);
+    }
+  }, [token]);
 
   const isStorageOwner =
     user?.accountCategory === 'vehicle_storage_owner' ||
@@ -145,28 +152,11 @@ export default function ProfileScreen() {
             <Text style={styles.userPhone}>📞 {user.contact}</Text>
           ) : null}
 
-          {/* GoDaddy-style Owner Customer Unique ID */}
-          <TouchableOpacity
-            style={styles.customerIdChip}
-            onPress={async () => {
-              const code = user?.uniqueId || 'OW000000';
-              try {
-                await Clipboard.setStringAsync(code);
-                Alert.alert('Copied! 📋', `Owner Customer ID (${code}) copied to clipboard.`);
-              } catch (e) {
-                Alert.alert('Owner ID', code);
-              }
-            }}
-            activeOpacity={0.8}
-          >
-            <View style={styles.customerIdLeft}>
-              <Text style={styles.customerIdLabel}>CUSTOMER ID</Text>
-              <Text style={styles.customerIdValue}>{user?.uniqueId || 'OW000000'}</Text>
-            </View>
-            <View style={styles.copyBadge}>
-              <Text style={styles.copyBadgeTxt}>Copy 📋</Text>
-            </View>
-          </TouchableOpacity>
+          {/* Owner Customer Unique ID matching Admin Panel */}
+          <View style={styles.customerIdChip}>
+            <Text style={styles.customerIdLabel}>CUSTOMER ID</Text>
+            <Text style={styles.customerIdValue}>{user?.uniqueId || 'OW000000'}</Text>
+          </View>
 
           <View style={[styles.roleTag, isStorageOwner && { backgroundColor: 'rgba(245, 158, 11, 0.15)', borderColor: '#f59e0b' }]}>
             <Text style={[styles.roleTagTxt, isStorageOwner && { color: '#f59e0b' }]}>
@@ -399,46 +389,28 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   customerIdChip: {
-    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     backgroundColor: '#1e293b',
     borderWidth: 1.5,
     borderColor: '#3b82f6',
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    marginTop: 10,
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    marginTop: 12,
     width: '100%',
-  },
-  customerIdLeft: {
-    flexDirection: 'column',
-    alignItems: 'flex-start',
   },
   customerIdLabel: {
     color: '#94a3b8',
     fontSize: 10,
     fontWeight: '800',
-    letterSpacing: 1,
+    letterSpacing: 1.5,
   },
   customerIdValue: {
     color: '#60a5fa',
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '900',
-    letterSpacing: 1.5,
+    letterSpacing: 2,
     marginTop: 2,
-  },
-  copyBadge: {
-    backgroundColor: 'rgba(59, 130, 246, 0.2)',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#3b82f6',
-  },
-  copyBadgeTxt: {
-    color: '#93c5fd',
-    fontSize: 12,
-    fontWeight: '700',
   },
 });

@@ -37,7 +37,11 @@ export const AuthProvider = ({ children }) => {
       });
       const data = await res.json();
       if (res.ok) {
-        setUser(data);
+        setUser((prev) => ({
+          ...(prev || {}),
+          ...data,
+          uniqueId: data.uniqueId || prev?.uniqueId,
+        }));
         await AsyncStorage.setItem('user_data', JSON.stringify(data));
       } else {
         logout();
@@ -73,6 +77,7 @@ export const AuthProvider = ({ children }) => {
 
     const userData = {
       _id: data._id,
+      uniqueId: data.uniqueId || '',
       name: data.name,
       email: data.email,
       role: data.role || role,
@@ -121,6 +126,7 @@ export const AuthProvider = ({ children }) => {
     if (data.token) {
       const userData = {
         _id: data._id,
+        uniqueId: data.uniqueId || '',
         name: data.name,
         email: data.email,
         role: data.role || role,
@@ -225,6 +231,7 @@ export const AuthProvider = ({ children }) => {
 
     const userData = {
       _id: data._id,
+      uniqueId: data.uniqueId || '',
       name: data.name,
       email: data.email,
       role: data.role || role,
@@ -265,6 +272,7 @@ export const AuthProvider = ({ children }) => {
 
     const userData = {
       _id: data._id,
+      uniqueId: data.uniqueId || '',
       name: data.name,
       email: data.email,
       role: data.role || role,
@@ -300,7 +308,7 @@ export const AuthProvider = ({ children }) => {
 
   return (
     <AuthContext.Provider
-      value={{ user, token, loading, loginForRole, signupForRole, googleLogin, googleRegister, updateProfile, logout, setUser }}
+      value={{ user, token, loading, loginForRole, signupForRole, googleLogin, googleRegister, updateProfile, logout, setUser, fetchProfile }}
     >
       {children}
     </AuthContext.Provider>
