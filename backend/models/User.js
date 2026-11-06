@@ -75,7 +75,8 @@ const userSchema = new mongoose.Schema(
     },
     contact: {
       type: String,
-      required: true,
+      default: '',
+      trim: true,
     },
     favorites: [
       {
