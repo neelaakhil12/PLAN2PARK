@@ -21,17 +21,39 @@ import TermsModal from '../../components/TermsModal';
 import SupportModal from '../../components/SupportModal';
 import { Linking } from 'react-native';
 
-export default function ProfileScreen() {
-  const { user, token, updateProfile, logout, fetchProfile } = useContext(AuthContext);
+class OwnerProfileErrorBoundary extends React.Component {
+  state = { hasError: false };
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+  componentDidCatch(error) {
+    console.warn('Owner ProfileScreen error:', error);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <SafeAreaView style={{ flex: 1, backgroundColor: '#090d16', justifyContent: 'center', alignItems: 'center', padding: 24 }}>
+          <Text style={{ fontSize: 24, fontWeight: '900', color: '#ffffff', marginBottom: 12 }}>👤 Owner Profile</Text>
+          <Text style={{ fontSize: 14, color: '#94a3b8', textAlign: 'center', marginBottom: 20 }}>
+            Unable to load profile view right now.
+          </Text>
+          <TouchableOpacity
+            style={{ backgroundColor: '#7c3aed', paddingHorizontal: 20, paddingVertical: 12, borderRadius: 12 }}
+            onPress={() => this.setState({ hasError: false })}
+          >
+            <Text style={{ color: '#ffffff', fontWeight: '700' }}>Retry</Text>
+          </TouchableOpacity>
+        </SafeAreaView>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+function ProfileScreenInner() {
+  const { user, token, updateProfile, logout } = useContext(AuthContext);
   const [showTermsModal, setShowTermsModal] = useState(false);
   const [showSupportModal, setShowSupportModal] = useState(false);
-
-  // Automatically refresh profile on mount to guarantee real database uniqueId is loaded
-  useEffect(() => {
-    if (token && fetchProfile) {
-      fetchProfile(token);
-    }
-  }, [token]);
 
   const isStorageOwner =
     user?.accountCategory === 'vehicle_storage_owner' ||
@@ -93,8 +115,8 @@ export default function ProfileScreen() {
     );
   };
 
-  const isEmojiAvatar = user?.profileImage && user?.profileImage.length <= 4;
-  const hasCustomPhoto = user?.profileImage && !isEmojiAvatar;
+  const isEmojiAvatar = Boolean(user?.profileImage && typeof user.profileImage === 'string' && user.profileImage.trim().length <= 4);
+  const hasCustomPhoto = Boolean(user?.profileImage && typeof user.profileImage === 'string' && user.profileImage.trim().length > 4 && !isEmojiAvatar);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -107,7 +129,6 @@ export default function ProfileScreen() {
           <TouchableOpacity
             style={styles.avatarWrapper}
             onPress={handlePickProfileImage}
-            onClick={handlePickProfileImage}
             activeOpacity={0.85}
             disabled={uploadingImage}
           >
@@ -136,7 +157,6 @@ export default function ProfileScreen() {
           <TouchableOpacity
             style={styles.uploadPhotoBtn}
             onPress={handlePickProfileImage}
-            onClick={handlePickProfileImage}
             activeOpacity={0.8}
             disabled={uploadingImage}
           >
@@ -235,6 +255,14 @@ export default function ProfileScreen() {
         isStorageYard={isStorageOwner}
       />
     </SafeAreaView>
+  );
+}
+
+export default function ProfileScreen(props) {
+  return (
+    <OwnerProfileErrorBoundary>
+      <ProfileScreenInner {...props} />
+    </OwnerProfileErrorBoundary>
   );
 }
 

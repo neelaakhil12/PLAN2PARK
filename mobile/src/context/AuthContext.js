@@ -35,19 +35,15 @@ export const AuthProvider = ({ children }) => {
       const res = await fetch(`${baseUrl}/auth/profile`, {
         headers: { ...COMMON_HEADERS, Authorization: `Bearer ${authToken}` },
       });
+      if (!res.ok) return;
       const data = await res.json();
-      if (res.ok) {
-        setUser((prev) => {
-          const merged = {
-            ...(prev || {}),
-            ...data,
-            uniqueId: data.uniqueId || prev?.uniqueId || '',
-          };
-          AsyncStorage.setItem('user_data', JSON.stringify(merged)).catch(() => {});
-          return merged;
-        });
-      } else {
-        console.log('Profile fetch non-ok status:', res.status);
+      if (data && data._id) {
+        setUser((prev) => ({
+          ...(prev || {}),
+          ...data,
+          uniqueId: data.uniqueId || prev?.uniqueId || '',
+        }));
+        AsyncStorage.setItem('user_data', JSON.stringify(data)).catch(() => {});
       }
     } catch (err) {
       console.log('Profile fetch error:', err.message);

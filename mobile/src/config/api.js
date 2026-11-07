@@ -24,19 +24,21 @@ export const getBaseApiUrl = async () => {
 export let API_URL = PUBLIC_ONLINE_URL;
 
 export const getImageUrl = (url) => {
-  if (!url) return '';
-  if (url.startsWith('data:') || url.startsWith('blob:')) return url;
-  if (url.startsWith('http://') || url.startsWith('https://')) {
-    if (url.includes('localhost:5000') || url.includes('127.0.0.1:5000') || url.includes('43.204.235.124:5000')) {
-      return url.replace(/https?:\/\/(localhost|127\.0\.0\.1|43\.204\.235\.124):5000/, 'https://api.plantopark.com');
+  if (!url || typeof url !== 'string') return '';
+  const trimmed = url.trim();
+  if (!trimmed) return '';
+  if (trimmed.startsWith('data:') || trimmed.startsWith('blob:')) return trimmed;
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+    if (trimmed.includes('localhost:5000') || trimmed.includes('127.0.0.1:5000') || trimmed.includes('43.204.235.124:5000')) {
+      return trimmed.replace(/https?:\/\/(localhost|127\.0\.0\.1|43\.204\.235\.124):5000/, 'https://api.plantopark.com');
     }
-    return url;
+    return trimmed;
   }
-  if (url.startsWith('/uploads/') || url.startsWith('uploads/')) {
-    const cleanPath = url.startsWith('/') ? url : `/${url}`;
+  if (trimmed.startsWith('/uploads/') || trimmed.startsWith('uploads/')) {
+    const cleanPath = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
     return `https://api.plantopark.com${cleanPath}`;
   }
-  return url;
+  return trimmed;
 };
 
 export const endpoints = {
