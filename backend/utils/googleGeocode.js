@@ -165,11 +165,39 @@ const extractCoordsFromMapsInput = async (inputUrl) => {
       if (geoRes && geoRes.lat && geoRes.lng) {
         return { lat: geoRes.lat, lng: geoRes.lng, formattedAddress: geoRes.formattedAddress };
       }
+
+      // Check known micro-neighborhoods if forward geocode is empty or restricted
+      for (const loc of KNOWN_LOCALITIES) {
+        if (loc.pattern.test(placeQuery)) {
+          return { lat: loc.lat, lng: loc.lng, formattedAddress: placeQuery };
+        }
+      }
+    }
+  }
+
+  // 7. Check query against known micro-neighborhoods as safety net
+  for (const loc of KNOWN_LOCALITIES) {
+    if (loc.pattern.test(target) || loc.pattern.test(decoded)) {
+      return { lat: loc.lat, lng: loc.lng };
     }
   }
 
   return null;
 };
+
+// Known micro-neighborhood coordinate index for immediate local precision
+const KNOWN_LOCALITIES = [
+  { pattern: /nandi hills|fit arc|above sbi/i, lat: 17.3153, lng: 78.5431 },
+  { pattern: /chaitanya hills|rd number 1|vinayaka mandapam/i, lat: 17.3131, lng: 78.5453 },
+  { pattern: /almasguda/i, lat: 17.3128, lng: 78.5450 },
+  { pattern: /meerpet/i, lat: 17.3195, lng: 78.5432 },
+  { pattern: /kothapet|maruthinagar|pratap nagar/i, lat: 17.3732, lng: 78.5386 },
+  { pattern: /dilsukhnagar/i, lat: 17.3685, lng: 78.5247 },
+  { pattern: /lb nagar/i, lat: 17.3457, lng: 78.5522 },
+  { pattern: /vanasthalipuram/i, lat: 17.3380, lng: 78.5720 },
+  { pattern: /badangpet/i, lat: 17.3140, lng: 78.5320 },
+  { pattern: /kurnool/i, lat: 15.8360, lng: 78.0240 },
+];
 
 module.exports = {
   googleForwardGeocode,
