@@ -816,8 +816,31 @@ const OwnerDashboard = () => {
       fd.append('hasEvCharger', user?.accountCategory === 'vehicle_storage_owner' ? false : spotForm.hasEvCharger);
       fd.append('hasCctv', spotForm.hasCctv);
       fd.append('isCovered', spotForm.isCovered);
-      fd.append('lat', spotForm.lat);
-      fd.append('lng', spotForm.lng);
+      let submitLat = spotForm.lat;
+      let submitLng = spotForm.lng;
+      if (!submitLat || !submitLng) {
+        const linkStr = spotForm.googleMapsLink || spotForm.address || '';
+        const dMatch = linkStr.match(/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/);
+        const atMatch = linkStr.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
+        const qMatch = linkStr.match(/[?&]q=(-?\d+\.\d+)(?:%2c|%2C|,)(-?\d+\.\d+)/i);
+        const rawCoords = linkStr.match(/(-?\d{1,2}\.\d{4,8})\s*[,/ ]\s*(-?\d{1,3}\.\d{4,8})/);
+        if (dMatch) {
+          submitLat = parseFloat(dMatch[1]);
+          submitLng = parseFloat(dMatch[2]);
+        } else if (atMatch) {
+          submitLat = parseFloat(atMatch[1]);
+          submitLng = parseFloat(atMatch[2]);
+        } else if (qMatch) {
+          submitLat = parseFloat(qMatch[1]);
+          submitLng = parseFloat(qMatch[2]);
+        } else if (rawCoords) {
+          submitLat = parseFloat(rawCoords[1]);
+          submitLng = parseFloat(rawCoords[2]);
+        }
+      }
+
+      fd.append('lat', submitLat !== null && submitLat !== undefined ? submitLat : '');
+      fd.append('lng', submitLng !== null && submitLng !== undefined ? submitLng : '');
       fd.append('pincode', spotForm.pincode || '500097');
       fd.append('googleMapsLink', spotForm.googleMapsLink || '');
       fd.append('locationLink', spotForm.googleMapsLink || '');

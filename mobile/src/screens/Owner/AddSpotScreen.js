@@ -913,6 +913,30 @@ export default function AddSpotScreen({ route, navigation }) {
       const url = editingSpot ? `${baseUrl}/spaces/${editingSpot._id}` : `${baseUrl}/spaces`;
       const method = editingSpot ? 'PUT' : 'POST';
 
+      // Fallback coordinate extraction from googleMapsLink or address
+      let finalLat = lat;
+      let finalLng = lng;
+      if (!finalLat || !finalLng) {
+        const linkStr = googleMapsLink || address || '';
+        const dMatch = linkStr.match(/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/);
+        const atMatch = linkStr.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
+        const qMatch = linkStr.match(/[?&]q=(-?\d+\.\d+)(?:%2c|%2C|,)(-?\d+\.\d+)/i);
+        const rawCoords = linkStr.match(/(-?\d{1,2}\.\d{4,8})\s*[,/ ]\s*(-?\d{1,3}\.\d{4,8})/);
+        if (dMatch) {
+          finalLat = parseFloat(dMatch[1]);
+          finalLng = parseFloat(dMatch[2]);
+        } else if (atMatch) {
+          finalLat = parseFloat(atMatch[1]);
+          finalLng = parseFloat(atMatch[2]);
+        } else if (qMatch) {
+          finalLat = parseFloat(qMatch[1]);
+          finalLng = parseFloat(qMatch[2]);
+        } else if (rawCoords) {
+          finalLat = parseFloat(rawCoords[1]);
+          finalLng = parseFloat(rawCoords[2]);
+        }
+      }
+
       const res = await fetch(url, {
         method,
         headers: {
@@ -926,8 +950,8 @@ export default function AddSpotScreen({ route, navigation }) {
           location: address,
           googleMapsLink,
           locationLink: googleMapsLink,
-          lat,
-          lng,
+          lat: finalLat,
+          lng: finalLng,
           image: spotImages[0] || spotImage || '',
           imageUrl: spotImages[0] || spotImage || '',
           images: spotImages,

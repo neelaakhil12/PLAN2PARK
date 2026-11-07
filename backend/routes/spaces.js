@@ -6,7 +6,11 @@ const fs = require('fs');
 const ParkingSpace = require('../models/ParkingSpace');
 const Booking = require('../models/Booking');
 const { protect, adminOnly, ownerOnly } = require('../middleware/auth');
-const { mapboxReverseGeocode, mapboxForwardSearch } = require('../utils/mapbox');
+const {
+  googleForwardGeocode,
+  googleReverseGeocode,
+  extractCoordsFromMapsInput,
+} = require('../utils/googleGeocode');
 
 // ─── Local Disk Storage Setup (Self-hosted on AWS Server) ──────────────────────
 const uploadsDir = path.join(__dirname, '../uploads');
@@ -65,7 +69,7 @@ const formatImageUrl = (req, file, fallbackUrl) => {
   return '';
 };
 
-// @desc    Parse Google Maps link to extract address, city, and coordinates
+// @desc    Parse Google Maps link to extract address, city, and coordinates using Google Geocoding API
 // @route   POST /api/spaces/parse-maps-link
 // @access  Public
 router.post('/parse-maps-link', async (req, res) => {
@@ -75,177 +79,93 @@ router.post('/parse-maps-link', async (req, res) => {
   }
 
   try {
-    // 1. Clean the incoming url string
-    let targetUrl = url.trim();
-    // Strip leading/trailing quotes or backticks if user copied them
-    targetUrl = targetUrl.replace(/^['"`\s]+|['"`\s]+$/g, '');
-    // Handle leading slashes (e.g. '/maps.google.com' or '//maps.google.com')
+    let targetUrl = url.trim().replace(/^['"`\s]+|['"`\s]+$/g, '');
     if (targetUrl.startsWith('//')) {
       targetUrl = 'https:' + targetUrl;
     } else if (targetUrl.startsWith('/')) {
       targetUrl = 'https:/' + targetUrl;
     } else if (!targetUrl.startsWith('http://') && !targetUrl.startsWith('https://')) {
-      targetUrl = 'https://' + targetUrl;
-    }
-
-    // Expand shortened URLs like maps.app.goo.gl
-    if (targetUrl.includes('goo.gl') || targetUrl.includes('maps.app.goo.gl')) {
-      try {
-        const response = await fetch(targetUrl, { redirect: 'follow' });
-        targetUrl = response.url || targetUrl;
-      } catch (e) {
-        console.error('Error expanding URL:', e);
+      // Check if raw coordinates entered
+      const rawMatch = targetUrl.match(/(-?\d{1,2}\.\d{4,8})\s*[,/ ]\s*(-?\d{1,3}\.\d{4,8})/);
+      if (!rawMatch) {
+        targetUrl = 'https://' + targetUrl;
       }
     }
 
-    // Decode URL for regex matching (decodes %2C -> , %20 -> space)
-    let decodedUrl = targetUrl;
-    try {
-      decodedUrl = decodeURIComponent(targetUrl);
-    } catch (e) {
-      decodedUrl = targetUrl;
-    }
+    // 1. Robust extraction of coordinates directly from link or text
+    let coords = await extractCoordsFromMapsInput(targetUrl);
+    let lat = coords ? coords.lat : null;
+    let lng = coords ? coords.lng : null;
 
-    let lat = null;
-    let lng = null;
-    let placeName = '';
-
-    // Check !3d(lat)!4d(lng) (common Google Maps desktop & mobile share URLs)
-    const dMatch = decodedUrl.match(/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/) || targetUrl.match(/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/);
-    if (dMatch) {
-      lat = parseFloat(dMatch[1]);
-      lng = parseFloat(dMatch[2]);
-    }
-
-    // Check @lat,lng
-    if (!lat) {
-      const atMatch = decodedUrl.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/) || targetUrl.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
-      if (atMatch) {
-        lat = parseFloat(atMatch[1]);
-        lng = parseFloat(atMatch[2]);
-      }
-    }
-
-    // Check q=lat,lng or ll=lat,lng (handles both decoded ',' and encoded '%2C'/'%2c')
-    if (!lat) {
-      const qMatch = decodedUrl.match(/[?&](?:q|ll)=(-?\d+\.\d+)\s*[,/]\s*(-?\d+\.\d+)/)
-        || targetUrl.match(/[?&](?:q|ll)=(-?\d+\.\d+)(?:%2c|%2C|,)(-?\d+\.\d+)/i);
-      if (qMatch) {
-        lat = parseFloat(qMatch[1]);
-        lng = parseFloat(qMatch[2]);
-      }
-    }
-
-    // Extract place name from /place/PlaceName/
-    const placeMatch = decodedUrl.match(/\/place\/([^/?#]+)/);
-    if (placeMatch) {
-      placeName = placeMatch[1].replace(/\+/g, ' ').trim();
-    }
-
-    // Extract search query if any and not coords
-    const searchMatch = decodedUrl.match(/[?&]q=([^&]+)/);
-    if (!placeName && searchMatch && !searchMatch[1].includes(',')) {
-      placeName = searchMatch[1].replace(/\+/g, ' ').trim();
-    }
-
-    let address = placeName || '';
+    let address = coords?.formattedAddress || '';
     let city = 'Hyderabad';
-    let pincode = '';
+    let pincode = '500097';
     let plotNo = '';
     let colonyArea = '';
-    let landmark = placeName || '';
+    let landmark = '';
 
-    // 1. Try Mapbox High-Precision Geocoding first if token is available
+    // 2. If coordinates found, Reverse Geocode with Google Geocoding API
     if (lat && lng) {
-      const mbRes = await mapboxReverseGeocode(lat, lng);
-      if (mbRes && mbRes.address) {
-        address = placeName ? `${placeName}, ${mbRes.address}` : mbRes.address;
-        city = mbRes.city || city;
-        plotNo = mbRes.plotNo || '';
-        colonyArea = mbRes.colonyArea || '';
-        if (mbRes.landmark) landmark = mbRes.landmark;
-        if (mbRes.pincode) pincode = mbRes.pincode;
-      } else {
-        // Fallback to Nominatim Reverse Geocoding
-        try {
-          const geoRes = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`,
-            { headers: { 'User-Agent': 'PlanToPark/1.0 (plantopark@gmail.com)' } }
-          );
-          const geoData = await geoRes.json();
-          if (geoData && geoData.display_name) {
-            const a = geoData.address || {};
-            const area = a.suburb || a.neighbourhood || a.residential || a.quarter || a.subdistrict || '';
-            city = a.city || a.town || a.village || a.county || 'Hyderabad';
-            if (a.house_number) plotNo = `Plot No. ${a.house_number}`;
-            if (area) colonyArea = area;
-            if (a.postcode) pincode = a.postcode;
-            address = placeName ? `${placeName}, ${area ? area + ', ' : ''}${city}` : geoData.display_name;
-          }
-        } catch (err) {
-          console.error('Reverse geocode error:', err);
+      const gRev = await googleReverseGeocode(lat, lng);
+      if (gRev) {
+        address = gRev.address || address;
+        city = gRev.city || city;
+        pincode = gRev.pincode || pincode;
+        plotNo = gRev.plotNo || '';
+        colonyArea = gRev.colonyArea || '';
+      }
+    }
+
+    // 3. If no coordinates yet, try to extract place name from URL and Forward Geocode with Google
+    if (!lat || !lng) {
+      let placeName = '';
+      const placeMatch = targetUrl.match(/\/place\/([^/?#]+)/);
+      if (placeMatch) {
+        placeName = decodeURIComponent(placeMatch[1]).replace(/\+/g, ' ').trim();
+      }
+      if (!placeName) {
+        const qMatch = targetUrl.match(/[?&]q=([^&]+)/);
+        if (qMatch) {
+          placeName = decodeURIComponent(qMatch[1]).replace(/\+/g, ' ').trim();
         }
       }
-    } else if (placeName) {
-      // Mapbox Forward Search
-      const mbSearch = await mapboxForwardSearch(placeName);
-      if (mbSearch && mbSearch.length > 0) {
-        address = mbSearch[0].address;
-        lat = mbSearch[0].lat;
-        lng = mbSearch[0].lng;
-        city = mbSearch[0].city || city;
-        if (mbSearch[0].pincode) pincode = mbSearch[0].pincode;
-      } else {
-        // Fallback to Nominatim Forward Search
-        try {
-          const geoRes = await fetch(
-            `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(placeName)}`,
-            { headers: { 'User-Agent': 'PlanToPark/1.0 (plantopark@gmail.com)' } }
-          );
-          const geoData = await geoRes.json();
-          if (geoData && geoData.length > 0) {
-            address = geoData[0].display_name;
-            lat = parseFloat(geoData[0].lat);
-            lng = parseFloat(geoData[0].lon);
-            if (geoData[0].address?.postcode) pincode = geoData[0].address.postcode;
-          }
-        } catch (err) {
-          console.error('Search geocode error:', err);
+
+      if (placeName) {
+        const gFwd = await googleForwardGeocode(placeName);
+        if (gFwd && gFwd.lat && gFwd.lng) {
+          lat = gFwd.lat;
+          lng = gFwd.lng;
+          address = gFwd.formattedAddress || placeName;
+          city = gFwd.city || city;
+          if (gFwd.pincode) pincode = gFwd.pincode;
         }
       }
     }
 
-    if (!plotNo) {
-      const plotMatch = (address || '').match(/(?:plot|h\.?no|door|flat|house)\s*(?:no\.?)?\s*([a-z0-9/A-Z-]+)/i);
+    // Extract plot number if not yet detected
+    if (!plotNo && address) {
+      const plotMatch = address.match(/(?:plot|h\.?no|door|flat|house)\s*(?:no\.?)?\s*([a-z0-9/A-Z-]+)/i);
       if (plotMatch) {
         plotNo = `Plot No. ${plotMatch[1]}`;
       }
     }
 
-    if (!colonyArea) {
-      const addrParts = (address || '').split(',').map(s => s.trim()).filter(Boolean);
+    // Extract colony area
+    if (!colonyArea && address) {
+      const addrParts = address.split(',').map((s) => s.trim()).filter(Boolean);
       if (addrParts.length > 1) {
         colonyArea = addrParts.slice(0, 2).join(', ');
-      } else {
-        colonyArea = placeName || 'Chaitanya Hills, BN Reddy Nagar';
       }
     }
 
-    // Extract 6-digit Indian PIN code if not already detected
+    // Extract 6-digit Indian PIN code
     if (!pincode && address) {
       const pinMatch = address.match(/\b(5\d{5})\b/) || address.match(/\b(\d{6})\b/);
       if (pinMatch) pincode = pinMatch[1];
     }
-    if (!pincode) pincode = '500097';
-
-    // Normalize city
-    const addrLower = (address || '').toLowerCase();
-    if (addrLower.includes('hyderabad')) city = 'Hyderabad';
-    else if (addrLower.includes('secunderabad')) city = 'Secunderabad';
-    else if (addrLower.includes('cyberabad')) city = 'Hyderabad';
 
     return res.json({
-      address: address || placeName || targetUrl,
+      address: address || targetUrl,
       city: city || 'Hyderabad',
       pincode: pincode || '500097',
       plotNo,
@@ -383,6 +303,32 @@ router.post('/', protect, ownerOnly, upload.any(), async (req, res) => {
       }
     }
 
+    // Robust coordinate resolution via Google Geocoding & Maps parsing
+    let finalLat = lat ? parseFloat(lat) : null;
+    let finalLng = lng ? parseFloat(lng) : null;
+
+    if (!finalLat || !finalLng || isNaN(finalLat) || isNaN(finalLng) || (finalLat === 17.385044 && finalLng === 78.486671)) {
+      if (finalMapsLink) {
+        const linkCoords = await extractCoordsFromMapsInput(finalMapsLink);
+        if (linkCoords && linkCoords.lat && linkCoords.lng) {
+          finalLat = linkCoords.lat;
+          finalLng = linkCoords.lng;
+        }
+      }
+      if (!finalLat || !finalLng) {
+        const geoCoords = await googleForwardGeocode(finalAddress);
+        if (geoCoords && geoCoords.lat && geoCoords.lng) {
+          finalLat = geoCoords.lat;
+          finalLng = geoCoords.lng;
+        }
+      }
+    }
+
+    if (!finalLat || !finalLng || isNaN(finalLat) || isNaN(finalLng)) {
+      finalLat = 17.313;
+      finalLng = 78.545;
+    }
+
     const space = new ParkingSpace({
       ownerId: req.user._id,
       title: title || (isCommercial ? `Secured ${acres} Acre Auto Stockyard` : finalAddress),
@@ -404,8 +350,8 @@ router.post('/', protect, ownerOnly, upload.any(), async (req, res) => {
       image: finalImageUrl,
       images: finalImages,
       coordinates: {
-        lat: lat ? parseFloat(lat) : 17.385044,
-        lng: lng ? parseFloat(lng) : 78.486671,
+        lat: finalLat,
+        lng: finalLng,
       },
       slots,
       suitableVehicles: suitableList,
@@ -766,6 +712,11 @@ router.put('/:id', protect, upload.any(), async (req, res) => {
     
     if (req.body.lat && req.body.lng) {
       space.coordinates = { lat: parseFloat(req.body.lat), lng: parseFloat(req.body.lng) };
+    } else if (req.body.googleMapsLink || req.body.locationLink) {
+      const linkCoords = await extractCoordsFromMapsInput(req.body.googleMapsLink || req.body.locationLink);
+      if (linkCoords && linkCoords.lat && linkCoords.lng) {
+        space.coordinates = { lat: linkCoords.lat, lng: linkCoords.lng };
+      }
     }
 
     const spotsCount = req.body.totalSlots !== undefined ? req.body.totalSlots : req.body.totalSpots;
