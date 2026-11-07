@@ -2,7 +2,11 @@
   "expo": {
     "name": "PlanToPark",
     "slug": "plantopark",
-    "scheme": ["plantopark", "plantopark-seeker", "plantopark-owner"],
+    "scheme": [
+      "plantopark",
+      "plantopark-seeker",
+      "plantopark-owner"
+    ],
     "version": "1.0.4",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -76,10 +80,10 @@
       "expo-font",
       "expo-web-browser"
     ],
-    "owner": "student222s-team",
+    "owner": "student222",
     "extra": {
       "eas": {
-        "projectId": "5fc623e2-9d4a-4da6-88d2-13d92ce53b24"
+        "projectId": "ad324aed-de05-42a9-9ff0-181eb91191dd"
       }
     }
   }
