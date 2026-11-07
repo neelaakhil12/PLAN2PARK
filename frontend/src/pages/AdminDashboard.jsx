@@ -4356,7 +4356,7 @@ const AdminDashboard = () => {
                                       <p className="text-slate-500 text-xs mt-1 line-clamp-2">{sp.address}</p>
                                       <div className="flex items-center gap-2 mt-2 flex-wrap">
                                         <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-800">
-                                          Capacity: {sp.totalSlots || 10} bays
+                                          Capacity: {sp.totalSlots || 10} spots
                                         </span>
                                         <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700">
                                           Available: {sp.availableSlots ?? sp.totalSlots}

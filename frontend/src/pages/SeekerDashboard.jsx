@@ -113,6 +113,7 @@ const SeekerDashboard = () => {
   const [payLoading, setPayLoading] = useState(false);
   const [walletBalance, setWalletBalance] = useState(0);
   const [walletTransactions, setWalletTransactions] = useState([]);
+  const [roadDistanceMap, setRoadDistanceMap] = useState({});
   const [useWallet, setUseWallet] = useState(true);
   const [showEditProfileModal, setShowEditProfileModal] = useState(false);
   const [showAddVehicleForm, setShowAddVehicleForm] = useState(false);
@@ -295,6 +296,16 @@ const SeekerDashboard = () => {
   useEffect(() => {
     let watchId;
     if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          if (!simulationActiveRef.current) {
+            setUserLat(pos.coords.latitude);
+            setUserLng(pos.coords.longitude);
+          }
+        },
+        (err) => console.log('Geolocation getCurrentPosition error:', err),
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      );
       watchId = navigator.geolocation.watchPosition(
         (pos) => {
           if (!simulationActiveRef.current) {
@@ -312,6 +323,48 @@ const SeekerDashboard = () => {
       }
     };
   }, []);
+
+  // Batch fetch Google road driving distances and duration like in the mobile app
+  useEffect(() => {
+    if (!spaces || spaces.length === 0 || !userLat || !userLng) return;
+
+    const destinations = spaces
+      .map(sp => {
+        const lat = sp.coordinates?.lat || sp.lat || (sp.location?.coordinates && sp.location.coordinates[1]);
+        const lng = sp.coordinates?.lng || sp.lng || (sp.location?.coordinates && sp.location.coordinates[0]);
+        const id = String(sp._id || sp.id || '');
+        return { id, lat: Number(lat), lng: Number(lng) };
+      })
+      .filter(d => !isNaN(d.lat) && !isNaN(d.lng) && d.lat !== 0 && d.lng !== 0);
+
+    if (destinations.length === 0) return;
+
+    let isMounted = true;
+    fetch(`${API_URL}/spaces/road-distances`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({
+        origin: { lat: userLat, lng: userLng },
+        destinations,
+      }),
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (isMounted && data?.success && data?.results) {
+          setRoadDistanceMap(prev => ({ ...prev, ...data.results }));
+        }
+      })
+      .catch(err => {
+        console.warn('Failed to fetch road distances from backend:', err);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [spaces, userLat, userLng, token, API_URL]);
 
   // Simulation Loop Hook
   useEffect(() => {
@@ -1060,8 +1113,8 @@ const SeekerDashboard = () => {
   const pastBookings = bookings.filter(b => ['completed', 'cancelled'].includes(b.status));
   const totalSpent = analytics?.totalSpent || 0;
 
-  // Geocoding distance calculation helper (Haversine Formula)
-  const calculateDistanceKm = (lat1, lon1, lat2, lon2) => {
+  // Geocoding straight distance calculation helper (Haversine Formula)
+  const calculateAirDistanceKm = (lat1, lon1, lat2, lon2) => {
     if (!lat1 || !lon1 || !lat2 || !lon2) return null;
     const R = 6371; // Earth radius in KM
     const dLat = ((lat2 - lat1) * Math.PI) / 180;
@@ -1077,16 +1130,50 @@ const SeekerDashboard = () => {
     return dist < 0.1 ? 0.1 : Math.round(dist * 10) / 10;
   };
 
+  // Realistic estimated road distance in KM (~1.18x air distance in urban city environments)
+  const calculateEstimatedRoadKm = (lat1, lon1, lat2, lon2) => {
+    const air = calculateAirDistanceKm(lat1, lon1, lat2, lon2);
+    if (air === null) return null;
+    if (air < 0.5) return air;
+    const estRoad = air * 1.18;
+    return Math.round(estRoad * 10) / 10;
+  };
+
+  const getEstimatedDurationText = (distanceKm) => {
+    if (distanceKm === null || distanceKm === undefined) return '';
+    const mins = Math.max(1, Math.round((distanceKm / 25) * 60));
+    return mins >= 60 ? `${Math.floor(mins / 60)} hr ${mins % 60} mins` : `${mins} min${mins > 1 ? 's' : ''}`;
+  };
+
   // Dynamically filtered spaces based on search, EV filter, radius, and distance
   const displaySpaces = spaces
     .map(space => {
-      const sLat = space.coordinates?.lat || space.lat;
-      const sLng = space.coordinates?.lng || space.lng;
-      const dist = calculateDistanceKm(userLat || 17.313, userLng || 78.545, sLat, sLng);
+      const sId = String(space._id || space.id || '');
+      const sLat = space.coordinates?.lat || space.lat || (space.location?.coordinates && space.location.coordinates[1]);
+      const sLng = space.coordinates?.lng || space.lng || (space.location?.coordinates && space.location.coordinates[0]);
+
+      const roadInfo = roadDistanceMap[sId];
+      let dist = null;
+      let distBadge = 'Nearby';
+
+      if (roadInfo && roadInfo.roadDistanceKm !== undefined) {
+        dist = roadInfo.roadDistanceKm;
+        const durationTxt = roadInfo.roadDurationText ? ` (${roadInfo.roadDurationText})` : '';
+        distBadge = `${roadInfo.roadDistanceText || `${dist} km`}${durationTxt}`;
+      } else {
+        dist = calculateEstimatedRoadKm(userLat || 17.313, userLng || 78.545, sLat, sLng);
+        if (dist !== null) {
+          const estDuration = getEstimatedDurationText(dist);
+          distBadge = `${dist} km (${estDuration})`;
+        } else {
+          distBadge = 'Nearby';
+        }
+      }
+
       return {
         ...space,
         calculatedDist: dist !== null ? dist : 999,
-        distBadge: dist !== null ? `${dist} km away` : 'Nearby',
+        distBadge,
       };
     })
     .sort((a, b) => (a.calculatedDist || 999) - (b.calculatedDist || 999))
@@ -1227,7 +1314,7 @@ const SeekerDashboard = () => {
                             ₹{selectedSpace.monthlyStorageRate || 2500}<span className="text-xs font-bold text-slate-400">/car/mo</span>
                           </p>
                           <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-800 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full mt-1 border border-amber-200">
-                            🟢 {bookingAvailableSlots.filter(s => s.isAvailable).length} of {bookingAvailableSlots.length || selectedSpace.totalSlots || 5} Repo Bays Free
+                            🟢 {bookingAvailableSlots.filter(s => s.isAvailable).length} of {bookingAvailableSlots.length || selectedSpace.totalSlots || 5} Repo Spots Free
                           </span>
                         </>
                       ) : (
@@ -2068,7 +2155,7 @@ const SeekerDashboard = () => {
                                   {/* Pills Row (Matching Mobile App 1:1) */}
                                   <div className="flex items-center gap-2 pt-3 flex-wrap">
                                     <span className="bg-emerald-50 border border-emerald-200 text-emerald-700 font-black text-[11px] px-2.5 py-1 rounded-xl flex items-center gap-1">
-                                      🎯 {space.calculatedDist} km away
+                                      🎯 {space.distBadge || `${space.calculatedDist} km`}
                                     </span>
                                     <span className="bg-slate-100 text-slate-600 font-bold text-[11px] px-2.5 py-1 rounded-xl">
                                       🚗 4-wheeler
@@ -2094,7 +2181,7 @@ const SeekerDashboard = () => {
                                   {isStorage ? 'Repossession Capacity' : 'Real-Time Capacity'}
                                 </p>
                                 <p className={`text-xs font-black mt-0.5 ${!isFull ? 'text-emerald-600' : 'text-rose-600'}`}>
-                                  {!isFull ? `🟢 ${freeSlots} of ${space.totalSlots || 5} Bays Free` : '🚫 Full'}
+                                  {!isFull ? `🟢 ${freeSlots} of ${space.totalSlots || 5} Spots Free` : '🚫 Full'}
                                 </p>
                               </div>
 
@@ -2114,7 +2201,7 @@ const SeekerDashboard = () => {
                                     : 'bg-slate-100 text-slate-400 cursor-not-allowed'
                                 }`}
                               >
-                                {!isFull ? (isStorage ? 'Reserve Yard Bay →' : 'Book Spot →') : 'Full'}
+                                {!isFull ? (isStorage ? 'Reserve Yard Spot →' : 'Book Spot →') : 'Full'}
                               </button>
                             </div>
                           </div>
@@ -2901,7 +2988,7 @@ const SeekerDashboard = () => {
                                       : 'bg-slate-100 text-slate-400 cursor-not-allowed'
                                   }`}
                                 >
-                                  {freeSlots > 0 ? (isStorage ? 'Reserve Bay →' : 'Book Now →') : 'Full'}
+                                  {freeSlots > 0 ? (isStorage ? 'Reserve Spot →' : 'Book Now →') : 'Full'}
                                 </button>
                               </div>
                             </div>
