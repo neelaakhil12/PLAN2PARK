@@ -2,7 +2,7 @@
   "expo": {
     "name": "PlanToPark",
     "slug": "plantopark",
-    "scheme": "plantopark",
+    "scheme": ["plantopark", "plantopark-seeker", "plantopark-owner"],
     "version": "1.0.4",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -24,7 +24,7 @@
         "backgroundColor": "#0f172a"
       },
       "package": "com.plantopark.seeker",
-      "versionCode": 13,
+      "versionCode": 14,
       "permissions": [
         "android.permission.ACCESS_FINE_LOCATION",
         "android.permission.ACCESS_COARSE_LOCATION",

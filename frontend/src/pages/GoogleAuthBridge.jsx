@@ -21,9 +21,11 @@ export default function GoogleAuthBridge() {
       const state = hashParams.get('state') || searchParams.get('state') || '';
 
       // Determine destination scheme based on state parameter
-      let scheme = 'plantopark-seeker';
+      let scheme = 'plantopark';
       if (state.toLowerCase().includes('owner')) {
         scheme = 'plantopark-owner';
+      } else if (state.toLowerCase().includes('seeker')) {
+        scheme = 'plantopark-seeker';
       }
 
       // Construct native deep link back into the app
