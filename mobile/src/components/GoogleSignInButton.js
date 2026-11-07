@@ -6,43 +6,15 @@ import {
   ActivityIndicator,
   View,
   Alert,
-  Linking,
-  Platform,
 } from 'react-native';
 import {
   GoogleSignin,
   statusCodes,
 } from '@react-native-google-signin/google-signin';
-import * as WebBrowser from 'expo-web-browser';
 
 const GOOGLE_WEB_CLIENT_ID =
   process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID ||
   '908977180-dkg2d8h9109b4tvsnaf51scbmi4l09or.apps.googleusercontent.com';
-
-const BRIDGE_REDIRECT_URI = 'https://plantopark.com/google-auth-bridge';
-
-function extractTokenFromUrl(url) {
-  if (!url) return null;
-  try {
-    const queryIdx = url.indexOf('?');
-    if (queryIdx !== -1) {
-      const qs = url.substring(queryIdx + 1).split('#')[0];
-      const params = new URLSearchParams(qs);
-      const token = params.get('id_token') || params.get('access_token');
-      if (token) return token;
-    }
-    const hashIdx = url.indexOf('#');
-    if (hashIdx !== -1) {
-      const hs = url.substring(hashIdx + 1);
-      const params = new URLSearchParams(hs);
-      const token = params.get('id_token') || params.get('access_token');
-      if (token) return token;
-    }
-  } catch (e) {
-    console.warn('Error extracting token from URL:', e);
-  }
-  return null;
-}
 
 class GoogleErrorBoundary extends React.Component {
   state = { hasError: false };
@@ -73,64 +45,7 @@ function GoogleSignInButtonInner({ onAuthSuccess, text = 'Sign in with Google', 
     } catch (e) {
       console.warn('GoogleSignin configure error:', e);
     }
-
-    const handleDeepLink = (event) => {
-      if (event?.url && (event.url.includes('google-auth') || event.url.includes('id_token') || event.url.includes('access_token'))) {
-        try {
-          WebBrowser.dismissBrowser();
-        } catch (e) {}
-        const token = extractTokenFromUrl(event.url);
-        if (token) {
-          onAuthSuccess(token);
-        }
-      }
-    };
-
-    const sub = Linking.addEventListener('url', handleDeepLink);
-    Linking.getInitialURL().then((initialUrl) => {
-      if (initialUrl && (initialUrl.includes('google-auth') || initialUrl.includes('id_token') || initialUrl.includes('access_token'))) {
-        const token = extractTokenFromUrl(initialUrl);
-        if (token) {
-          onAuthSuccess(token);
-        }
-      }
-    }).catch(() => {});
-
-    return () => {
-      sub.remove();
-    };
-  }, [onAuthSuccess]);
-
-  const runBrowserAuthFallback = async () => {
-    try {
-      setLoading(true);
-      const isOwner = text.toLowerCase().includes('owner');
-      const stateParam = isOwner ? 'plantopark-owner' : 'plantopark-seeker';
-      const authUrl =
-        `https://accounts.google.com/o/oauth2/v2/auth` +
-        `?client_id=${encodeURIComponent(GOOGLE_WEB_CLIENT_ID)}` +
-        `&redirect_uri=${encodeURIComponent(BRIDGE_REDIRECT_URI)}` +
-        `&response_type=token%20id_token` +
-        `&scope=${encodeURIComponent('openid email profile')}` +
-        `&nonce=${Date.now()}` +
-        `&prompt=select_account` +
-        `&state=${encodeURIComponent(stateParam)}`;
-
-      const result = await WebBrowser.openAuthSessionAsync(authUrl, `${stateParam}://`);
-      if (result.type === 'success' && result.url) {
-        const token = extractTokenFromUrl(result.url);
-        if (token) {
-          onAuthSuccess(token);
-          return;
-        }
-      }
-    } catch (browserErr) {
-      console.warn('Browser Google sign-in fallback error:', browserErr);
-      Alert.alert('Google Sign-In', 'Could not complete Google authentication. Please try with Email and Password.');
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, []);
 
   const handlePress = async () => {
     try {
@@ -149,18 +64,18 @@ function GoogleSignInButtonInner({ onAuthSuccess, text = 'Sign in with Google', 
       if (token) {
         onAuthSuccess(token);
       } else {
-        // Fallback to browser if no token
-        await runBrowserAuthFallback();
+        Alert.alert('Google Sign-In', 'Could not obtain Google authentication token.');
       }
     } catch (error) {
       if (error.code === statusCodes.SIGN_IN_CANCELLED) {
         // User cancelled, do nothing
       } else if (error.code === statusCodes.IN_PROGRESS) {
         // Operation already in progress
+      } else if (error.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
+        Alert.alert('Google Play Services', 'Google Play Services is not available or outdated on this device.');
       } else {
-        console.log('Google native sign-in encountered an issue, launching secure in-app browser login:', error.message || error);
-        // Automatically fallback to browser authentication without blocking user with error popup
-        await runBrowserAuthFallback();
+        console.warn('Google native sign-in error:', error);
+        Alert.alert('Google Sign-In Failed', error.message || 'Failed to sign in with Google');
       }
     } finally {
       setLoading(false);
